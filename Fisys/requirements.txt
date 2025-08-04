@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+qrcode
+pillow
+python-multipart
+netifaces
+requests

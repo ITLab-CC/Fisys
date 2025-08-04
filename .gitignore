@@ -10,7 +10,7 @@ __pycache__/
 
 .DS_Store
 filamente.db
-*.txt
+log.txt
 
 # Distribution / packaging
 .Python
