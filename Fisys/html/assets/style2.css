@@ -1,0 +1,194 @@
+/* Base page and logo styling */
+body {
+  margin: 0;
+  background-color: #121212e5;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.logo {
+  position: fixed;
+  top: 0em;
+  left: 2em;
+  z-index: 1000;
+}
+.logo img {
+  height: 100px;
+  width: auto;
+}
+
+/* CSS für Spulendetailseite */
+
+/* Titel */
+h1.spulentitel {
+  text-align: center;
+  font-size: 2rem;
+  margin-bottom: 1.5em;
+}
+
+/* Container */
+.container {
+  max-width: 960px;
+  margin: auto;
+  padding: 2em;
+  min-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Spulendetails-Block */
+.spule-details {
+  background-color: #2a2a2a;
+  padding: 3em;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 3em;
+  align-items: center;
+  margin: 0 auto;
+}
+
+/* Bild */
+.spule-details img {
+  width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* Informationen */
+.spule-details .infos p {
+  margin: 0.75em 0;
+  font-size: 1.3rem;
+  color: white;
+}
+
+/* Label-Bereich */
+.spule-details .infos p span:first-child {
+  font-weight: bold;
+  display: inline-block;
+  width: 160px;
+  margin-right: 0.5em;
+}
+
+/* Abstand zwischen Label und Wert */
+.spule-details .infos p span:nth-child(2) {
+  margin-left: 0.5em;
+}
+
+/* Button */
+#zur-typseite {
+  display: block;
+  margin: 3em auto 0 auto;
+  padding: 1em 2em;
+  background-color: #5a5a5a;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1rem;
+  text-align: center;
+  white-space: normal;
+  width: auto;
+  max-width: 400px;
+}
+
+#zur-typseite:hover {
+  background-color: #777;
+}
+
+/* Füllstandsanzeige auf der Spulendetailseite */
+
+
+/* Füllstand innerhalb des Bildbereichs */
+.spulenbild {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.7);
+  border-radius: 10px;
+}
+.restmenge-bar-wrapper {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  box-sizing: border-box;
+  height: 2em;
+  background-color: rgba(255,255,255,0.2);
+  border: 6px solid #2a2a2a;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.restmenge-bar {
+  width: 100%; /* will be set by JS */
+  height: 100%;
+  background-color: limegreen;
+  border-radius: 2px;
+}
+
+
+.qrcode-download {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 1000;
+  background-color: #444;
+  padding: 8px 12px;
+  border-radius: 6px;
+  box-shadow: 0 0 5px rgba(0,0,0,0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.qrcode-download:hover {
+  background-color: #333;
+}
+
+.qrcode-download a {
+  color: #fff;
+  text-decoration: none;
+  font-weight: normal;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.qrcode-download svg {
+  fill: white;
+  vertical-align: middle;
+}
+
+.qrcode-download img {
+  width: 20px;
+  height: 20px;
+  filter: invert(1);
+}
+
+/* Rahmenfarben für erkannte Farben */
+.border-blau { border: 3px solid rgba(0, 0, 255, 0.5); }
+.border-rot { border: 3px solid rgba(255, 0, 0, 0.5); }
+.border-grau { border: 3px solid rgba(128, 128, 128, 0.5); }
+.border-magenta { border: 3px solid rgba(255, 0, 255, 0.5); }
+.border-pink { border: 3px solid rgba(255, 192, 203, 0.5); }
+.border-cyan { border: 3px solid rgba(0, 255, 255, 0.5); }
+.border-birke { border: 3px solid rgba(222, 184, 135, 0.5); }
+.border-gelb { border: 3px solid rgba(255, 255, 0, 0.5); }
+.border-schwarz { border: 3px solid rgba(0, 0, 0, 0.5); }
+.border-weiß { border: 3px solid rgba(255, 255, 255, 0.5); }
+
+/* Zusätzliche Rahmenfarben */
+.border-grün { border: 3px solid rgba(0, 128, 0, 0.5); }
+.border-orange { border: 3px solid rgba(255, 165, 0, 0.5); }
+.border-violett { border: 3px solid rgba(138, 43, 226, 0.5); }
+.border-silber { border: 3px solid rgba(192, 192, 192, 0.5); }
+.border-gold { border: 3px solid rgba(255, 215, 0, 0.5); }
+.border-kupfer { border: 3px solid rgba(184, 115, 51, 0.5); }
+.border-transparent { border: 3px solid rgba(255, 255, 255, 0.2); }
+.border-natur { border: 3px solid rgba(245, 245, 220, 0.5); }
+.border-braun { border: 3px solid rgba(139, 69, 19, 0.5); }
