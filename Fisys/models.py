@@ -1,7 +1,8 @@
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Integer, String, Float, Text, ForeignKey, Boolean
+from sqlalchemy import Integer, String, Float, Text, ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from datetime import datetime
 
 class Base(DeclarativeBase):
     pass
@@ -30,6 +31,8 @@ class FilamentSpule(Base):
     restmenge: Mapped[float] = mapped_column(Float, nullable=False)
     in_printer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verpackt: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     typ: Mapped["FilamentTyp"] = relationship("FilamentTyp", back_populates="spulen")
 

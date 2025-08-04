@@ -18,7 +18,31 @@ async def lifespan(app: FastAPI):
     init_db()
     yield
 
+
 app = FastAPI(lifespan=lifespan)
+
+# --- WebSocket Dashboard Support ---
+from fastapi import WebSocket, WebSocketDisconnect
+import asyncio
+
+dashboard_connections: list[WebSocket] = []
+
+@app.websocket("/ws/dashboard")
+async def websocket_dashboard(ws: WebSocket):
+    await ws.accept()
+    dashboard_connections.append(ws)
+    try:
+        while True:
+            await asyncio.sleep(10)  # Verbindung offen halten
+    except WebSocketDisconnect:
+        dashboard_connections.remove(ws)
+
+async def notify_dashboard(data: dict):
+    for conn in dashboard_connections:
+        try:
+            await conn.send_json(data)
+        except Exception:
+            pass
 
 # Statische Dateien (HTML, CSS, JS)
 static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "html"))
@@ -32,6 +56,16 @@ def serve_index():
 @app.get("/filamentseite", response_class=FileResponse)
 def serve_filament_page():
     return os.path.join(static_dir, "filamentseite.html")
+
+# Serve filamentseite.html directly at /filamentseite.html
+@app.get("/filamentseite.html", response_class=FileResponse)
+def serve_filamentseite_html():
+    return os.path.join(static_dir, "filamentseite.html")
+
+# Serve spulen.html directly at /spulen.html
+@app.get("/spulen.html", response_class=FileResponse)
+def serve_spulen_page():
+    return os.path.join(static_dir, "spulen.html")
 
 # Helper functions
 def get_or_create_filament_typ(session, name, material, farbe, durchmesser, hersteller=None, leergewicht: int = 0):
@@ -150,6 +184,24 @@ def get_db():
 def read_typs(db: Session = Depends(get_db)):
     return db.query(FilamentTyp).all()
 
+# --- POST-Endpunkt zum Erstellen eines neuen Typs ---
+@app.post("/typs/")
+def create_typ(typ: FilamentTypBase, db: Session = Depends(get_db)):
+    neuer_typ = FilamentTyp(
+        name=typ.name,
+        material=typ.material,
+        farbe=typ.farbe,
+        durchmesser=typ.durchmesser,
+        hersteller=typ.hersteller,
+        hinweise=getattr(typ, 'hinweise', None),
+        bildname=getattr(typ, 'bildname', 'platzhalter.jpg'),
+        leergewicht=typ.leergewicht
+    )
+    db.add(neuer_typ)
+    db.commit()
+    db.refresh(neuer_typ)
+    return neuer_typ
+
 @app.get("/typs/{typ_id}", response_model=FilamentTypWithSpulen)
 def read_typ(typ_id: int, db: Session = Depends(get_db)):
     typ = db.get(FilamentTyp, typ_id)
@@ -191,7 +243,7 @@ def delete_typ(typ_id: int, db: Session = Depends(get_db)):
     return {"detail": f"Typ {typ_id} wurde gelöscht"}
 
 @app.post("/spulen/", response_model=FilamentSpuleRead)
-def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)):
+async def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)):
     typ = get_or_create_filament_typ(
         db,
         name=spule.name,
@@ -206,12 +258,6 @@ def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)):
         # Nur Typ wurde erstellt/zurückgegeben
         return JSONResponse({"detail": f"Nur Typ '{typ.name}' wurde erstellt oder verwendet"}, status_code=201)
 
-    # Alle Spulen mit Gewichten, die über das Webformular kommen, werden automatisch als verpackt markiert
-
-    # Ergänzung: Prüfe, ob spule.verpackt gesetzt ist (wenn nicht: echte Spule)
-    # Bei echten Spulen: Suche nach passender verpackter Spule und überschreibe ggf.
-    # spule.verpackt ist bei FilamentSpuleCreate nicht im Schema, aber wir nehmen an, dass sie nicht gesetzt ist für echte Spulen.
-    # Wenn das Attribut existiert und ist False, oder existiert nicht (default = echte Spule)
     is_verpackt = getattr(spule, "verpackt", None)
     if not is_verpackt:
         match = db.query(FilamentSpule).join(FilamentTyp).filter(
@@ -248,6 +294,8 @@ def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(new_spule)
     generate_qrcode_for_spule(new_spule)
+    # WebSocket-Dashboard-Benachrichtigung
+    await notify_dashboard({"event": "spule_created", "spule_id": new_spule.spulen_id})
     return FilamentSpuleRead.model_validate(new_spule)
 
 @app.get("/spulen/", response_model=List[FilamentSpuleRead])
@@ -307,6 +355,14 @@ def patch_spule(spulen_id: int, update: SpuleUpdate, db: Session = Depends(get_d
         spule.gesamtmenge = update.gesamtmenge
     db.commit()
     db.refresh(spule)
+    # WebSocket-Dashboard-Benachrichtigung
+    import asyncio
+    asyncio.create_task(notify_dashboard({
+        "event": "spule_updated",
+        "spule_id": spule.spulen_id,
+        "restmenge": spule.restmenge,
+        "gesamtmenge": spule.gesamtmenge
+    }))
     return spule
 
 @app.delete("/spulen/{spulen_id}")
@@ -317,6 +373,9 @@ def delete_spule_api(spulen_id: int, db: Session = Depends(get_db)):
     delete_qrcode_for_spule(spule)
     db.delete(spule)
     db.commit()
+    # WebSocket-Dashboard-Benachrichtigung
+    import asyncio
+    asyncio.create_task(notify_dashboard({"event": "spule_deleted", "spule_id": spulen_id}))
     return {"detail": f"Spule {spulen_id} wurde gelöscht"}
 
 
@@ -618,12 +677,66 @@ def serve_status_page():
         raise HTTPException(status_code=404, detail="Seite nicht gefunden")
     return path
 
+
 # Neuer API-Endpunkt: Statistik für Typen und Spulen
 @app.get("/stats", response_class=JSONResponse)
 def get_typ_and_spulen_stats(db: Session = Depends(get_db)):
     typ_count = db.query(FilamentTyp).count()
     spulen_count = db.query(FilamentSpule).count()
     return {"typen": typ_count, "spulen": spulen_count}
+
+
+# API-Endpoint: Dashboard-Daten
+@app.get("/api/dashboard-details")
+def get_dashboard_details(db: Session = Depends(get_db)):
+    typ_count = db.query(FilamentTyp).count()
+    spulen_count = db.query(FilamentSpule).count()
+
+    fastleere_typen = 0
+    typen = db.query(FilamentTyp).all()
+    for typ in typen:
+        spulen = typ.spulen
+        if not spulen or sum(s.restmenge for s in spulen) < 800:
+            fastleere_typen += 1
+
+    from datetime import datetime, timedelta
+    eine_woche = datetime.utcnow() - timedelta(days=7)
+    verbraucht_letzte_woche = (
+        db.query(FilamentSpule)
+        .filter(FilamentSpule.updated_at != None)
+        .filter(FilamentSpule.updated_at > eine_woche)
+        .all()
+    )
+    gesamtverbrauch = sum(
+        max(0, s.gesamtmenge - s.restmenge)
+        for s in verbraucht_letzte_woche
+        if s.gesamtmenge and s.restmenge
+    )
+
+    letzte_spulen = (
+        db.query(FilamentSpule)
+        .order_by(FilamentSpule.created_at.desc())
+        .limit(3)
+        .all()
+    )
+    spulen_liste = [{
+        "spulen_id": s.spulen_id,
+        "typ_name": s.typ.name,
+        "farbe": s.typ.farbe,
+        "material": s.typ.material,
+        "alt_gewicht": s.gesamtmenge,
+        "neu_gewicht": s.restmenge,
+        "created_at": s.created_at,
+        "updated_at": s.updated_at,
+    } for s in letzte_spulen]
+
+    return {
+        "typen": typ_count,
+        "spulen": spulen_count,
+        "fastleer": fastleere_typen,
+        "verbrauch_7tage": gesamtverbrauch,
+        "letzte_spulen": spulen_liste
+    }
 
 
 
@@ -719,4 +832,4 @@ if __name__ == "__main__":
     for ip in all_ips:
         print(f"➡️  http://{ip}:8000")
 
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Filamenttyp – Fisys</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen flex bg-gray-50">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between">
+    <div>
+      <div class="pt-1 pb-1">
+        <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto">
+      </div>
+      <nav class="px-4 space-y-2">
+        <a href="/" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Dashboard</a>
+        <a href="/spulen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Spulen</a>
+        <a href="/filamentseite.html" class="block px-4 py-2 rounded bg-gray-800 font-semibold text-white">Filamenttypen</a>
+        <hr class="my-2 border-gray-700" />
+        <a href="/status" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Status</a>
+      </nav>
+    </div>
+    <div class="mt-auto">
+      <div class="px-4 pb-2">
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      </div>
+      <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <div class="flex-1 flex flex-col">
+    <header class="bg-gray-50 px-10 py-10">
+      <h1 class="text-3xl font-bold">Filamenttypen</h1>
+      <p class="text-sm text-gray-500 mt-1">Alle verfügbaren Typen im Überblick</p>
+    </header>
+
+    <section class="flex-1 p-10">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <input
+          type="text"
+          id="suchfeld"
+          placeholder="Filamenttyp suchen..."
+          class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded shadow-sm text-sm focus:outline-none focus:ring focus:border-blue-300"
+        />
+        <div class="flex gap-2">
+          <button class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">+ Typ hinzufügen</button>
+          <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">+ Spule hinzufügen</button>
+        </div>
+      </div>
+      <!-- Modal Spule hinzufügen -->
+      <div id="modal-spule" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg w-full max-w-md p-6 overflow-auto max-h-[90vh]">
+          <h2 class="text-xl font-bold mb-4">Neue Spule hinzufügen</h2>
+          <form id="modal-spule-form" class="space-y-4">
+            <div>
+              <label for="spule-typ" class="block font-medium mb-1">Filamenttyp <span class="text-red-500">*</span></label>
+              <div class="relative">
+                <button id="dropdown-button" type="button" class="w-full bg-white border border-gray-300 rounded px-3 py-2 text-left focus:outline-none focus:ring focus:border-blue-500 flex justify-between items-center">
+                  <span id="dropdown-selected">Bitte wählen</span>
+                  <svg class="w-4 h-4 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <ul id="dropdown-list" class="absolute z-10 hidden w-full bg-white border border-gray-300 rounded mt-1 max-h-48 overflow-auto shadow-lg"></ul>
+              </div>
+              <input type="hidden" id="spule-typ" name="spule-typ" required />
+            </div>
+            <div>
+              <label for="gesamtmenge" class="block font-medium mb-1">Gesamtmenge (g) <span class="text-red-500">*</span></label>
+              <input type="number" id="gesamtmenge" name="gesamtmenge" min="1" step="1" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+            </div>
+            <div class="flex justify-end gap-2 pt-4">
+              <button type="button" id="modal-spule-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
+              <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Speichern</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div id="spulen-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+    </section>
+  </div>
+
+  <script>
+// Stelle sicher, dass das Modal für "+ Spule hinzufügen" zuverlässig geöffnet wird
+window.addEventListener("DOMContentLoaded", () => {
+  // Für Typenmodal Abbrechen-Button
+  const cancelTypBtn = document.getElementById("modal-cancel");
+  const modalTyp = document.getElementById("modal");
+  if (cancelTypBtn && modalTyp) {
+    cancelTypBtn.addEventListener("click", () => {
+      modalTyp.classList.add("hidden");
+    });
+  }
+
+  async function loadTypen() {
+    const res = await fetch("/typs/");
+    const typen = await res.json();
+
+    const container = document.getElementById("spulen-container");
+    container.innerHTML = "";
+
+    typen.forEach(typ => {
+      const el = document.createElement("div");
+      el.innerHTML = `
+        <div class="bg-white rounded-lg shadow-md py-6 px-4 flex items-center gap-4 text-sm relative max-w-lg mr-6">
+          <div class="relative flex items-center gap-4">
+            <img src="/static/assets/images/${typ.bildname || 'platzhalter.jpg'}" alt="Vorschau" class="w-18 h-24 object-cover rounded" />
+            <div class="flex flex-col flex-1 h-full">
+              <span class="absolute top-2 right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
+                ${typ.spulen.length}
+              </span>
+              <h2 class="text-lg font-semibold mb-1">${typ.name}</h2>
+              <div class="flex flex-wrap gap-3 text-gray-600 text-xs">
+                <span><strong>Material:</strong> ${typ.material}</span>
+                <span><strong>Farbe:</strong> ${typ.farbe}</span>
+                <span><strong>Durchmesser:</strong> ${typ.durchmesser} mm</span>
+                <span><strong>Hersteller:</strong> ${typ.hersteller || '–'}</span>
+                <span><strong>Leergewicht:</strong> ${typ.leergewicht ?? 0} g</span>
+              </div>
+              ${typ.hinweise ? `<p class="text-gray-500 text-xs italic mt-2">${typ.hinweise}</p>` : ''}
+              <div class="mt-auto">
+                <a href="/typ/${typ.id}" class="mt-3 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium">
+                  Spulen ansehen
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      container.appendChild(el);
+    });
+
+    const modal = document.getElementById("modal");
+    const form = document.getElementById("modal-form");
+    const addTypBtn = document.querySelector('button.bg-green-600');
+    const cancelBtn = document.getElementById("modal-cancel");
+
+    addTypBtn.addEventListener("click", () => {
+      modal.classList.remove("hidden");
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(form);
+      const data = {
+        name: formData.get("name"),
+        material: formData.get("material"),
+        farbe: formData.get("farbe"),
+        durchmesser: parseFloat(formData.get("durchmesser")),
+        hersteller: formData.get("hersteller") || null,
+        hinweise: formData.get("hinweise") || null,
+        bildname: "platzhalter.jpg",
+        leergewicht: parseFloat(formData.get("leergewicht")) || 0
+      };
+
+      const response = await fetch("/typs/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (response.ok) {
+        modal.classList.add("hidden");
+        form.reset();
+        loadTypen();
+      } else {
+        alert("Fehler beim Hinzufügen");
+      }
+    });
+  }
+
+  // --- Modal "+ Spule hinzufügen" mit Dropdown ---
+  const modalSpule = document.getElementById("modal-spule");
+  const formSpule = document.getElementById("modal-spule-form");
+  const addSpuleBtn = document.querySelector('button.bg-blue-600'); // Der blaue Button neben Typ hinzufügen
+  const cancelSpuleBtn = document.getElementById("modal-spule-cancel");
+
+  const dropdownButton = document.getElementById("dropdown-button");
+  const dropdownList = document.getElementById("dropdown-list");
+  const dropdownSelected = document.getElementById("dropdown-selected");
+  const hiddenSelect = document.getElementById("spule-typ");
+
+  // Toggle dropdown visibility
+  dropdownButton.addEventListener("click", () => {
+    dropdownList.classList.toggle("hidden");
+  });
+
+  // Close dropdown on outside click
+  document.addEventListener("click", (e) => {
+    if (!dropdownButton.contains(e.target) && !dropdownList.contains(e.target)) {
+      dropdownList.classList.add("hidden");
+    }
+  });
+
+  // Typen werden global zwischengespeichert
+  let typenCache = [];
+
+  // Populate dropdown with types, cache sie in typenCache
+  async function loadTypenDropdown() {
+    const res = await fetch("/typs/");
+    typenCache = await res.json();
+
+    dropdownList.innerHTML = "";
+    typenCache.forEach(typ => {
+      const li = document.createElement("li");
+      li.className = "px-3 py-2 hover:bg-blue-100 cursor-pointer";
+      li.innerHTML = `
+        <div class="font-semibold">${typ.name}</div>
+        <div class="text-xs text-gray-500">${typ.material}, ${typ.farbe}, ${typ.durchmesser} mm</div>
+      `;
+      li.addEventListener("click", () => {
+        dropdownSelected.innerHTML = `
+          <div class="flex flex-col text-xs leading-tight">
+            <span class="font-semibold">${typ.name}</span>
+            <span>${typ.material}, ${typ.farbe}, ${typ.durchmesser} mm</span>
+          </div>
+        `;
+        hiddenSelect.value = typ.id;
+        dropdownList.classList.add("hidden");
+      });
+      dropdownList.appendChild(li);
+    });
+  }
+
+  addSpuleBtn.addEventListener("click", async () => {
+    await loadTypenDropdown();
+    modalSpule.classList.remove("hidden");
+  });
+
+  cancelSpuleBtn.addEventListener("click", () => {
+    modalSpule.classList.add("hidden");
+  });
+
+  formSpule.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const typId = hiddenSelect.value;
+    const gesamtmenge = parseInt(document.getElementById("gesamtmenge").value, 10);
+
+    if (!typId || !gesamtmenge || gesamtmenge <= 0) {
+      alert("Bitte wählen Sie einen Typ und geben eine gültige Gesamtmenge ein.");
+      return;
+    }
+
+    // Suche den Typ im globalen gespeicherten Array
+    const typ = typenCache.find(t => t.id === parseInt(typId, 10));
+
+    if (!typ) {
+      alert("Der ausgewählte Typ wurde nicht gefunden.");
+      return;
+    }
+
+    const data = {
+      name: typ.name,
+      material: typ.material,
+      farbe: typ.farbe,
+      durchmesser: typ.durchmesser,
+      hersteller: typ.hersteller,
+      leergewicht: typ.leergewicht,
+      gesamtmenge: gesamtmenge,
+      restmenge: gesamtmenge,
+      verpackt: true,
+      in_printer: false
+    };
+
+    const response = await fetch("/spulen/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    if (response.ok) {
+      modalSpule.classList.add("hidden");
+      formSpule.reset();
+      dropdownSelected.textContent = "Bitte wählen";
+      hiddenSelect.value = "";
+      loadTypen();
+    } else {
+      alert("Fehler beim Hinzufügen der Spule");
+    }
+  });
+
+  loadTypen();
+});
+  </script>
+</body>
+<!-- Modal -->
+<div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+  <div class="bg-white rounded-lg w-full max-w-md p-6">
+    <h2 class="text-xl font-bold mb-4">Neuen Filamenttyp hinzufügen</h2>
+    <form id="modal-form" class="space-y-4">
+  <div>
+    <label for="name" class="block font-medium mb-1">Name <span class="text-red-500">*</span></label>
+    <input type="text" id="name" name="name" required placeholder="z. B. PLA" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="material" class="block font-medium mb-1">Material <span class="text-red-500">*</span></label>
+    <input type="text" id="material" name="material" required placeholder="z. B. PLA, PETG" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="farbe" class="block font-medium mb-1">Farbe <span class="text-red-500">*</span></label>
+    <input type="text" id="farbe" name="farbe" required placeholder="z. B. Schwarz, Rot" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="durchmesser" class="block font-medium mb-1">Durchmesser (mm) <span class="text-red-500">*</span></label>
+    <input type="number" step="0.01" id="durchmesser" name="durchmesser" value="1.75" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="hersteller" class="block font-medium mb-1">Hersteller</label>
+    <input type="text" id="hersteller" name="hersteller" placeholder="Optional" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="hinweise" class="block font-medium mb-1">Hinweise</label>
+    <textarea id="hinweise" name="hinweise" rows="3" placeholder="Optional" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500"></textarea>
+  </div>
+  <div>
+    <label for="leergewicht" class="block font-medium mb-1">Leergewicht (g) <span class="text-red-500">*</span></label>
+    <input type="number" step="1" min="0" id="leergewicht" name="leergewicht" value="0" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div class="flex justify-end gap-2 pt-4">
+    <button type="button" id="modal-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
+    <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Speichern</button>
+  </div>
+</form>
+  </div>
+</div>
+</html>
