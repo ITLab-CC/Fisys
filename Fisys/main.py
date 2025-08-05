@@ -144,6 +144,8 @@ class FilamentSpuleRead(BaseModel):
     restmenge: float
     in_printer: bool
     verpackt: bool
+    alt_gewicht: float  # neu hinzugefügt
+    typ: Optional[FilamentTypRead] = None
     model_config = ConfigDict(from_attributes=True)
 
 class FilamentTypWithSpulen(FilamentTypRead):
@@ -302,6 +304,15 @@ async def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)
 def read_spulen(db: Session = Depends(get_db)):
     return db.query(FilamentSpule).all()
 
+
+# Neuer Endpoint: Alle Spulen mit ihren Typ-Informationen
+from sqlalchemy.orm import joinedload
+
+@app.get("/spulen_mit_typen/", response_model=List[FilamentSpuleRead])
+def read_spulen_mit_typen(db: Session = Depends(get_db)):
+    spulen = db.query(FilamentSpule).options(joinedload(FilamentSpule.typ)).all()
+    return spulen
+
 @app.get("/spulen/{spulen_id}")
 def read_spule(spulen_id: int, db: Session = Depends(get_db)):
     spule = db.get(FilamentSpule, spulen_id)
@@ -318,13 +329,15 @@ def read_spule(spulen_id: int, db: Session = Depends(get_db)):
 
 
 @app.put("/spulen/{spulen_id}", response_model=FilamentSpuleRead)
-def update_spule(spulen_id: int, spule_update: FilamentSpuleCreate, db: Session = Depends(get_db)):
+async def update_spule(spulen_id: int, spule_update: FilamentSpuleCreate, db: Session = Depends(get_db)):
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule not found")
     if spule_update.gesamtmenge is not None:
         spule.gesamtmenge = spule_update.gesamtmenge
-    if spule_update.restmenge is not None:
+    if spule_update.restmenge is not None and spule_update.restmenge != spule.restmenge:
+        print(f"Update Spule ID {spule.spulen_id}: alt_gewicht={spule.alt_gewicht}, restmenge={spule.restmenge}, neuer Wert={spule_update.restmenge}")
+        spule.alt_gewicht = spule.restmenge
         spule.restmenge = spule_update.restmenge
     if spule_update.in_printer is not None:
         # Prüfung: Maximal 4 Spulen im Drucker
@@ -333,8 +346,17 @@ def update_spule(spulen_id: int, spule_update: FilamentSpuleCreate, db: Session 
             if in_printer_count >= 4:
                 raise HTTPException(status_code=400, detail="Maximale Anzahl an Spulen im Drucker erreicht. Entferne zuerst eine.")
         spule.in_printer = spule_update.in_printer
+    if spule_update.verpackt is not None:
+        spule.verpackt = spule_update.verpackt
     db.commit()
     db.refresh(spule)
+    # WebSocket-Dashboard-Benachrichtigung
+    await notify_dashboard({
+        "event": "spule_updated",
+        "spule_id": spule.spulen_id,
+        "restmenge": spule.restmenge,
+        "gesamtmenge": spule.gesamtmenge
+    })
     return spule
 
 # PATCH-Endpoint für Spule
@@ -343,6 +365,7 @@ def patch_spule(spulen_id: int, update: SpuleUpdate, db: Session = Depends(get_d
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule nicht gefunden")
+    spule.alt_gewicht = spule.restmenge
     spule.restmenge = update.restmenge
     if update.in_printer is not None:
         # Prüfung: Maximal 4 Spulen im Drucker
@@ -715,7 +738,7 @@ def get_dashboard_details(db: Session = Depends(get_db)):
 
     letzte_spulen = (
         db.query(FilamentSpule)
-        .order_by(FilamentSpule.created_at.desc())
+        .order_by(FilamentSpule.updated_at.desc())
         .limit(3)
         .all()
     )
@@ -724,17 +747,70 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "typ_name": s.typ.name,
         "farbe": s.typ.farbe,
         "material": s.typ.material,
-        "alt_gewicht": s.gesamtmenge,
+        "durchmesser": s.typ.durchmesser,
+        "alt_gewicht": s.alt_gewicht,
         "neu_gewicht": s.restmenge,
         "created_at": s.created_at,
         "updated_at": s.updated_at,
     } for s in letzte_spulen]
+
+    # Ergänzung: Spulen, die aktuell im Drucker sind
+    im_drucker_spulen = db.query(FilamentSpule).filter(FilamentSpule.in_printer == True).all()
+    im_drucker_liste = [{
+        "spulen_id": s.spulen_id,
+        "typ_name": s.typ.name,
+        "farbe": s.typ.farbe,
+        "material": s.typ.material,
+        "durchmesser": s.typ.durchmesser,
+        "alt_gewicht": s.alt_gewicht,
+        "neu_gewicht": s.restmenge,
+        "created_at": s.created_at,
+        "updated_at": s.updated_at,
+    } for s in im_drucker_spulen]
+
+    # Auch im Drucker gruppiert nach Typ (wie /drucker_data)
+    im_drucker = (
+        db.query(
+            FilamentTyp.id,
+            FilamentTyp.name,
+            FilamentTyp.material,
+            FilamentTyp.farbe,
+            FilamentTyp.durchmesser,
+            FilamentTyp.bildname,
+            func.count(FilamentSpule.spulen_id).label("spulenanzahl")
+        )
+        .join(FilamentSpule)
+        .filter(FilamentSpule.in_printer == True)
+        .group_by(
+            FilamentTyp.id,
+            FilamentTyp.name,
+            FilamentTyp.material,
+            FilamentTyp.farbe,
+            FilamentTyp.durchmesser,
+            FilamentTyp.bildname
+        )
+        .all()
+    )
+    im_drucker = [
+        {
+            "id": row.id,
+            "name": row.name,
+            "material": row.material,
+            "farbe": row.farbe,
+            "durchmesser": row.durchmesser,
+            "bildname": row.bildname,
+            "spulenanzahl": row.spulenanzahl
+        }
+        for row in im_drucker
+    ]
 
     return {
         "typen": typ_count,
         "spulen": spulen_count,
         "fastleer": fastleere_typen,
         "verbrauch_7tage": gesamtverbrauch,
+        "im_drucker": im_drucker,
+        "im_drucker_spulen": im_drucker_liste,
         "letzte_spulen": spulen_liste
     }
 

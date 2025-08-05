@@ -50,7 +50,7 @@
         </div>
       </div>
       <!-- Modal Spule hinzufügen -->
-      <div id="modal-spule" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+      <div id="modal-spule" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
         <div class="bg-white rounded-lg w-full max-w-md p-6 overflow-auto max-h-[90vh]">
           <h2 class="text-xl font-bold mb-4">Neue Spule hinzufügen</h2>
           <form id="modal-spule-form" class="space-y-4">
@@ -133,7 +133,6 @@ window.addEventListener("DOMContentLoaded", () => {
     });
 
     const modal = document.getElementById("modal");
-    const form = document.getElementById("modal-form");
     const addTypBtn = document.querySelector('button.bg-green-600');
     const cancelBtn = document.getElementById("modal-cancel");
 
@@ -144,36 +143,6 @@ window.addEventListener("DOMContentLoaded", () => {
     cancelBtn.addEventListener("click", () => {
       modal.classList.add("hidden");
     });
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const formData = new FormData(form);
-      const data = {
-        name: formData.get("name"),
-        material: formData.get("material"),
-        farbe: formData.get("farbe"),
-        durchmesser: parseFloat(formData.get("durchmesser")),
-        hersteller: formData.get("hersteller") || null,
-        hinweise: formData.get("hinweise") || null,
-        bildname: "platzhalter.jpg",
-        leergewicht: parseFloat(formData.get("leergewicht")) || 0
-      };
-
-      const response = await fetch("/typs/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-
-      if (response.ok) {
-        modal.classList.add("hidden");
-        form.reset();
-        loadTypen();
-      } else {
-        alert("Fehler beim Hinzufügen");
-      }
-    });
   }
 
   // --- Modal "+ Spule hinzufügen" mit Dropdown ---
@@ -181,6 +150,7 @@ window.addEventListener("DOMContentLoaded", () => {
   const formSpule = document.getElementById("modal-spule-form");
   const addSpuleBtn = document.querySelector('button.bg-blue-600'); // Der blaue Button neben Typ hinzufügen
   const cancelSpuleBtn = document.getElementById("modal-spule-cancel");
+  const spulenContainer = document.getElementById("spulen-container");
 
   const dropdownButton = document.getElementById("dropdown-button");
   const dropdownList = document.getElementById("dropdown-list");
@@ -229,13 +199,23 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Klasse zum Abdunkeln des Hintergrunds beim Öffnen des Modals
+  function darkenSpulenContainer() {
+    spulenContainer.classList.add("spulen-dimmed");
+  }
+  function undarkenSpulenContainer() {
+    spulenContainer.classList.remove("spulen-dimmed");
+  }
+
   addSpuleBtn.addEventListener("click", async () => {
     await loadTypenDropdown();
     modalSpule.classList.remove("hidden");
+    darkenSpulenContainer();
   });
 
   cancelSpuleBtn.addEventListener("click", () => {
     modalSpule.classList.add("hidden");
+    undarkenSpulenContainer();
   });
 
   formSpule.addEventListener("submit", async (e) => {
@@ -281,9 +261,81 @@ window.addEventListener("DOMContentLoaded", () => {
       formSpule.reset();
       dropdownSelected.textContent = "Bitte wählen";
       hiddenSelect.value = "";
+      undarkenSpulenContainer();
       loadTypen();
     } else {
       alert("Fehler beim Hinzufügen der Spule");
+    }
+  });
+  // Optional: Entferne Abdunklung, falls Modal-Spule durch andere Aktionen geschlossen wird
+  // (z. B. Escape-Taste oder Klick außerhalb)
+  document.addEventListener("keydown", (e) => {
+    if (!modalSpule.classList.contains("hidden") && e.key === "Escape") {
+      modalSpule.classList.add("hidden");
+      undarkenSpulenContainer();
+    }
+  });
+
+  // Optional: Klick auf Overlay schließt Modal
+  modalSpule.addEventListener("click", (e) => {
+    if (e.target === modalSpule) {
+      modalSpule.classList.add("hidden");
+      undarkenSpulenContainer();
+    }
+  });
+  // Style für das Abdunkeln von #spulen-container
+  // Fügt dies am Ende des <script> Blocks hinzu, damit es im <head> geladen wird
+  const style = document.createElement("style");
+  style.innerHTML = `
+    #spulen-container.spulen-dimmed {
+      opacity: 0.3;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+  `;
+  document.head.appendChild(style);
+
+  const modal = document.getElementById("modal");
+  const form = document.getElementById("modal-form");
+  const addTypBtn = document.querySelector('button.bg-green-600');
+  const cancelBtn = document.getElementById("modal-cancel");
+
+  addTypBtn.addEventListener("click", () => {
+    modal.classList.remove("hidden");
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    modal.classList.add("hidden");
+  });
+
+  // Registriere den Submit-Listener für das Typen-Formular nur einmal beim Laden der Seite
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const data = {
+      name: formData.get("name"),
+      material: formData.get("material"),
+      farbe: formData.get("farbe"),
+      durchmesser: parseFloat(formData.get("durchmesser")),
+      hersteller: formData.get("hersteller") || null,
+      hinweise: formData.get("hinweise") || null,
+      bildname: "platzhalter.jpg",
+      leergewicht: parseFloat(formData.get("leergewicht")) || 0
+    };
+
+    const response = await fetch("/typs/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    if (response.ok) {
+      modal.classList.add("hidden");
+      form.reset();
+      loadTypen();
+    } else {
+      alert("Fehler beim Hinzufügen");
     }
   });
 

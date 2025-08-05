@@ -8,9 +8,7 @@
   <!-- Weitere Meta-Tags und Links -->
 </head>
 <body>
-  <main class="flex min-h-screen bg-gray-50 text-gray-900">
-  <!-- Sidebar -->
-  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between">
+  <aside class="fixed top-0 left-0 h-full w-64 bg-[#0f172a] text-white flex flex-col justify-between">
     <div>
       <div class="pt-1 pb-1">
         <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto">
@@ -31,8 +29,7 @@
     </div>
   </aside>
 
-  <!-- Main Content -->
-  <section class="flex-1 p-10 space-y-10">
+  <main class="ml-64 p-10 bg-gray-50 min-h-screen text-gray-900 space-y-10">
     <header>
       <h1 class="text-3xl font-bold">Dashboard</h1>
       <p class="text-sm text-gray-500 mt-1">Willkommen im Fisys-System zur Filamentverwaltung.</p>
@@ -58,17 +55,22 @@
       </div>
     </div>
 
+    <div>
+      <h2 class="text-xl font-semibold mb-4">Im Drucker</h2>
+      <div id="im-drucker-spools" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600"></div>
+    </div>
+
     <!-- Letzte Änderungen -->
     <div>
       <h2 class="text-xl font-semibold mb-4">Letzte Änderungen</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="bg-white p-4 rounded-xl shadow-sm">
+      <div class="flex flex-col md:flex-row gap-4 items-stretch">
+        <div class="bg-white p-4 rounded-xl shadow-sm flex-1">
           <h3 class="text-sm font-medium text-gray-800 mb-2">Zuletzt bearbeitete Spulen</h3>
           <div id="last-edited-spools" class="space-y-3 text-sm text-gray-600">
             <div class="text-gray-400 italic">Lade letzte Änderungen …</div>
           </div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm">
+        <div class="bg-white p-4 rounded-xl shadow-sm flex-1">
           <h3 class="text-sm font-medium text-gray-800 mb-2">Neu hinzugefügte Spulen</h3>
           <div id="new-spools" class="space-y-3 text-sm text-gray-600">
             <div class="text-gray-400 italic">Lade neue Spulen …</div>
@@ -89,8 +91,7 @@
         </ul>
       </div>
     </div>
-  </section>
-</main>
+  </main>
 </body>
   <script>
     const ws = new WebSocket(`ws://${location.host}/ws/dashboard`);
@@ -116,7 +117,7 @@
         .filter(s => {
           const created = new Date(s.created_at).getTime();
           const updated = new Date(s.updated_at).getTime();
-          return Math.abs(updated - created) > 1000; // größer als 1 Sekunde Unterschied
+          return updated > created;
         })
         .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
         .slice(0, 3)
@@ -125,16 +126,19 @@
           const color = diff >= 100 ? "text-red-500" : diff >= 50 ? "text-yellow-500" : "text-green-600";
           const datum = new Date(s.updated_at).toLocaleDateString("de-DE");
           edited.innerHTML += `
-            <div class="flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+            <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
+                ID: ${s.spulen_id}
+              </div>
               <div class="flex justify-between items-center">
-                <div class="text-sm font-semibold text-gray-800">${s.typ_name}</div>
-                <div class="text-xs text-gray-500">${datum}</div>
+                <div class="text-sm font-semibold text-gray-800">${s.typ_name} (${s.material}, ${s.farbe})</div>
+                <div class="text-xs text-gray-500 ml-2">${datum}</div>
               </div>
-              <div class="flex justify-between text-xs text-gray-600">
-                <div>Alt: ${s.alt_gewicht} g → Neu: ${s.neu_gewicht} g</div>
-                <div>Restmenge: ${s.restmenge} g</div>
+              <div class="flex justify-between items-center text-xs text-gray-600 space-x-2">
+                <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
+                <div class="flex-1 text-center ${color} font-semibold">Differenz: –${diff} g</div>
+                <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
               </div>
-              <div class="${color} font-semibold text-sm">Differenz: –${diff} g</div>
             </div>
           `;
         });
@@ -146,19 +150,46 @@
         .forEach(s => {
           const datum = new Date(s.created_at).toLocaleDateString("de-DE");
           added.innerHTML += `
-            <div class="flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+            <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
+                ID: ${s.spulen_id}
+              </div>
               <div class="flex justify-between items-center">
                 <div class="text-sm font-semibold text-gray-800">${s.typ_name}</div>
-                <div class="text-xs text-gray-500">${datum}</div>
+                <div class="text-xs text-gray-500 ml-2">${datum}</div>
               </div>
-              <div class="flex justify-between text-xs text-gray-600">
-                <div>Farbe: ${s.farbe}</div>
-                <div>Material: ${s.material}</div>
-                <div>Durchmesser: ${s.durchmesser} mm</div>
+              <div class="flex justify-between items-center text-xs text-gray-600">
+                <div class="flex-1">Farbe: ${s.farbe}</div>
+                <div class="flex-1 text-center">Material: ${s.material}</div>
+                <div class="flex-1 text-right">Durchmesser: ${s.durchmesser} mm</div>
               </div>
             </div>
           `;
         });
+
+      const imDruckerContainer = document.getElementById("im-drucker-spools");
+      imDruckerContainer.innerHTML = "";
+      if (data.im_drucker_spulen && data.im_drucker_spulen.length > 0) {
+        data.im_drucker_spulen.forEach(spule => {
+          imDruckerContainer.innerHTML += `
+            <div class="bg-white p-4 rounded-xl shadow-sm max-w-xs mx-auto flex space-x-4 items-center">
+              <div class="flex flex-col items-center">
+                <img src="/static/assets/images/${spule.bildname || 'platzhalter.jpg'}" alt="${spule.typ_name}" class="w-16 h-16 rounded object-cover flex-shrink-0" />
+                <div class="text-xs text-gray-400 mt-1 select-none">ID: ${spule.spulen_id}</div>
+              </div>
+              <div class="flex flex-col text-sm text-gray-600 space-y-1">
+                <div class="font-semibold text-gray-800">${spule.typ_name}</div>
+                <div>Farbe: ${spule.farbe}</div>
+                <div>Material: ${spule.material}</div>
+                <div>Durchmesser: ${spule.durchmesser} mm</div>
+                <div class="font-semibold">Restmenge: ${spule.neu_gewicht} g</div>
+              </div>
+            </div>
+          `;
+        });
+      } else {
+        imDruckerContainer.innerHTML = `<div class="text-gray-500 italic text-center">Keine Spulen im Drucker</div>`;
+      }
     }
 
     // Initial laden & bei WS-Aktualisierung erneut
@@ -166,8 +197,44 @@
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
       console.log("📡 Live-Update:", data);
-      if (["spule_created", "spule_deleted", "spule_updated"].includes(data.event)) {
+      if (data.event === "spule_created" || data.event === "spule_deleted") {
         loadDashboardDetails();
+      } else if (data.event === "spule_updated") {
+        const edited = document.querySelector("#last-edited-spools");
+        fetch("/api/dashboard-details")
+          .then(res => res.json())
+          .then(data => {
+            edited.innerHTML = "";
+            data.letzte_spulen
+              .filter(s => {
+                const created = new Date(s.created_at).getTime();
+                const updated = new Date(s.updated_at).getTime();
+                return updated > created;
+              })
+              .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+              .slice(0, 3)
+              .forEach(s => {
+                const diff = s.alt_gewicht - s.neu_gewicht;
+                const color = diff >= 100 ? "text-red-500" : diff >= 50 ? "text-yellow-500" : "text-green-600";
+                const datum = new Date(s.updated_at).toLocaleDateString("de-DE");
+                edited.innerHTML += `
+                  <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+                    <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
+                      ID: ${s.spulen_id}
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <div class="text-sm font-semibold text-gray-800">${s.typ_name} (${s.material}, ${s.farbe})</div>
+                      <div class="text-xs text-gray-500 ml-2">${datum}</div>
+                    </div>
+                    <div class="flex justify-between items-center text-xs text-gray-600 space-x-2">
+                      <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
+                      <div class="flex-1 text-center ${color} font-semibold">Differenz: –${diff} g</div>
+                      <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
+                    </div>
+                  </div>
+                `;
+              });
+          });
       }
     };
   </script>

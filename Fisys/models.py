@@ -3,6 +3,7 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Integer, String, Float, Text, ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from datetime import datetime
+from sqlalchemy.sql import func
 
 class Base(DeclarativeBase):
     pass
@@ -31,9 +32,9 @@ class FilamentSpule(Base):
     restmenge: Mapped[float] = mapped_column(Float, nullable=False)
     in_printer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verpackt: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    alt_gewicht: Mapped[float] = mapped_column(Float, default=0)
     typ: Mapped["FilamentTyp"] = relationship("FilamentTyp", back_populates="spulen")
 
     def get_prozent_voll(self):

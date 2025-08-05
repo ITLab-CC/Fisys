@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spulen Übersicht - Fisys</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex">
+
+  <!-- Sidebar identisch zu index.html -->
+  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between">
+    <div>
+      <div class="pt-1 pb-1">
+        <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto" />
+      </div>
+      <nav class="px-4 space-y-2">
+        <a href="/" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Dashboard</a>
+        <a href="/spulen.html" class="block px-4 py-2 rounded bg-gray-800 font-semibold text-white">Spulen</a>
+        <a href="/filamentseite.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Filamenttypen</a>
+        <hr class="my-2 border-gray-700" />
+        <a href="/status" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Status</a>
+      </nav>
+    </div>
+    <div class="mt-auto">
+      <div class="px-4 pb-2">
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      </div>
+      <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
+    </div>
+  </aside>
+
+  <main class="flex-1 flex flex-col">
+    <header class="bg-white shadow-sm px-10 py-10">
+      <h1 class="text-3xl font-bold">Spulen Übersicht</h1>
+      <p class="text-sm text-gray-500 mt-1">Alle vorhandenen Filamentspulen im Überblick</p>
+    </header>
+
+    <section class="flex-1 p-10">
+      <div id="spulen-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+    </section>
+  </main>
+
+  <script>
+let currentEditSpuleId = null;
+let currentEditSpule = null;
+
+async function loadSpulen() {
+  const res = await fetch("/spulen_mit_typen/");
+  const spulen = await res.json();
+
+  const container = document.getElementById("spulen-container");
+  container.innerHTML = "";
+
+  spulen.forEach(spule => {
+    const el = document.createElement("div");
+
+    const radius = 16;
+    const circumference = 2 * Math.PI * radius;
+    const offset = 0; // Start bei 12 Uhr
+    const percent = spule.gesamtmenge > 0 ? Math.round((spule.restmenge / spule.gesamtmenge) * circumference) : 0;
+
+    const rest = spule.restmenge.toFixed(0);
+
+    el.innerHTML = `
+  <div class="card-wrapper" style="transform: scale(0.8); transform-origin: top left;">
+    <div class="flex gap-4 bg-white rounded-lg shadow-lg p-6 min-h-[180px] w-[580px]">
+      <div class="flex flex-col items-center justify-center h-full">
+        <div class="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-lg shadow-inner">
+          <img src="/static/assets/images/${spule.typ && spule.typ.bildname ? spule.typ.bildname : 'platzhalter.jpg'}" alt="Typ Bild" class="max-w-full max-h-full object-contain" />
+        </div>
+        <div class="flex justify-center mt-6">
+          <svg width="60" height="60" viewBox="0 0 36 36" class="donut" style="transform: rotate(-90deg) scaleY(-1); transform-origin: 50% 50%; display: block; margin: 0 auto;">
+            <circle class="donut-ring" cx="18" cy="18" r="16" fill="transparent" stroke="#e5e7eb" stroke-width="4"/>
+            <circle class="donut-segment" cx="18" cy="18" r="16" fill="transparent" stroke="#3b82f6" stroke-width="4"
+              stroke-dasharray="${percent} ${circumference}" stroke-dashoffset="${offset}"/>
+          </svg>
+        </div>
+      </div>
+      <div class="flex flex-col flex-1 ml-4">
+        <div class="flex items-center justify-between mb-4">
+          <div class="relative pb-3">
+            <h2 class="text-2xl font-bold">${spule.typ ? spule.typ.name : "Unbekannter Typ"}</h2>
+            <p class="absolute bottom-0 left-0 text-xs text-gray-500">ID: ${spule.spulen_id}</p>
+          </div>
+          <div class="flex gap-4">
+            ${spule.verpackt ? `<span class="flex items-center justify-center min-w-[100px] px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800 text-center">Verpackt</span>` : ""}
+            ${spule.in_printer ? `<span class="flex items-center justify-center min-w-[100px] px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-800 text-center">Im Drucker</span>` : ""}
+          </div>
+        </div>
+        <div class="flex gap-10 text-gray-700 text-sm border-t border-gray-200 pt-4 overflow-x-auto">
+          <div class="flex flex-col gap-1 flex-1">
+            <p class="whitespace-nowrap text-ellipsis"><strong>Material:</strong> ${spule.typ ? spule.typ.material : "–"}</p>
+            <p class="whitespace-nowrap text-ellipsis"><strong>Farbe:</strong> ${spule.typ ? spule.typ.farbe : "–"}</p>
+            <p class="whitespace-nowrap text-ellipsis"><strong>Hersteller:</strong> ${spule.typ && spule.typ.hersteller ? spule.typ.hersteller : "–"}</p>
+          </div>
+          <div class="flex flex-col gap-1 flex-[2] pr-6">
+            <p class="whitespace-nowrap text-ellipsis"><strong>Durchmesser:</strong> ${spule.typ ? spule.typ.durchmesser : "–"} mm</p>
+            <p class="whitespace-nowrap text-ellipsis"><strong>Gesamtmenge:</strong> ${spule.gesamtmenge} g</p>
+            <p class="whitespace-nowrap text-ellipsis"><strong>Leergewicht:</strong> ${spule.typ && spule.typ.leergewicht ? spule.typ.leergewicht : 0} g</p>
+          </div>
+        </div>
+        <button class="mt-4 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 transition" onclick='openEditModal(${JSON.stringify(spule)})'>
+          Spule bearbeiten
+        </button>
+      </div>
+    </div>
+  </div>
+`;
+    container.appendChild(el);
+  });
+}
+
+function openEditModal(spule) {
+  currentEditSpuleId = spule.spulen_id;
+  currentEditSpule = spule;
+  document.getElementById('gesamtmenge').value = spule.gesamtmenge;
+  document.getElementById('restmenge').value = spule.restmenge;
+  document.getElementById('verpackt').checked = spule.verpackt;
+  document.getElementById('in_printer').checked = spule.in_printer;
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+  currentEditSpuleId = null;
+  document.getElementById('edit-modal').classList.add('hidden');
+}
+
+window.addEventListener("DOMContentLoaded", () => {
+  loadSpulen();
+
+  document.getElementById('cancel-btn').addEventListener('click', () => {
+    closeEditModal();
+  });
+
+  document.getElementById('edit-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const gesamtmenge = Number(document.getElementById('gesamtmenge').value);
+    const restmenge = Number(document.getElementById('restmenge').value);
+    const verpackt = document.getElementById('verpackt').checked;
+    const in_printer = document.getElementById('in_printer').checked;
+
+    if (restmenge > gesamtmenge) {
+      alert("Restmenge darf nicht größer als Gesamtmenge sein.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/spulen/${currentEditSpuleId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gesamtmenge,
+          restmenge,
+          verpackt: document.getElementById('verpackt').checked,
+          in_printer: document.getElementById('in_printer').checked,
+          name: currentEditSpule.typ.name,
+          material: currentEditSpule.typ.material,
+          farbe: currentEditSpule.typ.farbe,
+          durchmesser: currentEditSpule.typ.durchmesser,
+          leergewicht: currentEditSpule.typ.leergewicht
+        })
+      });
+      if (!response.ok) {
+        throw new Error('Fehler beim Speichern');
+      }
+      closeEditModal();
+      loadSpulen(); // Neu laden der Spulenliste
+    } catch (error) {
+      alert(error.message);
+    }
+  });
+});
+  </script>
+
+  <!-- Modal Overlay -->
+  <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <!-- Modal Content -->
+    <div class="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full">
+      <h2 class="text-xl font-bold mb-4">Spule bearbeiten</h2>
+      <form id="edit-form" class="flex flex-col gap-4">
+        <div>
+          <label for="gesamtmenge" class="block font-semibold mb-1">Gesamtmenge (g):</label>
+          <input type="number" id="gesamtmenge" name="gesamtmenge" min="0" class="w-full border border-gray-300 rounded px-3 py-2" required />
+        </div>
+        <div>
+          <label for="restmenge" class="block font-semibold mb-1">Restmenge (g):</label>
+          <input type="number" id="restmenge" name="restmenge" min="0" class="w-full border border-gray-300 rounded px-3 py-2" required />
+        </div>
+        <div class="flex items-center gap-4">
+          <input type="checkbox" id="verpackt" name="verpackt" class="w-4 h-4" />
+          <label for="verpackt" class="select-none">Verpackt</label>
+        </div>
+        <div class="flex items-center gap-4">
+          <input type="checkbox" id="in_printer" name="in_printer" class="w-4 h-4" />
+          <label for="in_printer" class="select-none">Im Drucker</label>
+        </div>
+        <div class="flex justify-end gap-4 mt-4">
+          <button type="button" id="cancel-btn" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 transition">Abbrechen</button>
+          <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
