@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Status - Fisys</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
+    <div>
+      <div class="pt-1 pb-1">
+        <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto" />
+      </div>
+      <nav class="px-4 space-y-2">
+        <a href="/" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Dashboard</a>
+        <a href="/spulen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Spulen</a>
+        <a href="/filamentseite.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Filamenttypen</a>
+        <hr class="my-2 border-gray-700" />
+        <a href="/status.html" class="block px-4 py-2 rounded bg-gray-800 font-semibold text-white">Status</a>
+      </nav>
+    </div>
+    <div class="mt-auto">
+      <div class="px-4 pb-2">
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      </div>
+      <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 flex flex-col ml-64">
+    <header class="bg-gray-50 px-10 pt-10 pb-6">
+      <h1 class="text-3xl font-bold">Status</h1>
+      <p class="text-sm text-gray-500 mt-1">System- und Druckerstatus im Überblick</p>
+    </header>
+
+    <section class="flex-1 pt-4 px-10 pb-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Fast leere oder leere Typen -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold mb-4 border-b pb-2">Fast leere oder leere Typen</h2>
+        <ul id="low-stock-list" class="space-y-3 text-sm text-gray-700">
+          <li class="text-gray-400">Lade Daten...</li>
+        </ul>
+      </div>
+
+      <!-- Meistgenutzte Filamente -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold mb-4 border-b pb-2">Meistgenutzte Filamente</h2>
+        <ul id="top-filaments-list" class="space-y-3 text-sm text-gray-700">
+          <li class="text-gray-400">Lade Daten...</li>
+        </ul>
+      </div>
+
+      <!-- Verbrauch pro Typ in dieser Woche -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold mb-4 border-b pb-2">Verbrauch pro Typ (diese Woche)</h2>
+        <ul id="weekly-usage-list" class="space-y-3 text-sm text-gray-700">
+          <li class="text-gray-400">Lade Daten...</li>
+        </ul>
+      </div>
+
+    </section>
+
+    <script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const createListItem = (id, name, extra, details, statusColor = "bg-gray-50", material = "", farbe = "", durchmesser = "") => `
+    <li class="flex items-center justify-between ${statusColor} p-3 rounded border hover:bg-gray-100 transition">
+      <div>
+        <div class="font-medium">${name}</div>
+        <div class="text-xs text-gray-500">
+          Typ-ID: ${id}
+          ${material ? " • Material: " + material : ""}
+          ${farbe ? " • Farbe: " + farbe : ""}
+          ${durchmesser ? " • " + durchmesser + "mm" : ""}
+          ${details ? " • " + details : ""}
+        </div>
+      </div>
+      ${extra ? `<div class="text-right text-sm text-gray-700">${extra}</div>` : ""}
+    </li>
+  `;
+
+  // Fast leere oder leere Typen
+  const lowStockRes = await fetch("/api/status/low_stock_types");
+  const lowStock = await lowStockRes.json();
+
+  // Für jeden Typ zusätzlich die Spulenanzahl abrufen, falls nicht vorhanden
+  for (let typ of lowStock) {
+    if (!typ.anzahl_spulen) {
+      try {
+        const spulenRes = await fetch(`/typs/${typ.id}/spulen`);
+        if (spulenRes.ok) {
+          const spulen = await spulenRes.json();
+          typ.anzahl_spulen = spulen.length;
+        } else {
+          typ.anzahl_spulen = "?";
+        }
+      } catch {
+        typ.anzahl_spulen = "?";
+      }
+    }
+  }
+
+  const lowStockList = document.getElementById("low-stock-list");
+  lowStockList.innerHTML = lowStock.length
+    ? lowStock.map(t => {
+        let color = "bg-gray-50";
+        if (t.restmenge <= 0) color = "bg-red-100";
+        else if (t.restmenge <= (t.gesamtmenge * 0.1 || 100)) color = "bg-orange-100";
+        return createListItem(
+          t.id,
+          t.name,
+          `${t.restmenge}g übrig`,
+          `Spulen: ${t.anzahl_spulen}`,
+          color,
+          t.material || "",
+          t.farbe || "",
+          t.durchmesser || ""
+        );
+      }).join("")
+    : "<li class='text-gray-400'>Keine fast leeren Typen</li>";
+
+  // Meistgenutzte Filamente
+  const topFilamentsRes = await fetch("/api/status/top_filaments");
+  const topFilaments = await topFilamentsRes.json();
+  const topFilamentsList = document.getElementById("top-filaments-list");
+  topFilamentsList.innerHTML = topFilaments.length
+    ? topFilaments.map(f => createListItem(
+        f.id,
+        f.name,
+        `${f.verbrauch}g gesamt`,
+        null,
+        "bg-blue-50",
+        f.material || "",
+        f.farbe || "",
+        f.durchmesser || ""
+      )).join("")
+    : "<li class='text-gray-400'>Keine Verbrauchsdaten</li>";
+
+  // Wöchentlicher Verbrauch pro Typ
+  const weeklyUsageRes = await fetch("/api/status/weekly_usage");
+  const weeklyUsage = await weeklyUsageRes.json();
+  const weeklyUsageList = document.getElementById("weekly-usage-list");
+      weeklyUsageList.innerHTML = weeklyUsage.length
+        ? weeklyUsage.map(u => {
+            return `
+              <li class="p-3 rounded border bg-green-50">
+                <div class="flex justify-between">
+                  <div>
+                    <div class="font-medium">${u.name}</div>
+                    <div class="text-xs text-gray-500">
+                      Typ-ID: ${u.id}
+                      ${u.material ? " • Material: " + u.material : ""}
+                      ${u.farbe ? " • Farbe: " + u.farbe : ""}
+                      ${u.durchmesser ? " • " + u.durchmesser + "mm" : ""}
+                    </div>
+                  </div>
+                  <div class="text-sm text-gray-700">${u.verbrauch}g</div>
+                </div>
+              </li>
+            `;
+          }).join("")
+        : "<li class='text-gray-400'>Keine Daten für diese Woche</li>";
+});
+    </script>
+  </main>
+
+</body>
+</html>

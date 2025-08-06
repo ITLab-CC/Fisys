@@ -107,6 +107,7 @@
       animateRollingNumber(document.querySelector(".text-blue-600"), data.typen ?? 0);
       animateRollingNumber(document.querySelector(".text-green-600"), data.spulen ?? 0);
       animateRollingNumber(document.querySelector(".text-red-500"), data.fastleer ?? 0);
+      // Gesamtverbrauch (7 Tage) direkt aus Dashboard-Daten
       animateRollingNumber(document.querySelector(".text-orange-500"), data.verbrauch_7tage ?? 0, " g");
 
       const edited = document.querySelector("#last-edited-spools");

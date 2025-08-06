@@ -123,7 +123,7 @@ window.addEventListener("DOMContentLoaded", () => {
             <div class="flex justify-between"><span>Leergewicht:</span><span>${typ.leergewicht ?? 0} g</span></div>
             ${typ.hinweise ? `<p class="text-gray-500 text-xs italic mt-2">${typ.hinweise}</p>` : ''}
             <div class="pt-2 flex gap-2">
-              <a href="/typ/${typ.id}" class="flex-1 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium text-center">
+              <a href="/spulen.html?typ_id=${typ.id}" class="flex-1 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium text-center">
                 Spulen ansehen
               </a>
               <button data-id="${typ.id}" class="delete-typ-btn px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition text-sm font-medium">

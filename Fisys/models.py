@@ -41,6 +41,18 @@ class FilamentSpule(Base):
         return (self.restmenge / self.gesamtmenge) * 100 if self.gesamtmenge else 0.0
 
 
+# Tabelle für Filament-Verbrauchs-Logs
+class FilamentVerbrauch(Base):
+    __tablename__ = 'filament_verbrauch'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    typ_id: Mapped[int] = mapped_column(ForeignKey('filament_typ.typ_id'), nullable=False)
+    verbrauch_in_g: Mapped[float] = mapped_column(Float, nullable=False)
+    datum: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    typ: Mapped["FilamentTyp"] = relationship("FilamentTyp")
+
+
 # Pydantic model for serializing FilamentSpule
 class FilamentSpuleRead(BaseModel):
     spulen_id: int

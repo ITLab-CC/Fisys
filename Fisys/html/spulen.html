@@ -31,12 +31,27 @@
   </aside>
 
   <main class="flex-1 flex flex-col ml-64">
-    <header class="bg-gray-50 px-10 py-10">
+    <header class="bg-gray-50 px-10 pt-10 pb-10">
       <h1 class="text-3xl font-bold">Spulen Übersicht</h1>
       <p class="text-sm text-gray-500 mt-1">Alle vorhandenen Filamentspulen im Überblick</p>
     </header>
 
-    <section class="flex-1 p-10">
+    <section class="flex-1 pt-2 px-10 pb-10">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <input
+          type="text"
+          id="suchfeld"
+          placeholder="Spulen suchen..."
+          class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded shadow-sm text-sm focus:outline-none focus:ring focus:border-blue-300"
+        />
+        <button
+          id="show-all-btn"
+          class="hidden bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 text-sm"
+          onclick="window.location.href='/spulen.html'"
+        >
+          Alle Spulen anzeigen
+        </button>
+      </div>
       <div id="spulen-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
     </section>
   </main>
@@ -46,8 +61,32 @@ let currentEditSpuleId = null;
 let currentEditSpule = null;
 
 async function loadSpulen() {
-  const res = await fetch("/spulen_mit_typen/");
+  const params = new URLSearchParams(window.location.search);
+  const typId = params.get("typ_id");
+
+  // Button "Alle Spulen anzeigen" ein-/ausblenden
+  const showAllBtn = document.getElementById("show-all-btn");
+  if (showAllBtn) {
+    if (typId) {
+      showAllBtn.classList.remove("hidden");
+    } else {
+      showAllBtn.classList.add("hidden");
+    }
+  }
+
+  let res;
+  if (typId) {
+    res = await fetch(`/typs/${typId}/spulen`);
+  } else {
+    res = await fetch("/spulen_mit_typen/");
+  }
   const spulen = await res.json();
+
+  // Überschrift anpassen, wenn typ_id vorhanden
+  if (typId && spulen.length > 0) {
+    document.querySelector("header h1").textContent = `Spulen des Typs ${spulen[0].typ?.name || ""}`;
+    document.querySelector("header p").textContent = "Alle vorhandenen Spulen dieses Typs im Überblick";
+  }
 
   const container = document.getElementById("spulen-container");
   container.innerHTML = "";
@@ -196,6 +235,15 @@ window.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       alert(error.message);
     }
+  });
+});
+
+document.getElementById("suchfeld").addEventListener("input", () => {
+  const searchTerm = document.getElementById("suchfeld").value.toLowerCase();
+  const cards = document.querySelectorAll("#spulen-container > div");
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase();
+    card.style.display = text.includes(searchTerm) ? "" : "none";
   });
 });
   </script>

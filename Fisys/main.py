@@ -3,7 +3,7 @@ import os
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from db import SessionLocal, init_db
-from models import FilamentTyp, FilamentSpule
+from models import FilamentTyp, FilamentSpule, FilamentVerbrauch
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response, BackgroundTasks
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
@@ -397,12 +397,27 @@ def delete_spule_api(
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule not found")
+
+    # Verbrauch berechnen: alles, was verbraucht wurde + ggf. Restmenge
+    bereits_verbraucht = max(0, spule.gesamtmenge - spule.restmenge)
+    rest_auch_verbraucht = spule.restmenge if spule.restmenge > 0 else 0
+    gesamt_verbrauch = bereits_verbraucht + rest_auch_verbraucht
+
+    # In Verbrauchstabelle eintragen
+    verbrauch_eintrag = FilamentVerbrauch(
+        typ_id=spule.typ_id,
+        verbrauch_in_g=gesamt_verbrauch
+    )
+    db.add(verbrauch_eintrag)
+
+    # QR-Code löschen und Spule entfernen
     delete_qrcode_for_spule(spule)
     db.delete(spule)
     db.commit()
+
     # WebSocket-Dashboard-Benachrichtigung
     background_tasks.add_task(notify_dashboard, {"event": "spule_deleted", "spule_id": spulen_id})
-    return {"detail": f"Spule {spulen_id} wurde gelöscht"}
+    return {"detail": f"Spule {spulen_id} wurde gelöscht und Verbrauch von {gesamt_verbrauch}g geloggt"}
 
 
 # Bild-Upload Endpoint
@@ -726,18 +741,13 @@ def get_dashboard_details(db: Session = Depends(get_db)):
             fastleere_typen += 1
 
     from datetime import datetime, timedelta
-    eine_woche = datetime.utcnow() - timedelta(days=7)
-    verbraucht_letzte_woche = (
-        db.query(FilamentSpule)
-        .filter(FilamentSpule.updated_at != None)
-        .filter(FilamentSpule.updated_at > eine_woche)
-        .all()
-    )
-    gesamtverbrauch = sum(
-        max(0, s.gesamtmenge - s.restmenge)
-        for s in verbraucht_letzte_woche
-        if s.gesamtmenge and s.restmenge
-    )
+    # Gesamtverbrauch der letzten 7 Tage aus Verbrauchslog
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    verbrauch_7tage_sum = (
+        db.query(func.sum(FilamentVerbrauch.verbrauch_in_g))
+        .filter(FilamentVerbrauch.datum >= seven_days_ago)
+        .scalar()
+    ) or 0
 
     letzte_spulen = (
         db.query(FilamentSpule)
@@ -812,7 +822,7 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "typen": typ_count,
         "spulen": spulen_count,
         "fastleer": fastleere_typen,
-        "verbrauch_7tage": gesamtverbrauch,
+        "verbrauch_7tage": int(verbrauch_7tage_sum),
         "im_drucker": im_drucker,
         "im_drucker_spulen": im_drucker_liste,
         "letzte_spulen": spulen_liste
@@ -903,6 +913,70 @@ def print_qrcode(spulen_id: int, request: Request):
             raise HTTPException(status_code=500, detail=response.text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fehler beim Aufruf der Station: {e}")
+
+from datetime import datetime, timedelta
+
+# Neuer API-Endpunkt: Typen mit niedrigem Lagerbestand
+@app.get("/api/status/low_stock_types")
+def get_low_stock_types(db: Session = Depends(get_db)):
+    """Gibt alle Typen zurück, die leer oder fast leer sind."""
+    typen = db.query(FilamentTyp).all()
+    result = []
+    for typ in typen:
+        gesamt_rest = sum([spule.restmenge for spule in typ.spulen])
+        # Schwellenwert: unter 10% oder weniger als 100g
+        if gesamt_rest <= 0 or (typ.spulen and gesamt_rest <= (typ.spulen[0].gesamtmenge * 0.1)) or gesamt_rest <= 100:
+            result.append({
+                "id": typ.id,
+                "name": typ.name,
+                "material": typ.material,
+                "farbe": typ.farbe,
+                "durchmesser": typ.durchmesser,
+                "restmenge": gesamt_rest
+            })
+    return result
+
+# Neuer API-Endpunkt: Top 5 meistgenutzte Filamente nach Gesamtverbrauch (aus Verbrauchslog)
+@app.get("/api/status/top_filaments")
+def get_top_filaments(db: Session = Depends(get_db)):
+    """Gibt die meistgenutzten Filamente nach Gesamtverbrauch zurück (aus Verbrauchslog)."""
+    result = (
+        db.query(
+            FilamentTyp.id,
+            FilamentTyp.name,
+            FilamentTyp.material,
+            FilamentTyp.farbe,
+            FilamentTyp.durchmesser,
+            func.sum(FilamentVerbrauch.verbrauch_in_g).label("verbrauch")
+        )
+        .join(FilamentVerbrauch, FilamentVerbrauch.typ_id == FilamentTyp.id)
+        .group_by(FilamentTyp.id, FilamentTyp.name, FilamentTyp.material, FilamentTyp.farbe, FilamentTyp.durchmesser)
+        .order_by(func.sum(FilamentVerbrauch.verbrauch_in_g).desc())
+        .limit(5)
+        .all()
+    )
+    return [{"id": r.id, "name": r.name, "material": r.material, "farbe": r.farbe, "durchmesser": r.durchmesser, "verbrauch": int(r.verbrauch or 0)} for r in result]
+
+# Neuer API-Endpunkt: Verbrauch der letzten 7 Tage pro Typ (aus Verbrauchslog)
+@app.get("/api/status/weekly_usage")
+def get_weekly_usage(db: Session = Depends(get_db)):
+    """Gibt den Verbrauch pro Typ in den letzten 7 Tagen zurück (aus Verbrauchslog)."""
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    result = (
+        db.query(
+            FilamentTyp.id,
+            FilamentTyp.name,
+            FilamentTyp.material,
+            FilamentTyp.farbe,
+            FilamentTyp.durchmesser,
+            func.sum(FilamentVerbrauch.verbrauch_in_g).label("verbrauch")
+        )
+        .join(FilamentVerbrauch, FilamentVerbrauch.typ_id == FilamentTyp.id)
+        .filter(FilamentVerbrauch.datum >= seven_days_ago)
+        .group_by(FilamentTyp.id, FilamentTyp.name, FilamentTyp.material, FilamentTyp.farbe, FilamentTyp.durchmesser)
+        .all()
+    )
+    return [{"id": r.id, "name": r.name, "material": r.material, "farbe": r.farbe, "durchmesser": r.durchmesser, "verbrauch": int(r.verbrauch or 0)} for r in result]
 
 if __name__ == "__main__":
     import uvicorn
