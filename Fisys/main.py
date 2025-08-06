@@ -4,7 +4,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from db import SessionLocal, init_db
 from models import FilamentTyp, FilamentSpule
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response, BackgroundTasks
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -389,7 +389,11 @@ def patch_spule(spulen_id: int, update: SpuleUpdate, db: Session = Depends(get_d
     return spule
 
 @app.delete("/spulen/{spulen_id}")
-def delete_spule_api(spulen_id: int, db: Session = Depends(get_db)):
+def delete_spule_api(
+    spulen_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
+):
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule not found")
@@ -397,8 +401,7 @@ def delete_spule_api(spulen_id: int, db: Session = Depends(get_db)):
     db.delete(spule)
     db.commit()
     # WebSocket-Dashboard-Benachrichtigung
-    import asyncio
-    asyncio.create_task(notify_dashboard({"event": "spule_deleted", "spule_id": spulen_id}))
+    background_tasks.add_task(notify_dashboard, {"event": "spule_deleted", "spule_id": spulen_id})
     return {"detail": f"Spule {spulen_id} wurde gelöscht"}
 
 
@@ -764,6 +767,7 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "durchmesser": s.typ.durchmesser,
         "alt_gewicht": s.alt_gewicht,
         "neu_gewicht": s.restmenge,
+        "gesamtmenge": s.gesamtmenge,
         "created_at": s.created_at,
         "updated_at": s.updated_at,
     } for s in im_drucker_spulen]

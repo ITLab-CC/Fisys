@@ -8,7 +8,7 @@
 </head>
 <body class="min-h-screen flex bg-gray-50">
   <!-- Sidebar -->
-  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between">
+  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
     <div>
       <div class="pt-1 pb-1">
         <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto">
@@ -30,13 +30,13 @@
   </aside>
 
   <!-- Main content -->
-  <div class="flex-1 flex flex-col">
+  <div class="flex-1 flex flex-col ml-64">
     <header class="bg-gray-50 px-10 py-10">
       <h1 class="text-3xl font-bold">Filamenttypen</h1>
       <p class="text-sm text-gray-500 mt-1">Alle verfügbaren Typen im Überblick</p>
     </header>
 
-    <section class="flex-1 p-10">
+    <section class="flex-1 pt-2 px-10 pb-10">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <input
           type="text"
@@ -51,7 +51,7 @@
       </div>
       <!-- Modal Spule hinzufügen -->
       <div id="modal-spule" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-        <div class="bg-white rounded-lg w-full max-w-md p-6 overflow-auto max-h-[90vh]">
+        <div class="bg-white rounded-lg w-full max-w-md p-6">
           <h2 class="text-xl font-bold mb-4">Neue Spule hinzufügen</h2>
           <form id="modal-spule-form" class="space-y-4">
             <div>
@@ -63,7 +63,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <ul id="dropdown-list" class="absolute z-10 hidden w-full bg-white border border-gray-300 rounded mt-1 max-h-48 overflow-auto shadow-lg"></ul>
+                <div id="dropdown-container" class="absolute z-10 hidden w-full bg-white border border-gray-300 rounded mt-1 shadow-lg">
+                  <input type="text" id="dropdown-search" placeholder="Suchen..." class="w-full px-3 py-2 border-b border-gray-300 text-sm focus:outline-none">
+                  <ul id="dropdown-list" class="max-h-48 overflow-auto"></ul>
+                </div>
               </div>
               <input type="hidden" id="spule-typ" name="spule-typ" required />
             </div>
@@ -78,7 +81,7 @@
           </form>
         </div>
       </div>
-      <div id="spulen-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+      <div id="spulen-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4"></div>
     </section>
   </div>
 
@@ -104,32 +107,63 @@ window.addEventListener("DOMContentLoaded", () => {
     typen.forEach(typ => {
       const el = document.createElement("div");
       el.innerHTML = `
-        <div class="bg-white rounded-lg shadow-md py-6 px-4 flex items-center gap-4 text-sm relative max-w-lg mr-6">
-          <div class="relative flex items-center gap-4">
-            <img src="/static/assets/images/${typ.bildname || 'platzhalter.jpg'}" alt="Vorschau" class="w-18 h-24 object-cover rounded" />
-            <div class="flex flex-col flex-1 h-full">
-              <span class="absolute top-2 right-2 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-blue-600 rounded-full">
-                ${typ.spulen.length}
-              </span>
-              <h2 class="text-lg font-semibold mb-1">${typ.name}</h2>
-              <div class="flex flex-wrap gap-3 text-gray-600 text-xs">
-                <span><strong>Material:</strong> ${typ.material}</span>
-                <span><strong>Farbe:</strong> ${typ.farbe}</span>
-                <span><strong>Durchmesser:</strong> ${typ.durchmesser} mm</span>
-                <span><strong>Hersteller:</strong> ${typ.hersteller || '–'}</span>
-                <span><strong>Leergewicht:</strong> ${typ.leergewicht ?? 0} g</span>
-              </div>
-              ${typ.hinweise ? `<p class="text-gray-500 text-xs italic mt-2">${typ.hinweise}</p>` : ''}
-              <div class="mt-auto">
-                <a href="/typ/${typ.id}" class="mt-3 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium">
-                  Spulen ansehen
-                </a>
-              </div>
+        <div class="bg-white rounded-xl shadow-sm max-w-sm w-full mx-auto flex flex-col overflow-hidden border border-gray-200">
+          <div class="relative">
+            <img src="/static/assets/images/${typ.bildname || 'platzhalter.jpg'}" alt="${typ.name}" class="w-full h-32 object-cover" />
+            <div class="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
+              ${typ.spulen.length}
+            </div>
+          </div>
+          <div class="p-4 flex flex-col space-y-1 text-sm text-gray-700">
+            <div class="font-semibold text-gray-900 text-base">${typ.name}</div>
+            <div class="flex justify-between"><span>Material:</span><span>${typ.material}</span></div>
+            <div class="flex justify-between"><span>Farbe:</span><span>${typ.farbe}</span></div>
+            <div class="flex justify-between"><span>Durchmesser:</span><span>${typ.durchmesser} mm</span></div>
+            <div class="flex justify-between"><span>Hersteller:</span><span>${typ.hersteller || '–'}</span></div>
+            <div class="flex justify-between"><span>Leergewicht:</span><span>${typ.leergewicht ?? 0} g</span></div>
+            ${typ.hinweise ? `<p class="text-gray-500 text-xs italic mt-2">${typ.hinweise}</p>` : ''}
+            <div class="pt-2 flex gap-2">
+              <a href="/typ/${typ.id}" class="flex-1 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium text-center">
+                Spulen ansehen
+              </a>
+              <button data-id="${typ.id}" class="delete-typ-btn px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition text-sm font-medium">
+                Löschen
+              </button>
             </div>
           </div>
         </div>
       `;
       container.appendChild(el);
+      // Löschen-Button Event-Listener hinzufügen (ersetzt confirm durch eigenes Modal)
+      el.querySelector(".delete-typ-btn").addEventListener("click", async () => {
+        if (typ.spulen.length > 0) {
+          alert("Dieser Typ kann nicht gelöscht werden, da ihm noch Spulen zugeordnet sind.");
+          return;
+        }
+
+        const confirmModal = document.getElementById("confirm-modal");
+        const confirmOk = document.getElementById("confirm-ok");
+        const confirmCancel = document.getElementById("confirm-cancel");
+
+        confirmModal.classList.remove("hidden");
+
+        // Remove previous handlers first, to avoid stacking
+        confirmOk.onclick = null;
+        confirmCancel.onclick = null;
+
+        confirmOk.onclick = async () => {
+          confirmModal.classList.add("hidden");
+          const res = await fetch(`/typs/${typ.id}`, { method: "DELETE" });
+          if (res.ok) {
+            loadTypen();
+          } else {
+            alert("Fehler beim Löschen des Typs.");
+          }
+        };
+        confirmCancel.onclick = () => {
+          confirmModal.classList.add("hidden");
+        };
+      });
     });
 
     const modal = document.getElementById("modal");
@@ -145,6 +179,17 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Suchfunktion für Filamenttypen
+  const suchfeld = document.getElementById("suchfeld");
+  suchfeld.addEventListener("input", () => {
+    const searchTerm = suchfeld.value.toLowerCase();
+    const cards = document.querySelectorAll("#spulen-container > div");
+    cards.forEach(card => {
+      const text = card.textContent.toLowerCase();
+      card.style.display = text.includes(searchTerm) ? "" : "none";
+    });
+  });
+
   // --- Modal "+ Spule hinzufügen" mit Dropdown ---
   const modalSpule = document.getElementById("modal-spule");
   const formSpule = document.getElementById("modal-spule-form");
@@ -153,19 +198,29 @@ window.addEventListener("DOMContentLoaded", () => {
   const spulenContainer = document.getElementById("spulen-container");
 
   const dropdownButton = document.getElementById("dropdown-button");
+  const dropdownContainer = document.getElementById("dropdown-container");
   const dropdownList = document.getElementById("dropdown-list");
+  const dropdownSearch = document.getElementById("dropdown-search");
   const dropdownSelected = document.getElementById("dropdown-selected");
   const hiddenSelect = document.getElementById("spule-typ");
 
-  // Toggle dropdown visibility
+  // Toggle dropdown visibility und passe Popup-Höhe dynamisch an
+  const popupContent = modalSpule.querySelector("div.bg-white");
+
   dropdownButton.addEventListener("click", () => {
-    dropdownList.classList.toggle("hidden");
+    dropdownContainer.classList.toggle("hidden");
+
+    if (!dropdownContainer.classList.contains("hidden")) {
+      popupContent.style.maxHeight = "95vh"; // Popup vergrößern
+    } else {
+      popupContent.style.maxHeight = "90vh"; // Zurück zur Standardhöhe
+    }
   });
 
   // Close dropdown on outside click
   document.addEventListener("click", (e) => {
-    if (!dropdownButton.contains(e.target) && !dropdownList.contains(e.target)) {
-      dropdownList.classList.add("hidden");
+    if (!dropdownButton.contains(e.target) && !dropdownContainer.contains(e.target)) {
+      dropdownContainer.classList.add("hidden");
     }
   });
 
@@ -193,9 +248,19 @@ window.addEventListener("DOMContentLoaded", () => {
           </div>
         `;
         hiddenSelect.value = typ.id;
-        dropdownList.classList.add("hidden");
+        dropdownContainer.classList.add("hidden");
       });
       dropdownList.appendChild(li);
+    });
+    // Reset search and add search event
+    dropdownSearch.value = "";
+    dropdownSearch.addEventListener("input", () => {
+      const searchTerm = dropdownSearch.value.toLowerCase();
+      const items = dropdownList.querySelectorAll("li");
+      items.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(searchTerm) ? "" : "none";
+      });
     });
   }
 
@@ -210,11 +275,13 @@ window.addEventListener("DOMContentLoaded", () => {
   addSpuleBtn.addEventListener("click", async () => {
     await loadTypenDropdown();
     modalSpule.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
     darkenSpulenContainer();
   });
 
   cancelSpuleBtn.addEventListener("click", () => {
     modalSpule.classList.add("hidden");
+    document.body.style.overflow = "";
     undarkenSpulenContainer();
   });
 
@@ -272,6 +339,7 @@ window.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", (e) => {
     if (!modalSpule.classList.contains("hidden") && e.key === "Escape") {
       modalSpule.classList.add("hidden");
+      document.body.style.overflow = "";
       undarkenSpulenContainer();
     }
   });
@@ -280,6 +348,7 @@ window.addEventListener("DOMContentLoaded", () => {
   modalSpule.addEventListener("click", (e) => {
     if (e.target === modalSpule) {
       modalSpule.classList.add("hidden");
+      document.body.style.overflow = "";
       undarkenSpulenContainer();
     }
   });
@@ -302,10 +371,28 @@ window.addEventListener("DOMContentLoaded", () => {
 
   addTypBtn.addEventListener("click", () => {
     modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
   });
 
   cancelBtn.addEventListener("click", () => {
     modal.classList.add("hidden");
+    document.body.style.overflow = "";
+  });
+
+  // Schließen bei Escape
+  document.addEventListener("keydown", (e) => {
+    if (!modal.classList.contains("hidden") && e.key === "Escape") {
+      modal.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+  });
+
+  // Schließen bei Klick außerhalb
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
   });
 
   // Registriere den Submit-Listener für das Typen-Formular nur einmal beim Laden der Seite
@@ -342,6 +429,17 @@ window.addEventListener("DOMContentLoaded", () => {
   loadTypen();
 });
   </script>
+  <!-- Bestätigungs-Modal für Typ-Löschen -->
+  <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg w-full max-w-sm p-6 text-center">
+      <h3 class="text-lg font-semibold mb-4">Typ löschen?</h3>
+      <p class="text-sm text-gray-600 mb-6">Möchten Sie diesen Typ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</p>
+      <div class="flex justify-center gap-4">
+        <button id="confirm-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
+        <button id="confirm-ok" class="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700">Löschen</button>
+      </div>
+    </div>
+  </div>
 </body>
 <!-- Modal -->
 <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
@@ -350,7 +448,7 @@ window.addEventListener("DOMContentLoaded", () => {
     <form id="modal-form" class="space-y-4">
   <div>
     <label for="name" class="block font-medium mb-1">Name <span class="text-red-500">*</span></label>
-    <input type="text" id="name" name="name" required placeholder="z. B. PLA" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+    <input type="text" id="name" name="name" required placeholder="z. B. Bambu Basic" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
   </div>
   <div>
     <label for="material" class="block font-medium mb-1">Material <span class="text-red-500">*</span></label>
@@ -374,7 +472,7 @@ window.addEventListener("DOMContentLoaded", () => {
   </div>
   <div>
     <label for="leergewicht" class="block font-medium mb-1">Leergewicht (g) <span class="text-red-500">*</span></label>
-    <input type="number" step="1" min="0" id="leergewicht" name="leergewicht" value="0" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+    <input type="number" step="1" min="0" id="leergewicht" name="leergewicht" placeholder="Gewicht der Spule ohne Filament" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
   </div>
   <div class="flex justify-end gap-2 pt-4">
     <button type="button" id="modal-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>

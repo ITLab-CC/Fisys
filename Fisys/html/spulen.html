@@ -6,10 +6,10 @@
   <title>Spulen Übersicht - Fisys</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen flex">
+<body class="bg-gray-50 min-h-screen flex">
 
   <!-- Sidebar identisch zu index.html -->
-  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between">
+  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
     <div>
       <div class="pt-1 pb-1">
         <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto" />
@@ -30,8 +30,8 @@
     </div>
   </aside>
 
-  <main class="flex-1 flex flex-col">
-    <header class="bg-white shadow-sm px-10 py-10">
+  <main class="flex-1 flex flex-col ml-64">
+    <header class="bg-gray-50 px-10 py-10">
       <h1 class="text-3xl font-bold">Spulen Übersicht</h1>
       <p class="text-sm text-gray-500 mt-1">Alle vorhandenen Filamentspulen im Überblick</p>
     </header>
@@ -100,14 +100,40 @@ async function loadSpulen() {
             <p class="whitespace-nowrap text-ellipsis"><strong>Leergewicht:</strong> ${spule.typ && spule.typ.leergewicht ? spule.typ.leergewicht : 0} g</p>
           </div>
         </div>
-        <button class="mt-4 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 transition" onclick='openEditModal(${JSON.stringify(spule)})'>
-          Spule bearbeiten
-        </button>
+        <div class="mt-4 flex gap-2">
+          <button class="flex-1 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 transition" onclick='openEditModal(${JSON.stringify(spule)})'>
+            Spule bearbeiten
+          </button>
+          <button class="delete-btn flex-1 bg-red-600 text-white rounded px-4 py-2 hover:bg-red-700 transition" data-id="${spule.spulen_id}">
+            Löschen
+          </button>
+        </div>
       </div>
     </div>
   </div>
 `;
     container.appendChild(el);
+
+    el.querySelector(".delete-btn").addEventListener("click", () => {
+      const confirmModal = document.getElementById("confirm-modal");
+      const confirmOk = document.getElementById("confirm-ok");
+      const confirmCancel = document.getElementById("confirm-cancel");
+
+      confirmModal.classList.remove("hidden");
+
+      confirmOk.onclick = async () => {
+        confirmModal.classList.add("hidden");
+        const res = await fetch(`/spulen/${spule.spulen_id}`, { method: "DELETE" });
+        if (res.ok) {
+          loadSpulen();
+        } else {
+          alert("Fehler beim Löschen der Spule.");
+        }
+      };
+      confirmCancel.onclick = () => {
+        confirmModal.classList.add("hidden");
+      };
+    });
   });
 }
 
@@ -201,6 +227,17 @@ window.addEventListener("DOMContentLoaded", () => {
           <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 transition">Speichern</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg w-full max-w-sm p-6 text-center">
+      <h3 class="text-lg font-semibold mb-4">Spule löschen?</h3>
+      <p class="text-sm text-gray-600 mb-6">Möchten Sie diese Spule wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</p>
+      <div class="flex justify-center gap-4">
+        <button id="confirm-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
+        <button id="confirm-ok" class="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700">Löschen</button>
+      </div>
     </div>
   </div>
 </body>
