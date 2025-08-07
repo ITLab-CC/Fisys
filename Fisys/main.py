@@ -412,17 +412,13 @@ def delete_spule_api(
     if not spule:
         raise HTTPException(status_code=404, detail="Spule not found")
 
-    # Verbrauch berechnen: alles, was verbraucht wurde + ggf. Restmenge
-    bereits_verbraucht = max(0, spule.gesamtmenge - spule.restmenge)
-    rest_auch_verbraucht = spule.restmenge if spule.restmenge > 0 else 0
-    gesamt_verbrauch = bereits_verbraucht + rest_auch_verbraucht
-
-    # In Verbrauchstabelle eintragen
-    verbrauch_eintrag = FilamentVerbrauch(
-        typ_id=spule.typ_id,
-        verbrauch_in_g=gesamt_verbrauch
-    )
-    db.add(verbrauch_eintrag)
+    # Nur den Rest als Verbrauch eintragen, wenn vorhanden
+    if spule.restmenge > 0:
+        verbrauch_eintrag = FilamentVerbrauch(
+            typ_id=spule.typ_id,
+            verbrauch_in_g=spule.restmenge
+        )
+        db.add(verbrauch_eintrag)
 
     # QR-Code löschen und Spule entfernen
     delete_qrcode_for_spule(spule)
@@ -431,7 +427,7 @@ def delete_spule_api(
 
     # WebSocket-Dashboard-Benachrichtigung
     background_tasks.add_task(notify_dashboard, {"event": "spule_deleted", "spule_id": spulen_id})
-    return {"detail": f"Spule {spulen_id} wurde gelöscht und Verbrauch von {gesamt_verbrauch}g geloggt"}
+    return {"detail": f"Spule {spulen_id} wurde gelöscht und Verbrauch von {spule.restmenge}g geloggt"}
 
 
 # Bild-Upload Endpoint
