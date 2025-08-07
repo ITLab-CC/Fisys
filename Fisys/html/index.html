@@ -23,7 +23,7 @@
       </nav>
     </div>
     <div class="mt-auto">
-      <div class="px-4 pb-2">
+      <div class="px-4 pb-2" id="auth-bereich">
         <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
       </div>
       <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
@@ -292,4 +292,34 @@
       }
     };
   </script>
+</script>
+<script>
+  const authBereich = document.getElementById("auth-bereich");
+
+  async function checkAuthStatus() {
+    try {
+      const res = await fetch("/api/userinfo");
+      if (!res.ok) throw new Error("Nicht angemeldet");
+      const daten = await res.json();
+
+      // Auth-Bereich dynamisch anpassen (Login/Logout, Benutzername)
+      authBereich.innerHTML = `
+        <form id="logoutForm" class="flex flex-col items-center">
+          <span class="text-sm text-gray-300 mb-1">Angemeldet als ${daten.username}</span>
+          <button type="submit" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition w-full">Logout</button>
+        </form>
+      `;
+
+      document.getElementById("logoutForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await fetch("/logout", { method: "POST" });
+        location.reload();
+      });
+    } catch (err) {
+      // Nicht eingeloggt, Standard-Login-Link bleibt
+    }
+  }
+
+  checkAuthStatus();
+</script>
 </html>

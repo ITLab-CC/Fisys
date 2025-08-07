@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 import os
+import string
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from db import SessionLocal, init_db
@@ -12,14 +13,38 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from qrcode_utils import generate_qrcode_for_spule, delete_qrcode_for_spule
 import shutil
+from auth import router as auth_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # --- Initialen Admin-Token generieren, falls keine Benutzer vorhanden ---
+    from sqlalchemy.orm import Session
+    from models import User, AuthToken
+    from db import SessionLocal
+    import secrets
+
+    def generate_initial_admin_token():
+        db = SessionLocal()
+        try:
+            existing_users = db.query(User).count()
+            if existing_users == 0:
+                import string
+                token_str = secrets.token_urlsafe(6)[:8].upper()
+                token = AuthToken(token=token_str, rolle="admin", verwendet=False)
+                db.add(token)
+                db.commit()
+                print(f"\n🌟 Initialer Admin-Token (einmalig nutzbar): {token_str}\n")
+        finally:
+            db.close()
+    generate_initial_admin_token()
     yield
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Auth-Router einbinden
+app.include_router(auth_router)
 
 # --- WebSocket Dashboard Support ---
 from fastapi import WebSocket, WebSocketDisconnect
@@ -1000,6 +1025,7 @@ def get_top_filaments(db: Session = Depends(get_db)):
     )
     return [{"id": r.id, "name": r.name, "material": r.material, "farbe": r.farbe, "durchmesser": r.durchmesser, "verbrauch": int(r.verbrauch or 0)} for r in result]
 
+
 # Neuer API-Endpunkt: Verbrauch der letzten 7 Tage pro Typ (aus Verbrauchslog)
 @app.get("/api/status/weekly_usage")
 def get_weekly_usage(db: Session = Depends(get_db)):
@@ -1021,6 +1047,39 @@ def get_weekly_usage(db: Session = Depends(get_db)):
     )
     return [{"id": r.id, "name": r.name, "material": r.material, "farbe": r.farbe, "durchmesser": r.durchmesser, "verbrauch": int(r.verbrauch or 0)} for r in result]
 
+
+# Serve login.html for /login
+@app.get("/login", response_class=FileResponse)
+def serve_login_page():
+    path = os.path.join(static_dir, "login.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Login-Seite nicht gefunden")
+    return path
+
+# Serve login.html directly at /login.html
+@app.get("/login.html", response_class=FileResponse)
+def serve_login_html_direct():
+    path = os.path.join(static_dir, "login.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Login-Seite nicht gefunden")
+    return path
+
+# Serve register.html for /register
+@app.get("/register", response_class=FileResponse)
+def serve_register_page():
+    path = os.path.join(static_dir, "register.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Registrierungsseite nicht gefunden")
+    return path
+
+# Serve register.html directly at /register.html
+@app.get("/register.html", response_class=FileResponse)
+def serve_register_html_direct():
+    path = os.path.join(static_dir, "register.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Registrierungsseite nicht gefunden")
+    return path
+
 if __name__ == "__main__":
     import uvicorn
 
@@ -1030,3 +1089,6 @@ if __name__ == "__main__":
         print(f"➡️  http://{ip}:8000")
 
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
+
+

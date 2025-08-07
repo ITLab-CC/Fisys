@@ -76,3 +76,19 @@ class FilamentSpuleCreate(BaseModel):
     verpackt: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    rolle: Mapped[str] = mapped_column(String, nullable=False, default="user")
+
+class AuthToken(Base):
+    __tablename__ = "auth_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    rolle: Mapped[str] = mapped_column(String, nullable=False)
+    erstellt_am: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    verwendet: Mapped[bool] = mapped_column(Boolean, default=False)

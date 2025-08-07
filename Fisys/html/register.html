@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Registrieren | Fisys</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="min-h-screen flex bg-gray-50">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-gray-900 text-white flex flex-col justify-between fixed h-full">
+    <div>
+      <div class="pt-1 pb-1">
+        <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto">
+      </div>
+      <nav class="px-4 space-y-2">
+        <a href="/" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Dashboard</a>
+        <a href="/spulen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Spulen</a>
+        <a href="/filamentseite.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Filamenttypen</a>
+        <hr class="my-2 border-gray-700" />
+        <a href="/status" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Status</a>
+        <a href="/einstellungen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Einstellungen</a>
+      </nav>
+    </div>
+    <div class="mt-auto">
+      <div class="px-4 pb-2">
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      </div>
+      <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <div class="flex-1 flex flex-col ml-64 items-center justify-center">
+    <div class="bg-white shadow-md rounded p-8 w-full max-w-sm mt-10">
+      <div class="mb-6 text-center">
+        <h1 class="text-xl font-bold text-gray-700">Registrierung</h1>
+      </div>
+      <form method="POST" action="/register" class="space-y-4">
+        <div>
+          <label for="token" class="block text-sm font-medium text-gray-600">Registrierungscode</label>
+          <input type="text" id="token" name="token" required minlength="8" maxlength="8" class="mt-1 w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300" />
+        </div>
+        <div>
+          <label for="benutzername" class="block text-sm font-medium text-gray-600">Benutzername</label>
+          <input type="text" id="benutzername" name="benutzername" required class="mt-1 w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300" />
+        </div>
+        <div>
+          <label for="passwort" class="block text-sm font-medium text-gray-600">Passwort</label>
+          <input type="password" id="passwort" name="passwort" required class="mt-1 w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300" />
+        </div>
+        <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700 transition">Registrieren</button>
+        <div class="text-sm text-center mt-4">
+          <span class="text-gray-600">Bereits registriert?</span>
+          <a href="/login" class="text-blue-600 hover:underline">Zum Login</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

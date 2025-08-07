@@ -23,8 +23,8 @@
         </nav>
       </div>
       <div class="mt-auto">
-        <div class="px-4 pb-2">
-          <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+        <div class="px-4 pb-2" id="authBereich">
+          <!-- Wird per JavaScript ersetzt durch Login- oder Logout-Button -->
         </div>
         <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
       </div>
@@ -32,52 +32,165 @@
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col ml-64">
-      <header class="bg-gray-50 px-10 py-10">
+      <header class="bg-gray-50 px-10 py-10 relative">
         <h1 class="text-3xl font-bold">Einstellungen</h1>
         <p class="text-sm text-gray-500 mt-1">Verwalte globale Optionen und Systemeinstellungen</p>
       </header>
 
       <section class="flex-1 pt-2 px-10 pb-10">
-        <div class="bg-white p-6 rounded shadow max-w-xl">
-          <h2 class="text-xl font-semibold mb-4">Filamentbild hochladen & zuweisen</h2>
-          <form id="uploadForm" class="space-y-4">
-            <div>
-              <label for="bild" class="block text-sm font-medium text-gray-700 mb-1">Bild auswählen</label>
-              <input type="file" id="bild" name="file" accept="image/*" class="block w-full text-sm text-gray-700 border rounded px-3 py-2">
-            </div>
-            <div id="bildVorschauContainer" class="mt-2 hidden">
-              <p class="text-sm text-gray-600 mb-1">Vorschau:</p>
-              <img id="bildVorschau" src="" alt="Bildvorschau" class="h-24 rounded border">
-            </div>
-            <div>
-              <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">Bild hochladen</button>
-            </div>
-          </form>
-        </div>
+        <div class="flex flex-col xl:flex-row gap-8">
+          <!-- Seitenmenü -->
+          <aside class="w-full xl:w-1/4 bg-white shadow rounded p-4">
+            <h2 class="text-lg font-semibold mb-2">Einstellungen</h2>
+            <nav id="einstellungsMenue" class="space-y-2">
+              <button data-ziel="bilderVerwaltung" class="block w-full text-left px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">Bild hochladen</button>
+              <button data-ziel="vorhandeneBilderBlock" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Vorhandene Bilder</button>
+              <button data-ziel="tokenBlockContainer" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Token erstellen</button>
+              <button data-ziel="tokenUebersichtBlockContainer" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Token Übersicht</button>
+            </nav>
+          </aside>
 
-        <hr class="my-8" />
+          <!-- Inhalt -->
+          <div class="flex-1 space-y-10">
+            <!-- Filamentbild hochladen -->
+            <div id="bilderVerwaltung" class="hidden bg-white p-6 rounded shadow">
+              <h2 class="text-xl font-semibold mb-4">Filamentbild hochladen</h2>
+              <form id="uploadForm" class="space-y-4">
+                <div>
+                  <label for="bild" class="block text-sm font-medium text-gray-700 mb-1">Bild auswählen</label>
+                  <input type="file" id="bild" name="file" accept="image/*" class="block w-full text-sm text-gray-700 border rounded px-3 py-2">
+                </div>
+                <div id="bildVorschauContainer" class="mt-2 hidden">
+                  <p class="text-sm text-gray-600 mb-1">Vorschau:</p>
+                  <img id="bildVorschau" src="" alt="Bildvorschau" class="h-24 rounded border">
+                </div>
+                <div>
+                  <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">Bild hochladen</button>
+                </div>
+              </form>
+            </div>
 
-        <div class="bg-white p-6 rounded shadow max-w-5xl mt-6">
-          <h2 class="text-xl font-semibold mb-4">Vorhandene Bilder verwalten</h2>
-          <div class="overflow-x-auto">
-            <table class="min-w-full text-sm text-left border">
-              <thead class="bg-gray-100 border-b">
-                <tr>
-                  <th class="px-4 py-2">Bild</th>
-                  <th class="px-4 py-2">Zugewiesener Typ</th>
-                  <th class="px-4 py-2">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody id="bildVerwaltungTabelle">
-                <!-- Wird dynamisch per JavaScript befüllt -->
-              </tbody>
-            </table>
+            <!-- Token erstellen -->
+            <div id="tokenBlockContainer" class="hidden"></div>
+
+            <!-- Vorhandene Bilder -->
+            <div id="vorhandeneBilderBlock" class="hidden bg-white p-6 rounded shadow">
+              <h2 class="text-xl font-semibold mb-4">Vorhandene Bilder verwalten</h2>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-sm text-left border">
+                  <thead class="bg-gray-100 border-b">
+                    <tr>
+                      <th class="px-4 py-2">Bild</th>
+                      <th class="px-4 py-2">Zugewiesener Typ</th>
+                      <th class="px-4 py-2">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="bildVerwaltungTabelle"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Token-Tabelle -->
+            <div id="tokenUebersichtBlockContainer" class="hidden"></div>
           </div>
         </div>
       </section>
     </div>
 <script>
     document.addEventListener("DOMContentLoaded", async () => {
+      // Wechsel zwischen Einstellungsbereichen
+      document.getElementById("einstellungsMenue").addEventListener("click", (e) => {
+        const ziel = e.target.dataset.ziel;
+        if (!ziel) return;
+
+        // Alle Bereichscontainer verstecken
+        const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer"];
+        bereiche.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add("hidden");
+        });
+
+        // Gewählten Bereich anzeigen
+        const zielElement = document.getElementById(ziel);
+        if (zielElement) zielElement.classList.remove("hidden");
+      });
+      // Verstecke sensible Blöcke sofort
+      document.getElementById("bilderVerwaltung").classList.add("hidden");
+      document.getElementById("vorhandeneBilderBlock").classList.add("hidden");
+      let benutzerRolle = null;
+      const tokenBlock = document.createElement("div");
+      tokenBlock.className = "bg-white p-6 rounded shadow max-w-xl mt-10";
+      tokenBlock.innerHTML = `
+        <h2 class="text-xl font-semibold mb-4">Registrierungstoken erstellen</h2>
+        <form id="tokenForm" class="space-y-4">
+          <div>
+            <label for="rolle" class="block text-sm font-medium text-gray-700 mb-1">Rolle auswählen</label>
+            <select id="rolle" name="rolle" required class="block w-full text-sm text-gray-700 border rounded px-3 py-2">
+              <option value="">-- auswählen --</option>
+              <option value="user">User</option>
+              <option value="helper">Helper</option>
+              <option value="mod">Mod</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div>
+            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">Token generieren</button>
+          </div>
+        </form>
+        <div id="tokenAnzeige" class="mt-4 hidden">
+          <p class="text-sm text-gray-700">Token:</p>
+          <code id="generierterToken" class="block text-center mt-1 text-lg font-mono text-blue-600 bg-blue-100 p-2 rounded">________</code>
+        </div>
+      `;
+      // Token-Übersicht-Block erstellen
+      const tokenUebersichtBlock = document.createElement("div");
+      tokenUebersichtBlock.className = "bg-white p-6 rounded shadow max-w-xl mt-6";
+      tokenUebersichtBlock.innerHTML = `
+        <h2 class="text-xl font-semibold mb-4">Alle Tokens</h2>
+        <div id="tokenTabelleWrapper" class="overflow-x-auto">
+          <table class="min-w-full text-sm text-left border">
+            <thead class="bg-gray-100 border-b">
+              <tr>
+                <th class="px-4 py-2">Token</th>
+                <th class="px-4 py-2">Rolle</th>
+                <th class="px-4 py-2">Verwendet</th>
+                <th class="px-4 py-2">Aktion</th>
+              </tr>
+            </thead>
+            <tbody id="tokenTabelleBody"></tbody>
+          </table>
+        </div>
+      `;
+      const authBereich = document.getElementById("authBereich");
+      try {
+        const res = await fetch("/api/userinfo");
+        if (!res.ok) throw new Error("Nicht eingeloggt");
+        const daten = await res.json();
+        benutzerRolle = daten.rolle;
+        // Auth-Bereich dynamisch anpassen (Login/Logout, Benutzername)
+        authBereich.innerHTML = `
+          <form id="logoutForm" class="flex flex-col items-center">
+            <span class="text-sm text-gray-300 mb-1">Angemeldet als ${daten.username}</span>
+            <button type="submit" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition w-full">Logout</button>
+          </form>
+        `;
+        document.getElementById("logoutForm").addEventListener("submit", async (e) => {
+          e.preventDefault();
+          try {
+            const res = await fetch("/logout", { method: "POST" });
+            if (res.ok) {
+              window.location.href = "/login";
+            }
+          } catch (err) {
+            console.error("Logout fehlgeschlagen", err);
+          }
+        });
+      } catch (err) {
+        console.warn("Nicht eingeloggt – Weiterleitung zur Login-Seite");
+        window.location.href = "/login";
+        return;
+      }
+
       const tableBody = document.getElementById("bildVerwaltungTabelle");
 
       function zeigeBenachrichtigung(text, farbe = "blue") {
@@ -282,6 +395,100 @@
       confirmBtn.addEventListener("click", confirmHandler);
       cancelBtn.onclick = () => overlay.classList.add("hidden");
     }
+
+      if (["helper", "mod", "admin"].includes(benutzerRolle)) {
+        document.getElementById("bilderVerwaltung").classList.remove("hidden");
+        document.getElementById("vorhandeneBilderBlock").classList.remove("hidden");
+        if (["mod", "admin"].includes(benutzerRolle)) {
+          document.getElementById("tokenBlockContainer").appendChild(tokenBlock);
+          document.getElementById("tokenUebersichtBlockContainer").appendChild(tokenUebersichtBlock);
+          document.getElementById("tokenBlockContainer").classList.remove("hidden");
+          document.getElementById("tokenUebersichtBlockContainer").classList.remove("hidden");
+          ladeTokenTabelle();
+          const tokenForm = document.getElementById("tokenForm");
+          tokenForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const rolle = document.getElementById("rolle").value;
+            if (!rolle) {
+              zeigeBenachrichtigung("Bitte eine Rolle auswählen", "red");
+              return;
+            }
+            try {
+              const res = await fetch("/admin/create-token", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ rolle })
+              });
+              if (!res.ok) throw new Error(await res.text());
+              const daten = await res.json();
+              document.getElementById("generierterToken").textContent = daten.token;
+              document.getElementById("tokenAnzeige").classList.remove("hidden");
+              zeigeBenachrichtigung("Token erfolgreich erstellt.", "blue");
+            } catch (err) {
+              console.error("Token-Erstellung fehlgeschlagen", err);
+              zeigeBenachrichtigung("Fehler beim Erstellen des Tokens.", "red");
+            }
+          });
+        }
+      } else {
+        document.getElementById("bilderVerwaltung").remove();
+        document.getElementById("vorhandeneBilderBlock").remove();
+      }
+  // Funktion zum Laden der Token-Tabelle
+  async function ladeTokenTabelle() {
+    try {
+      const res = await fetch("/admin/tokens");
+      const tokens = await res.json();
+      const tbody = document.getElementById("tokenTabelleBody");
+      tbody.innerHTML = "";
+      tokens.forEach(t => {
+        const row = document.createElement("tr");
+        row.className = "border-b";
+        // Token
+        const tokenCell = document.createElement("td");
+        tokenCell.className = "px-4 py-2 font-mono";
+        tokenCell.textContent = t.token;
+        // Rolle
+        const rolleCell = document.createElement("td");
+        rolleCell.className = "px-4 py-2";
+        rolleCell.textContent = t.rolle;
+        // Verwendet
+        const verwendetCell = document.createElement("td");
+        verwendetCell.className = "px-4 py-2";
+        verwendetCell.textContent = t.verwendet ? "✅" : "❌";
+        // Aktion
+        const loeschBtn = document.createElement("button");
+        loeschBtn.textContent = "Löschen";
+        loeschBtn.className = "px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700";
+        loeschBtn.addEventListener("click", async () => {
+          zeigePopup("Diesen Token wirklich löschen?", async () => {
+            try {
+              const res = await fetch(`/admin/token/${t.token}`, { method: "DELETE" });
+              if (!res.ok) throw new Error(await res.text());
+              zeigeBenachrichtigung("Token gelöscht.", "blue");
+              ladeTokenTabelle();
+            } catch (err) {
+              console.error("Fehler beim Löschen des Tokens:", err);
+              zeigeBenachrichtigung("Fehler beim Löschen des Tokens.", "red");
+            }
+          });
+        });
+        const aktionCell = document.createElement("td");
+        aktionCell.className = "px-4 py-2";
+        aktionCell.appendChild(loeschBtn);
+        // Zeile zusammenbauen
+        row.appendChild(tokenCell);
+        row.appendChild(rolleCell);
+        row.appendChild(verwendetCell);
+        row.appendChild(aktionCell);
+        tbody.appendChild(row);
+      });
+    } catch (err) {
+      console.error("Fehler beim Laden der Tokens:", err);
+    }
+  }
   });
   </script>
   <div id="popupOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">

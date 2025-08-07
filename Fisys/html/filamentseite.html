@@ -24,7 +24,7 @@
     </div>
     <div class="mt-auto">
       <div class="px-4 pb-2">
-        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+        <div id="auth-bereich" class="text-center text-sm text-gray-300"></div>
       </div>
       <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
     </div>
@@ -428,6 +428,40 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   loadTypen();
+
+  // Auth-Bereich (Login/Logout)
+  const authBereich = document.getElementById("auth-bereich");
+
+  async function ladeAuthStatus() {
+    try {
+      const res = await fetch("/api/userinfo");
+      if (res.ok) {
+        const daten = await res.json();
+        authBereich.innerHTML = `
+          <form id="logoutForm" class="flex flex-col items-center">
+            <span class="text-sm text-gray-300 mb-1">Angemeldet als ${daten.username}</span>
+            <button type="submit" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition w-full">Logout</button>
+          </form>
+        `;
+        const logoutForm = document.getElementById("logoutForm");
+        logoutForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          await fetch("/logout", { method: "POST" });
+          location.reload();
+        });
+      } else {
+        authBereich.innerHTML = `
+          <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+        `;
+      }
+    } catch (err) {
+      authBereich.innerHTML = `
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      `;
+    }
+  }
+
+  ladeAuthStatus();
 });
   </script>
   <!-- Bestätigungs-Modal für Typ-Löschen -->
