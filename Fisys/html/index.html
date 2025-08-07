@@ -19,6 +19,7 @@
         <a href="/filamentseite.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Filamenttypen</a>
         <hr class="my-2 border-gray-700" />
         <a href="/status" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Status</a>
+        <a href="/einstellungen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Einstellungen</a>
       </nav>
     </div>
     <div class="mt-auto">
@@ -175,7 +176,7 @@
           imDruckerContainer.innerHTML += `
   <div class="bg-white rounded-xl shadow-sm max-w-sm w-full mx-auto flex flex-col overflow-hidden border border-gray-200">
     <div class="relative">
-      <img src="/static/assets/images/${spule.bildname || 'platzhalter.jpg'}" alt="${spule.typ_name}" class="w-full h-32 object-cover" />
+      <img src="/static/assets/images/${spule.bildname && spule.bildname !== 'null' ? spule.bildname : 'platzhalter.jpg'}" alt="${spule.typ_name}" class="w-full h-32 object-cover object-center" />
       <div class="absolute top-2 right-2 bg-white bg-opacity-80 text-xs px-2 py-0.5 rounded text-gray-600 border border-gray-300">
         ID: ${spule.spulen_id}
       </div>

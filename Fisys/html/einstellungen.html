@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Einstellungen | Fisys</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen flex bg-gray-50">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
+      <div>
+        <div class="pt-1 pb-1">
+          <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto">
+        </div>
+        <nav class="px-4 space-y-2">
+          <a href="/" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Dashboard</a>
+          <a href="/spulen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Spulen</a>
+          <a href="/filamentseite.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Filamenttypen</a>
+          <hr class="my-2 border-gray-700" />
+          <a href="/status" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Status</a>
+          <a href="/einstellungen.html" class="block px-4 py-2 rounded bg-gray-800 font-semibold text-white">Einstellungen</a>
+        </nav>
+      </div>
+      <div class="mt-auto">
+        <div class="px-4 pb-2">
+          <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+        </div>
+        <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <div class="flex-1 flex flex-col ml-64">
+      <header class="bg-gray-50 px-10 py-10">
+        <h1 class="text-3xl font-bold">Einstellungen</h1>
+        <p class="text-sm text-gray-500 mt-1">Verwalte globale Optionen und Systemeinstellungen</p>
+      </header>
+
+      <section class="flex-1 pt-2 px-10 pb-10">
+        <div class="bg-white p-6 rounded shadow max-w-xl">
+          <h2 class="text-xl font-semibold mb-4">Filamentbild hochladen & zuweisen</h2>
+          <form id="uploadForm" class="space-y-4">
+            <div>
+              <label for="bild" class="block text-sm font-medium text-gray-700 mb-1">Bild auswählen</label>
+              <input type="file" id="bild" name="file" accept="image/*" class="block w-full text-sm text-gray-700 border rounded px-3 py-2">
+            </div>
+            <div id="bildVorschauContainer" class="mt-2 hidden">
+              <p class="text-sm text-gray-600 mb-1">Vorschau:</p>
+              <img id="bildVorschau" src="" alt="Bildvorschau" class="h-24 rounded border">
+            </div>
+            <div>
+              <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">Bild hochladen</button>
+            </div>
+          </form>
+        </div>
+
+        <hr class="my-8" />
+
+        <div class="bg-white p-6 rounded shadow max-w-5xl mt-6">
+          <h2 class="text-xl font-semibold mb-4">Vorhandene Bilder verwalten</h2>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm text-left border">
+              <thead class="bg-gray-100 border-b">
+                <tr>
+                  <th class="px-4 py-2">Bild</th>
+                  <th class="px-4 py-2">Zugewiesener Typ</th>
+                  <th class="px-4 py-2">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="bildVerwaltungTabelle">
+                <!-- Wird dynamisch per JavaScript befüllt -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+<script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const tableBody = document.getElementById("bildVerwaltungTabelle");
+
+      function zeigeBenachrichtigung(text, farbe = "blue") {
+        const box = document.getElementById("benachrichtigung");
+        box.textContent = text;
+        box.className = `fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-${farbe}-600 text-white px-4 py-2 rounded shadow z-50 text-sm`;
+        box.classList.remove("hidden");
+        setTimeout(() => box.classList.add("hidden"), 3000);
+      }
+
+      async function ladeBilder() {
+        try {
+          const response = await fetch("/bilder/");
+          const bilder = await response.json();
+
+          tableBody.innerHTML = "";
+
+          bilder.forEach((bild) => {
+            if (bild.bildname === "platzhalter.jpg") return;
+            const row = document.createElement("tr");
+            row.classList.add("border-b");
+
+            const imgCell = document.createElement("td");
+            imgCell.className = "px-4 py-2";
+            imgCell.innerHTML = `<img src="/static/assets/images/${bild.bildname}" alt="${bild.bildname}" class="h-16 rounded object-contain" />`;
+
+            const typCell = document.createElement("td");
+            typCell.className = "px-4 py-2";
+            typCell.innerText = bild.zugewiesen_an
+              ? `${bild.zugewiesen_an.name} (${bild.zugewiesen_an.material}, ${bild.zugewiesen_an.farbe}, ${bild.zugewiesen_an.durchmesser}mm)`
+              : "Nicht zugewiesen";
+
+            const actionsCell = document.createElement("td");
+            actionsCell.className = "px-4 py-2 space-x-2";
+
+            const entknopf = document.createElement("button");
+            entknopf.innerText = "Zuweisung entfernen";
+            entknopf.className = "px-2 py-1 bg-yellow-500 text-white rounded text-xs hover:bg-yellow-600";
+
+            entknopf.addEventListener("click", async () => {
+              zeigePopup("Zuweisung dieses Bildes entfernen?", async () => {
+                try {
+                  const res = await fetch(`/bilder/${bild.bildname}/entferne-typ`, { method: "PATCH" });
+                  if (!res.ok) throw new Error(await res.text());
+                  zeigeBenachrichtigung("Zuweisung entfernt", "blue");
+                  ladeBilder();
+                } catch (err) {
+                  console.error("Fehler beim Entfernen der Zuweisung:", err);
+                  zeigeBenachrichtigung("Fehler beim Entfernen der Zuweisung.", "red");
+                }
+              });
+            });
+
+            const typwechsel = document.createElement("button");
+            typwechsel.innerText = "Typ ändern";
+            typwechsel.className = "px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600";
+
+            typwechsel.addEventListener("click", async () => {
+              zeigeTypPopup(async (typId) => {
+                try {
+                  const formData = new FormData();
+                  formData.append("bildname", bild.bildname);
+                  const res = await fetch(`/typs/${typId}/bild`, {
+                    method: "PATCH",
+                    body: formData,
+                  });
+                  if (!res.ok) throw new Error(await res.text());
+                  zeigeBenachrichtigung("Typ erfolgreich zugewiesen.", "blue");
+                  ladeBilder();
+                } catch (err) {
+                  console.error("Fehler beim Typwechsel:", err);
+                  zeigeBenachrichtigung("Fehler beim Zuweisen des Typs.", "red");
+                }
+              });
+            });
+
+            const löschen = document.createElement("button");
+            löschen.innerText = "Löschen";
+            löschen.className = "px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700";
+
+            löschen.addEventListener("click", async () => {
+              zeigePopup("Dieses Bild wirklich löschen?", async () => {
+                try {
+                  const res = await fetch(`/bilder/${bild.bildname}`, { method: "DELETE" });
+                  if (!res.ok) throw new Error(await res.text());
+                  zeigeBenachrichtigung("Bild gelöscht.", "blue");
+                  ladeBilder();
+                } catch (err) {
+                  console.error("Fehler beim Löschen:", err);
+                  zeigeBenachrichtigung("Fehler beim Löschen des Bildes.", "red");
+                }
+              });
+            });
+
+            actionsCell.append(entknopf, typwechsel, löschen);
+            row.append(imgCell, typCell, actionsCell);
+            tableBody.appendChild(row);
+          });
+        } catch (err) {
+          console.error("Fehler beim Laden der Bilder:", err);
+        }
+      }
+
+      ladeBilder();
+
+      function zeigePopup(text, onConfirm) {
+        const overlay = document.getElementById("popupOverlay");
+        const popupText = document.getElementById("popupText");
+        const popupConfirm = document.getElementById("popupConfirm");
+        const popupCancel = document.getElementById("popupCancel");
+
+        popupText.innerText = text;
+        overlay.classList.remove("hidden");
+
+        const confirmHandler = () => {
+          overlay.classList.add("hidden");
+          onConfirm();
+          popupConfirm.removeEventListener("click", confirmHandler);
+        };
+
+        popupConfirm.addEventListener("click", confirmHandler);
+        popupCancel.onclick = () => overlay.classList.add("hidden");
+      }
+
+      const uploadForm = document.getElementById("uploadForm");
+      uploadForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const formData = new FormData(uploadForm);
+        const file = formData.get("file");
+        if (!file || !file.name) {
+          zeigeBenachrichtigung("Bitte ein Bild auswählen.", "red");
+          return;
+        }
+        try {
+          const response = await fetch("/upload-image/", {
+            method: "POST",
+            body: formData,
+          });
+          if (!response.ok) {
+            const error = await response.text();
+            throw new Error(error);
+          }
+          zeigeBenachrichtigung("Bild erfolgreich hochgeladen!", "blue");
+          uploadForm.reset();
+          ladeBilder();
+        } catch (err) {
+          console.error("Fehler beim Hochladen:", err);
+          zeigeBenachrichtigung("Fehler beim Hochladen des Bildes.", "red");
+        }
+      });
+
+      // Bild-Vorschau anzeigen
+      const bildInput = document.getElementById("bild");
+      const vorschauContainer = document.getElementById("bildVorschauContainer");
+      const vorschauBild = document.getElementById("bildVorschau");
+
+      bildInput.addEventListener("change", () => {
+        const file = bildInput.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            vorschauBild.src = reader.result;
+            vorschauContainer.classList.remove("hidden");
+          };
+          reader.readAsDataURL(file);
+        } else {
+          vorschauContainer.classList.add("hidden");
+        }
+      });
+    // Modales Popup zum Eingeben der Typ-ID
+    function zeigeTypPopup(onConfirm) {
+      const overlay = document.getElementById("typPopupOverlay");
+      const select = document.getElementById("typPopupSelect");
+      const confirmBtn = document.getElementById("typPopupConfirm");
+      const cancelBtn = document.getElementById("typPopupCancel");
+
+      // Vorherige Optionen löschen
+      select.innerHTML = `<option value="">-- Typ auswählen --</option>`;
+
+      // Typen laden
+      fetch("/typs/")
+        .then((res) => res.json())
+        .then((typen) => {
+          typen.forEach((typ) => {
+            const option = document.createElement("option");
+            option.value = typ.id;
+            option.textContent = `${typ.name} (${typ.material}, ${typ.farbe}, ${typ.durchmesser}mm)`;
+            select.appendChild(option);
+          });
+        });
+
+      overlay.classList.remove("hidden");
+
+      const confirmHandler = () => {
+        const typId = select.value;
+        if (!typId) return;
+        overlay.classList.add("hidden");
+        onConfirm(typId);
+        confirmBtn.removeEventListener("click", confirmHandler);
+      };
+
+      confirmBtn.addEventListener("click", confirmHandler);
+      cancelBtn.onclick = () => overlay.classList.add("hidden");
+    }
+  });
+  </script>
+  <div id="popupOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center">
+      <p id="popupText" class="mb-4 text-sm text-gray-800">Bist du sicher?</p>
+      <div class="flex justify-center gap-4">
+        <button id="popupCancel" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm">Abbrechen</button>
+        <button id="popupConfirm" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm">Ja, bestätigen</button>
+      </div>
+    </div>
+  </div>
+  <div id="typPopupOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center">
+      <p class="mb-2 text-sm text-gray-800">Wähle einen neuen Typ aus:</p>
+      <select id="typPopupSelect" class="w-full mb-4 px-3 py-2 border rounded text-sm focus:outline-none focus:ring">
+        <option value="">-- Typ auswählen --</option>
+      </select>
+      <div class="flex justify-center gap-4">
+        <button id="typPopupCancel" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm">Abbrechen</button>
+        <button id="typPopupConfirm" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Typ ändern</button>
+      </div>
+    </div>
+  </div>
+  <div id="benachrichtigung" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-blue-600 text-white px-4 py-2 rounded shadow hidden z-50 text-sm"></div>
+  </body>
+</html>

@@ -337,8 +337,15 @@ async def update_spule(spulen_id: int, spule_update: FilamentSpuleCreate, db: Se
         spule.gesamtmenge = spule_update.gesamtmenge
     if spule_update.restmenge is not None and spule_update.restmenge != spule.restmenge:
         print(f"Update Spule ID {spule.spulen_id}: alt_gewicht={spule.alt_gewicht}, restmenge={spule.restmenge}, neuer Wert={spule_update.restmenge}")
+        verbrauch = spule.restmenge - spule_update.restmenge
         spule.alt_gewicht = spule.restmenge
         spule.restmenge = spule_update.restmenge
+        if verbrauch > 0:
+            eintrag = FilamentVerbrauch(
+                typ_id=spule.typ_id,
+                verbrauch_in_g=verbrauch
+            )
+            db.add(eintrag)
     if spule_update.in_printer is not None:
         # Prüfung: Maximal 4 Spulen im Drucker
         if spule_update.in_printer and not spule.in_printer:
@@ -365,8 +372,15 @@ def patch_spule(spulen_id: int, update: SpuleUpdate, db: Session = Depends(get_d
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule nicht gefunden")
+    verbrauch = spule.restmenge - update.restmenge
     spule.alt_gewicht = spule.restmenge
     spule.restmenge = update.restmenge
+    if verbrauch > 0:
+        eintrag = FilamentVerbrauch(
+            typ_id=spule.typ_id,
+            verbrauch_in_g=verbrauch
+        )
+        db.add(eintrag)
     if update.in_printer is not None:
         # Prüfung: Maximal 4 Spulen im Drucker
         if update.in_printer and not spule.in_printer:
@@ -463,7 +477,6 @@ async def assign_image_to_typ(typ_id: int, request: Request, db: Session = Depen
     if bild_input is None:
         raise HTTPException(status_code=400, detail="Kein Bildname angegeben")
 
-    # Robustere Typprüfung: .filename nur bei UploadFile verwenden
     if isinstance(bild_input, UploadFile):
         bildname = bild_input.filename
     else:
@@ -473,8 +486,13 @@ async def assign_image_to_typ(typ_id: int, request: Request, db: Session = Depen
     if not typ:
         raise HTTPException(status_code=404, detail=f"Typ-ID {typ_id} nicht gefunden")
 
-    if not bildname:
-        raise HTTPException(status_code=400, detail="Kein Bildname angegeben")
+    # Andere Typen, die das Bild nutzen → zurücksetzen
+    andere_typs = db.query(FilamentTyp).filter(
+        FilamentTyp.bildname == bildname,
+        FilamentTyp.id != typ_id
+    ).all()
+    for anderer in andere_typs:
+        anderer.bildname = None
 
     typ.bildname = bildname
     try:
@@ -495,11 +513,22 @@ def list_images(db: Session = Depends(get_db)):
         result = []
         for file in all_files:
             typ = db.query(FilamentTyp).filter_by(bildname=file).first()
-            result.append({
-                "bildname": file,
-                "typ_name": typ.name if typ else None,
-                "typ_farbe": typ.farbe if typ else None
-            })
+            if typ:
+                result.append({
+                    "bildname": file,
+                    "zugewiesen_an": {
+                        "id": typ.id,
+                        "name": typ.name,
+                        "material": typ.material,
+                        "farbe": typ.farbe,
+                        "durchmesser": typ.durchmesser
+                    }
+                })
+            else:
+                result.append({
+                    "bildname": file,
+                    "zugewiesen_an": None
+                })
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fehler beim Lesen der Bilder: {str(e)}")
@@ -719,6 +748,23 @@ def serve_status_page():
     return path
 
 
+# Serve einstellungen.html für /einstellungen
+@app.get("/einstellungen", response_class=FileResponse)
+def serve_settings_page():
+    path = os.path.join(static_dir, "einstellungen.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Seite nicht gefunden")
+    return path
+
+# Serve einstellungen.html directly at /einstellungen.html
+@app.get("/einstellungen.html", response_class=FileResponse)
+def serve_settings_html():
+    path = os.path.join(static_dir, "einstellungen.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    return path
+
+
 # Neuer API-Endpunkt: Statistik für Typen und Spulen
 @app.get("/stats", response_class=JSONResponse)
 def get_typ_and_spulen_stats(db: Session = Depends(get_db)):
@@ -780,6 +826,7 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "gesamtmenge": s.gesamtmenge,
         "created_at": s.created_at,
         "updated_at": s.updated_at,
+        "bildname": s.typ.bildname  # neu hinzugefügt
     } for s in im_drucker_spulen]
 
     # Auch im Drucker gruppiert nach Typ (wie /drucker_data)

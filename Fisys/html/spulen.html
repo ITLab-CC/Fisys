@@ -20,6 +20,7 @@
         <a href="/filamentseite.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Filamenttypen</a>
         <hr class="my-2 border-gray-700" />
         <a href="/status" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Status</a>
+        <a href="/einstellungen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Einstellungen</a>
       </nav>
     </div>
     <div class="mt-auto">
@@ -106,7 +107,7 @@ async function loadSpulen() {
     <div class="flex gap-4 bg-white rounded-lg shadow-lg p-6 min-h-[180px] w-[580px]">
       <div class="flex flex-col items-center justify-center h-full">
         <div class="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-lg shadow-inner">
-          <img src="/static/assets/images/${spule.typ && spule.typ.bildname ? spule.typ.bildname : 'platzhalter.jpg'}" alt="Typ Bild" class="max-w-full max-h-full object-contain" />
+                      <img src="/static/assets/images/${spule.typ && spule.typ.bildname && spule.typ.bildname !== 'null' ? spule.typ.bildname : 'platzhalter.jpg'}" alt="${spule.typ ? spule.typ.name : 'Unbekannt'}" class="w-full h-32 object-contain bg-white" />
         </div>
         <div class="flex justify-center mt-6">
           <svg width="60" height="60" viewBox="0 0 36 36" class="donut" style="transform: rotate(-90deg) scaleY(-1); transform-origin: 50% 50%; display: block; margin: 0 auto;">
