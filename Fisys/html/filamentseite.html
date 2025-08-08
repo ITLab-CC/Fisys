@@ -1,505 +1,616 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  
-    <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#222">
-  <title>Fisys Produktdetails</title>
-  
-  <link rel="stylesheet" type="text/css" href="/static/assets/style.css" >
-
-  <style>
-    html {
-      background-color: #222;
-    }
-    html {
-      height: 100%;
-    }
-
-    body {
-      min-height: 100%;
-      position: relative;
-      margin: 0;
-      padding: 0;
-      z-index: 0;
-    }
-    .popup-buttons button {
-      font-size: 1rem;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      margin: 0 8px;
-    }
-
-    .popup-buttons {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      margin-top: 1em;
-    }
-
-    .popup-buttons button#confirm-print {
-      background-color: #007b5e; /* dunkles Türkisgrün passend zur Website */
-      color: white;
-    }
-
-    .popup-buttons button.cancel-print {
-      background-color: #b80028; /* dunkles, warmes Rot */
-      color: white;
-    }
-    .blurred::before {
-      content: "";
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      backdrop-filter: blur(5px);
-      z-index: 10;
-    }
-
-    .blur-popup {
-      z-index: 100;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: #1e1e1e;
-      padding: 1em;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .restmenge-bar.in-printer {
-      background-color: orange !important;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.9em;
-    }
-
-    .download-qrcode {
-      position: absolute;
-      top: 8px;
-      left: 5px;
-      background-color: #444;
-      padding: 6px;
-      border-radius: 8px;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .download-qrcode svg {
-      fill: white;
-      width: 18px;
-      height: 18px;
-    }
-
-    .download-qrcode span {
-      color: white;
-      font-size: 0.75em;
-      margin-left: 4px;
-    }
-
-    .print-qrcode {
-      position: absolute;
-      left: 5px;
-      bottom: 8px;
-      background-color: #444;
-      padding: 6px;
-      border-radius: 8px;
-      text-decoration: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .print-qrcode svg {
-      fill: white;
-      width: 18px;
-      height: 18px;
-    }
-
-    .print-qrcode span {
-      color: white;
-      font-size: 0.75em;
-      margin-left: 4px;
-    }
-
-    .spulenbild-wrapper {
-      position: relative;
-    }
-
-    .verpackt-label {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: red;
-      color: white;
-      padding: 6px 12px;
-      font-weight: bold;
-      border-radius: 4px;
-      font-size: 1em;
-      z-index: 20;
-      pointer-events: none;
-    }
-
-    .spule-card {
-      cursor: pointer;
-    }
-
-    .popup-content {
-      background: #2c2c2c;
-      color: #f0f0f0;
-      font-family: "Helvetica Neue", sans-serif;
-      border-radius: 10px;
-      padding: 20px 30px;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-      min-width: 300px;
-      max-width: 90vw;
-    }
-
-    .popup-content h3 {
-      font-size: 1.5em;
-      margin-bottom: 0.5em;
-      color: #ffffff;
-      text-align: center;
-    }
-
-    .popup-content p {
-      font-size: 1em;
-      margin-bottom: 1em;
-      color: #dddddd;
-      text-align: center;
-    }
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(270deg, #111, #222, #333, #222, #111);
-      background-size: 400% 400%;
-      animation: animated-bg 20s linear infinite;
-      z-index: -1;
-      pointer-events: none;
-    }
-
-    @keyframes animated-bg {
-      0% { background-position: 0% 0%; }
-      50% { background-position: 100% 0%; }
-      100% { background-position: 0% 0%; }
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Filamenttyp – Fisys</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
+<body class="min-h-screen flex bg-gray-50">
+  <!-- Sidebar -->
+  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
+    <div>
+      <div class="pt-1 pb-1">
+        <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto">
+      </div>
+      <nav class="px-4 space-y-2">
+        <a href="/" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Dashboard</a>
+        <a href="/spulen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Spulen</a>
+        <a href="/filamentseite.html" class="block px-4 py-2 rounded bg-gray-800 font-semibold text-white">Filamenttypen</a>
+        <hr class="my-2 border-gray-700" />
+        <a href="/status" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Status</a>
+        <a href="/einstellungen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Einstellungen</a>
+      </nav>
+    </div>
+    <div class="mt-auto">
+      <div class="px-4 pb-2">
+        <div id="auth-bereich" class="text-center text-sm text-gray-300"></div>
+      </div>
+      <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
+    </div>
+  </aside>
 
-<body>
+  <!-- Main content -->
+  <div class="flex-1 flex flex-col ml-64">
+    <header class="bg-gray-50 px-10 py-10">
+      <h1 class="text-3xl font-bold">Filamenttypen</h1>
+      <p class="text-sm text-gray-500 mt-1">Alle verfügbaren Typen im Überblick</p>
+    </header>
 
-
-  <div class="logo">
-    <a href="/"><img src="/static/assets/Fisys Logo.png" alt="Fisys Logo"></a>
-  </div>
-
-    <div class="center-container">
-  
-  <div id="typ-details">
-    <h1 id="filament-title">[Filamenttyp]</h1>
-    <p><strong>Material:</strong> <span id="typ-material"></span></p>
-    <p><strong>Farbe:</strong> <span id="typ-farbe"></span></p>
-    <p><strong>Durchmesser:</strong> <span id="typ-durchmesser"></span> mm</p>
-    <p><strong>Hersteller:</strong> <span id="typ-hersteller"></span></p>
-    <p><strong>Leergewicht:</strong> <span id="typ-leergewicht"></span> g</p>
-  </div>
-
-  <div id="spulen-container" class="spulen-grid">
-    <template id="spule-template">
-      <div class="spule-card">
-        <div class="spulenbild-wrapper">
-          <div class="verpackt-label" style="display: none;">VERPACKT</div>
-          <a class="download-qrcode" href="" download title="QR-Code herunterladen">
-            <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 24 24" width="18">
-              <path d="M0 0h24v24H0z" fill="none"/>
-              <path d="M5 20h14v-2H5v2zm7-18v12l4-4h-3V4h-2v6h-3l4 4z"/>
-            </svg>
-            <span>QR-Code</span>
-          </a>
-          <img src="" alt="Spulenbild">
-          <button class="bearbeiten-button" data-id="" title="Bearbeiten">
-            <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 24 24" width="18" fill="#ffffff">
-              <path d="M0 0h24v24H0z" fill="none"/>
-              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/>
-            </svg>
-          </button>
-          <a class="print-qrcode" href="#" title="QR-Code drucken">
-            <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 24 24" width="18">
-              <path d="M0 0h24v24H0z" fill="none"/>
-              <path d="M19 8h-1V3H6v5H5c-1.1 0-2 .9-2 2v9c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-9c0-1.1-.9-2-2-2zM6 5h10v3H6V5zm13 14H5v-9h14v9z"/>
-            </svg>
-            <span>QR-Code drucken</span>
-          </a>
-        </div>
-        <div class="spule-info">
-          <p><strong>Spulen-ID:</strong> <span class="spule-id"></span></p>
-          <p><strong>Gesamtmenge:</strong> <span class="spule-gesamtmenge"></span> g</p>
-          <p><strong>Restmenge:</strong> <span class="spule-restmenge"></span> g</p>
-        </div>
-        <div class="restmenge-bar-wrapper">
-          <div class="restmenge-bar" style="width: 75%;"></div>
+    <section class="flex-1 pt-2 px-10 pb-10">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <input
+          type="text"
+          id="suchfeld"
+          placeholder="Filamenttyp suchen..."
+          class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded shadow-sm text-sm focus:outline-none focus:ring focus:border-blue-300"
+        />
+        <div class="flex gap-2" id="button-container" style="display: none;">
+          <button id="btn-typ-hinzufuegen" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">+ Typ hinzufügen</button>
+          <button id="btn-spule-hinzufuegen" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">+ Spule hinzufügen</button>
         </div>
       </div>
-    </template>
+      <!-- Modal Spule hinzufügen -->
+      <div id="modal-spule" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg w-full max-w-md p-6">
+          <h2 class="text-xl font-bold mb-4">Neue Spule hinzufügen</h2>
+          <form id="modal-spule-form" class="space-y-4">
+            <div>
+              <label for="spule-typ" class="block font-medium mb-1">Filamenttyp <span class="text-red-500">*</span></label>
+              <div class="relative">
+                <button id="dropdown-button" type="button" class="w-full bg-white border border-gray-300 rounded px-3 py-2 text-left focus:outline-none focus:ring focus:border-blue-500 flex justify-between items-center">
+                  <span id="dropdown-selected">Bitte wählen</span>
+                  <svg class="w-4 h-4 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div id="dropdown-container" class="absolute z-10 hidden w-full bg-white border border-gray-300 rounded mt-1 shadow-lg">
+                  <input type="text" id="dropdown-search" placeholder="Suchen..." class="w-full px-3 py-2 border-b border-gray-300 text-sm focus:outline-none">
+                  <ul id="dropdown-list" class="max-h-48 overflow-auto"></ul>
+                </div>
+              </div>
+              <input type="hidden" id="spule-typ" name="spule-typ" required />
+            </div>
+            <div>
+              <label for="gesamtmenge" class="block font-medium mb-1">Gesamtmenge (g) <span class="text-red-500">*</span></label>
+              <input type="number" id="gesamtmenge" name="gesamtmenge" min="1" step="1" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+            </div>
+            <div class="flex justify-end gap-2 pt-4">
+              <button type="button" id="modal-spule-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
+              <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Speichern</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div id="spulen-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4"></div>
+    </section>
   </div>
-</div>
 
-
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  let typId = null;
-
-  // Versuch 1: Query-Parameter
-  const urlParams = new URLSearchParams(window.location.search);
-  typId = urlParams.get("typ_id");
-
-  // Versuch 2: Pfad aus URL auslesen, falls keine Query
-  if (!typId) {
-    const pathParts = window.location.pathname.split('/');
-    if (pathParts.length > 2) {
-      typId = pathParts[2];
-    }
+  <script>
+// Stelle sicher, dass das Modal für "+ Spule hinzufügen" zuverlässig geöffnet wird
+window.addEventListener("DOMContentLoaded", () => {
+  // Für Typenmodal Abbrechen-Button
+  const cancelTypBtn = document.getElementById("modal-cancel");
+  const modalTyp = document.getElementById("modal");
+  if (cancelTypBtn && modalTyp) {
+    cancelTypBtn.addEventListener("click", () => {
+      modalTyp.classList.add("hidden");
+    });
   }
 
-  if (!typId) return;
+  async function loadTypen() {
+    // Hole Benutzerrolle
+    const userInfo = await fetch("/api/userinfo");
+    const daten = userInfo.ok ? await userInfo.json() : {};
+    const res = await fetch("/typs/");
+    const typen = await res.json();
 
-  fetch(`/typs/${typId}`)
-    .then(response => response.json())
-    .then(typ => {
-      document.getElementById("filament-title").textContent = typ.name;
-      document.getElementById("typ-material").textContent = typ.material;
-      document.getElementById("typ-farbe").textContent = typ.farbe;
-      document.getElementById("typ-durchmesser").textContent = typ.durchmesser;
-      document.getElementById("typ-hersteller").textContent = typ.hersteller || "-";
-      document.getElementById("typ-leergewicht").textContent = typ.leergewicht || "-";
+    const container = document.getElementById("spulen-container");
+    container.innerHTML = "";
 
-      const container = document.getElementById("spulen-container");
-      const template = document.getElementById("spule-template");
+    typen.forEach(typ => {
+      const el = document.createElement("div");
+      el.innerHTML = `
+        <div class="bg-white rounded-xl shadow-sm max-w-sm w-full mx-auto flex flex-col overflow-hidden border border-gray-200">
+          <div class="relative">
+            <img src="/static/assets/images/${typ.bildname && typ.bildname !== 'null' ? typ.bildname : 'platzhalter.jpg'}" alt="${typ.name}" class="w-full h-32 object-cover" />
+            <div class="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
+              ${typ.spulen.length}
+            </div>
+          </div>
+          <div class="p-4 flex flex-col space-y-1 text-sm text-gray-700">
+            <div class="font-semibold text-gray-900 text-base">${typ.name}</div>
+            <div class="flex justify-between"><span>Material:</span><span>${typ.material}</span></div>
+            <div class="flex justify-between"><span>Farbe:</span><span>${typ.farbe}</span></div>
+            <div class="flex justify-between"><span>Durchmesser:</span><span>${typ.durchmesser} mm</span></div>
+            <div class="flex justify-between"><span>Hersteller:</span><span>${typ.hersteller || '–'}</span></div>
+            <div class="flex justify-between"><span>Leergewicht:</span><span>${typ.leergewicht ?? 0} g</span></div>
+            ${typ.hinweise ? `<p class="text-gray-500 text-xs italic mt-2">${typ.hinweise}</p>` : ''}
+            <div class="pt-2 flex gap-2">
+              <a href="/spulen.html?typ_id=${typ.id}" class="flex-1 inline-block px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium text-center">
+                Spulen ansehen
+              </a>
+              ${["mod", "admin"].includes(daten.rolle) ? `
+                <button data-id="${typ.id}" class="bearbeite-typ-btn px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-sm font-medium">
+                  Bearbeiten
+                </button>
+              ` : ""}
+              ${["mod", "admin"].includes(daten.rolle) ? `
+                <button data-id="${typ.id}" class="delete-typ-btn px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition text-sm font-medium">
+                  Löschen
+                </button>
+              ` : ""}
+            </div>
+          </div>
+        </div>
+      `;
+      container.appendChild(el);
+      // Bearbeiten-Button Event-Listener nur hinzufügen, wenn Button existiert
+      const bearbeiteBtn = el.querySelector(".bearbeite-typ-btn");
+      if (bearbeiteBtn) {
+        bearbeiteBtn.addEventListener("click", () => {
+          // Modal öffnen
+          const modal = document.getElementById("modal");
+          const form = document.getElementById("modal-form");
+          modal.classList.remove("hidden");
+          document.body.style.overflow = "hidden";
 
-      typ.spulen.forEach(spule => {
-        const clone = template.content.cloneNode(true);
-        const img = clone.querySelector("img");
-        const bildName = (typ.bildname || 'platzhalter.jpg').split('/').pop();
-        img.src = `/static/assets/images/${bildName}`;
-        img.onerror = function() {
-          this.onerror = null;
-          this.src = '/static/assets/images/platzhalter.jpg';
-        };
-        clone.querySelector(".spule-id").textContent = spule.spulen_id;
-        clone.querySelector(".download-qrcode").href = `/static/assets/images/qrcodes/qrcode_spule_id_${spule.spulen_id}.png`;
-        const printBtn = clone.querySelector(".print-qrcode");
-        printBtn.setAttribute("data-id", spule.spulen_id);
-        printBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          selectedSpuleId = spule.spulen_id;
-          showQrPopup();
+          // Formular mit bestehenden Daten füllen
+          form.name.value = typ.name;
+          form.material.value = typ.material;
+          form.farbe.value = typ.farbe;
+          form.durchmesser.value = typ.durchmesser;
+          form.hersteller.value = typ.hersteller || "";
+          form.hinweise.value = typ.hinweise || "";
+          form.leergewicht.value = typ.leergewicht ?? 0;
+
+          form.setAttribute("data-mode", "edit");
+          form.setAttribute("data-id", typ.id);
         });
-        clone.querySelector(".spule-restmenge").textContent = spule.restmenge;
-        clone.querySelector(".spule-gesamtmenge").textContent = spule.gesamtmenge;
-        const restBar = clone.querySelector(".restmenge-bar");
-        const rest = Math.round((spule.restmenge / spule.gesamtmenge) * 100);
-        if (spule.in_printer) {
-          restBar.style.width = "100%";
-          restBar.classList.add("in-printer");
-          restBar.textContent = "Im Drucker";
-        } else {
-          restBar.style.width = rest + "%";
-          restBar.textContent = "";
-        }
-        if (spule.verpackt) {
-          clone.querySelector(".verpackt-label").style.display = "block";
-        }
+      }
+      // Löschen-Button Event-Listener nur hinzufügen, wenn Button existiert
+      const deleteBtn = el.querySelector(".delete-typ-btn");
+      if (deleteBtn) {
+        deleteBtn.addEventListener("click", async () => {
+          if (typ.spulen.length > 0) {
+            zeigeHinweis("Dieser Typ kann nicht gelöscht werden, da ihm noch Spulen zugeordnet sind.", "bg-red-600");
+            return;
+          }
 
-        const spuleCard = clone.querySelector(".spule-card");
-        // --- Farbklassenzuweisung (Farbrand) ---
-        const farbe = typ.farbe?.toLowerCase().replace(/\s+/g, "") || "";
-        let farbschlüssel = "";
-        if (farbe.includes("blau")) farbschlüssel = "blau";
-        else if (farbe.includes("rot")) farbschlüssel = "rot";
-        else if (farbe.includes("grau")) farbschlüssel = "grau";
-        else if (farbe.includes("magenta")) farbschlüssel = "magenta";
-        else if (farbe.includes("pink")) farbschlüssel = "pink";
-        else if (farbe.includes("cyan")) farbschlüssel = "cyan";
-        else if (farbe.includes("birke")) farbschlüssel = "birke";
-        else if (farbe.includes("gelb")) farbschlüssel = "gelb";
-        else if (farbe.includes("schwarz")) farbschlüssel = "schwarz";
-        else if (farbe.includes("weiß") || farbe.includes("weiss")) farbschlüssel = "weiß";
-        else if (farbe.includes("grün")) farbschlüssel = "grün";
-        else if (farbe.includes("orange")) farbschlüssel = "orange";
-        else if (farbe.includes("violett")) farbschlüssel = "violett";
-        else if (farbe.includes("silber")) farbschlüssel = "silber";
-        else if (farbe.includes("gold")) farbschlüssel = "gold";
-        else if (farbe.includes("kupfer")) farbschlüssel = "kupfer";
-        else if (farbe.includes("transparent")) farbschlüssel = "transparent";
-        else if (farbe.includes("natur")) farbschlüssel = "natur";
-        else if (farbe.includes("braun")) farbschlüssel = "braun";
-        if (farbschlüssel) spuleCard.classList.add("border-" + farbschlüssel);
-        // --- Ende Farbklassenzuweisung ---
-        spuleCard.dataset.typId = typId;
-        spuleCard.dataset.spulenId = spule.spulen_id;
-        spuleCard.addEventListener("click", () => {
-          window.location.href = `/typ/${typId}/id${spule.spulen_id}`;
+          const confirmModal = document.getElementById("confirm-modal");
+          const confirmOk = document.getElementById("confirm-ok");
+          const confirmCancel = document.getElementById("confirm-cancel");
+
+          confirmModal.classList.remove("hidden");
+
+          // Remove previous handlers first, to avoid stacking
+          confirmOk.onclick = null;
+          confirmCancel.onclick = null;
+
+          confirmOk.onclick = async () => {
+            confirmModal.classList.add("hidden");
+            const res = await fetch(`/typs/${typ.id}`, { method: "DELETE" });
+            if (res.ok) {
+              loadTypen();
+            } else {
+              zeigeHinweis("Fehler beim Löschen des Typs.", "bg-red-600");
+            }
+          };
+          confirmCancel.onclick = () => {
+            confirmModal.classList.add("hidden");
+          };
         });
+      }
+    });
 
-        const editBtn = clone.querySelector(".bearbeiten-button");
-        editBtn.setAttribute("data-id", spule.spulen_id);
-        editBtn.addEventListener("click", (e) => {
-          e.stopPropagation();
-          selectedSpuleId = spule.spulen_id;
-          document.getElementById("edit-restmenge").value = spule.restmenge;
-          document.getElementById("edit-gesamtmenge").value = spule.gesamtmenge;
-          document.getElementById("edit-in-printer").checked = spule.in_printer;
-          document.getElementById("spulen-bearbeiten-popup").classList.remove("hidden");
-          document.body.classList.add("blurred");
-        });
+    const modal = document.getElementById("modal");
+    const addTypBtn = document.querySelector('button.bg-green-600');
+    const cancelBtn = document.getElementById("modal-cancel");
 
+    addTypBtn.addEventListener("click", async () => {
+      const res = await fetch("/api/userinfo");
+      if (!res.ok) {
+        zeigeHinweis("Nicht berechtigt.", "bg-red-600");
+        return;
+      }
+      const data = await res.json();
+      if (!["helper", "mod", "admin"].includes(data.rolle)) {
+        zeigeHinweis("Keine Berechtigung, um einen Typ hinzuzufügen.", "bg-red-600");
+        return;
+      }
+      modal.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    });
 
-        container.appendChild(clone);
+    cancelBtn.addEventListener("click", () => {
+      modal.classList.add("hidden");
+    });
+  }
+
+  // Suchfunktion für Filamenttypen
+  const suchfeld = document.getElementById("suchfeld");
+  suchfeld.addEventListener("input", () => {
+    const searchTerm = suchfeld.value.toLowerCase();
+    const cards = document.querySelectorAll("#spulen-container > div");
+    cards.forEach(card => {
+      const text = card.textContent.toLowerCase();
+      card.style.display = text.includes(searchTerm) ? "" : "none";
+    });
+  });
+
+  // --- Modal "+ Spule hinzufügen" mit Dropdown ---
+  const modalSpule = document.getElementById("modal-spule");
+  const formSpule = document.getElementById("modal-spule-form");
+  const addSpuleBtn = document.querySelector('button.bg-blue-600'); // Der blaue Button neben Typ hinzufügen
+  const cancelSpuleBtn = document.getElementById("modal-spule-cancel");
+  const spulenContainer = document.getElementById("spulen-container");
+
+  const dropdownButton = document.getElementById("dropdown-button");
+  const dropdownContainer = document.getElementById("dropdown-container");
+  const dropdownList = document.getElementById("dropdown-list");
+  const dropdownSearch = document.getElementById("dropdown-search");
+  const dropdownSelected = document.getElementById("dropdown-selected");
+  const hiddenSelect = document.getElementById("spule-typ");
+
+  // Toggle dropdown visibility und passe Popup-Höhe dynamisch an
+  const popupContent = modalSpule.querySelector("div.bg-white");
+
+  dropdownButton.addEventListener("click", () => {
+    dropdownContainer.classList.toggle("hidden");
+
+    if (!dropdownContainer.classList.contains("hidden")) {
+      popupContent.style.maxHeight = "95vh"; // Popup vergrößern
+    } else {
+      popupContent.style.maxHeight = "90vh"; // Zurück zur Standardhöhe
+    }
+  });
+
+  // Close dropdown on outside click
+  document.addEventListener("click", (e) => {
+    if (!dropdownButton.contains(e.target) && !dropdownContainer.contains(e.target)) {
+      dropdownContainer.classList.add("hidden");
+    }
+  });
+
+  // Typen werden global zwischengespeichert
+  let typenCache = [];
+
+  // Populate dropdown with types, cache sie in typenCache
+  async function loadTypenDropdown() {
+    const res = await fetch("/typs/");
+    typenCache = await res.json();
+
+    dropdownList.innerHTML = "";
+    typenCache.forEach(typ => {
+      const li = document.createElement("li");
+      li.className = "px-3 py-2 hover:bg-blue-100 cursor-pointer";
+      li.innerHTML = `
+        <div class="font-semibold">${typ.name}</div>
+        <div class="text-xs text-gray-500">${typ.material}, ${typ.farbe}, ${typ.durchmesser} mm</div>
+      `;
+      li.addEventListener("click", () => {
+        dropdownSelected.innerHTML = `
+          <div class="flex flex-col text-xs leading-tight">
+            <span class="font-semibold">${typ.name}</span>
+            <span>${typ.material}, ${typ.farbe}, ${typ.durchmesser} mm</span>
+          </div>
+        `;
+        hiddenSelect.value = typ.id;
+        dropdownContainer.classList.add("hidden");
+      });
+      dropdownList.appendChild(li);
+    });
+    // Reset search and add search event
+    dropdownSearch.value = "";
+    dropdownSearch.addEventListener("input", () => {
+      const searchTerm = dropdownSearch.value.toLowerCase();
+      const items = dropdownList.querySelectorAll("li");
+      items.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(searchTerm) ? "" : "none";
       });
     });
-  // Keydown event for closing popups with Escape
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      const popup = document.getElementById("spulen-bearbeiten-popup");
-      if (!popup.classList.contains("hidden")) {
-        closeSpulenPopup();
-      }
+  }
 
-      const qrPopup = document.getElementById("qr-confirm-popup");
-      if (!qrPopup.classList.contains("hidden")) {
-        closeQrPopup();
-      }
+  // Klasse zum Abdunkeln des Hintergrunds beim Öffnen des Modals
+  function darkenSpulenContainer() {
+    spulenContainer.classList.add("spulen-dimmed");
+  }
+  function undarkenSpulenContainer() {
+    spulenContainer.classList.remove("spulen-dimmed");
+  }
+
+  addSpuleBtn.addEventListener("click", async () => {
+    const res = await fetch("/api/userinfo");
+    if (!res.ok) {
+      zeigeHinweis("Nicht berechtigt.", "bg-red-600");
+      return;
     }
+    const data = await res.json();
+    if (!["helper", "mod", "admin"].includes(data.rolle)) {
+      zeigeHinweis("Keine Berechtigung, um eine Spule hinzuzufügen.", "bg-red-600");
+      return;
+    }
+    await loadTypenDropdown();
+    modalSpule.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    darkenSpulenContainer();
   });
 
-  // Attach save and delete handlers after DOM is ready and popup elements exist
-  document.getElementById("save-edit").addEventListener("click", () => {
-    const menge = document.getElementById("edit-restmenge").value;
-    fetch(`/spulen/${selectedSpuleId}`, {
-      method: "PATCH",
+  cancelSpuleBtn.addEventListener("click", () => {
+    modalSpule.classList.add("hidden");
+    document.body.style.overflow = "";
+    undarkenSpulenContainer();
+  });
+
+  formSpule.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const typId = hiddenSelect.value;
+    const gesamtmenge = parseInt(document.getElementById("gesamtmenge").value, 10);
+
+    if (!typId || !gesamtmenge || gesamtmenge <= 0) {
+      zeigeHinweis("Bitte wählen Sie einen Typ und geben eine gültige Gesamtmenge ein.", "bg-yellow-600");
+      return;
+    }
+
+    // Suche den Typ im globalen gespeicherten Array
+    const typ = typenCache.find(t => t.id === parseInt(typId, 10));
+
+    if (!typ) {
+      zeigeHinweis("Der ausgewählte Typ wurde nicht gefunden.", "bg-yellow-600");
+      return;
+    }
+
+    const data = {
+      name: typ.name,
+      material: typ.material,
+      farbe: typ.farbe,
+      durchmesser: typ.durchmesser,
+      hersteller: typ.hersteller,
+      leergewicht: typ.leergewicht,
+      gesamtmenge: gesamtmenge,
+      restmenge: gesamtmenge,
+      verpackt: true,
+      in_printer: false
+    };
+
+    const response = await fetch("/spulen/", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        restmenge: menge,
-        gesamtmenge: document.getElementById("edit-gesamtmenge").value,
-        in_printer: document.getElementById("edit-in-printer").checked
-      })
-    }).then(response => {
-      if (!response.ok) {
-        return response.json().then(data => {
-          alert(data.detail || "Fehler beim Speichern.");
-          throw new Error(data.detail);
+      body: JSON.stringify(data)
+    });
+
+    if (response.ok) {
+      modalSpule.classList.add("hidden");
+      formSpule.reset();
+      dropdownSelected.textContent = "Bitte wählen";
+      hiddenSelect.value = "";
+      undarkenSpulenContainer();
+      loadTypen();
+    } else {
+      zeigeHinweis("Fehler beim Hinzufügen der Spule", "bg-red-600");
+    }
+  });
+  // Optional: Entferne Abdunklung, falls Modal-Spule durch andere Aktionen geschlossen wird
+  // (z. B. Escape-Taste oder Klick außerhalb)
+  document.addEventListener("keydown", (e) => {
+    if (!modalSpule.classList.contains("hidden") && e.key === "Escape") {
+      modalSpule.classList.add("hidden");
+      document.body.style.overflow = "";
+      undarkenSpulenContainer();
+    }
+  });
+
+  // Optional: Klick auf Overlay schließt Modal
+  modalSpule.addEventListener("click", (e) => {
+    if (e.target === modalSpule) {
+      modalSpule.classList.add("hidden");
+      document.body.style.overflow = "";
+      undarkenSpulenContainer();
+    }
+  });
+  // Style für das Abdunkeln von #spulen-container
+  // Fügt dies am Ende des <script> Blocks hinzu, damit es im <head> geladen wird
+  const style = document.createElement("style");
+  style.innerHTML = `
+    #spulen-container.spulen-dimmed {
+      opacity: 0.3;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+  `;
+  document.head.appendChild(style);
+
+  const modal = document.getElementById("modal");
+  const form = document.getElementById("modal-form");
+  const addTypBtn = document.querySelector('button.bg-green-600');
+  const cancelBtn = document.getElementById("modal-cancel");
+
+  addTypBtn.addEventListener("click", () => {
+    modal.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    modal.classList.add("hidden");
+    document.body.style.overflow = "";
+  });
+
+  // Schließen bei Escape
+  document.addEventListener("keydown", (e) => {
+    if (!modal.classList.contains("hidden") && e.key === "Escape") {
+      modal.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+  });
+
+  // Schließen bei Klick außerhalb
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+  });
+
+  // Registriere den Submit-Listener für das Typen-Formular nur einmal beim Laden der Seite
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const mode = form.getAttribute("data-mode");
+    const typId = form.getAttribute("data-id");
+    const typ = typenCache.find(t => t.id === parseInt(typId, 10));
+    const data = {
+      name: formData.get("name"),
+      material: formData.get("material"),
+      farbe: formData.get("farbe"),
+      durchmesser: parseFloat(formData.get("durchmesser")),
+      hersteller: formData.get("hersteller") || null,
+      hinweise: formData.get("hinweise") || null,
+      leergewicht: parseFloat(formData.get("leergewicht")) || 0
+    };
+
+    if (mode === "edit" && typ?.bildname && typ.bildname !== "null") {
+      data.bildname = typ.bildname;
+    }
+
+    const response = await fetch(mode === "edit" ? `/typs/${typId}` : "/typs/", {
+      method: mode === "edit" ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    });
+
+    if (response.ok) {
+      modal.classList.add("hidden");
+      form.reset();
+      form.removeAttribute("data-mode");
+      form.removeAttribute("data-id");
+      loadTypen();
+    } else {
+      zeigeHinweis("Fehler beim Hinzufügen", "bg-red-600");
+    }
+  });
+// Benachrichtigungssystem
+function zeigeHinweis(nachricht, farbe = "bg-gray-800") {
+  const box = document.getElementById("benachrichtigung");
+  box.textContent = nachricht;
+  box.className = `fixed bottom-6 right-6 text-white text-sm px-4 py-2 rounded shadow-lg z-50 transition-opacity duration-300 ${farbe}`;
+  box.classList.remove("hidden");
+  box.style.opacity = 1;
+
+  setTimeout(() => {
+    box.style.opacity = 0;
+    setTimeout(() => box.classList.add("hidden"), 300);
+  }, 3000);
+}
+
+  loadTypen();
+
+  // Auth-Bereich (Login/Logout)
+  const authBereich = document.getElementById("auth-bereich");
+
+  async function ladeAuthStatus() {
+    try {
+      const res = await fetch("/api/userinfo");
+      if (res.ok) {
+        const daten = await res.json();
+        authBereich.innerHTML = `
+          <form id="logoutForm" class="flex flex-col items-center">
+            <span class="text-sm text-gray-300 mb-1">Angemeldet als ${daten.username}</span>
+            <button type="submit" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition w-full">Logout</button>
+          </form>
+        `;
+        const logoutForm = document.getElementById("logoutForm");
+        logoutForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          await fetch("/logout", { method: "POST" });
+          location.reload();
         });
+      } else {
+        authBereich.innerHTML = `
+          <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+        `;
       }
-      closeSpulenPopup();
-      location.reload();
-    });
-  });
-
-  document.getElementById("delete-spule").addEventListener("click", () => {
-    fetch(`/spulen/${selectedSpuleId}`, {
-      method: "DELETE"
-    }).then(() => {
-      closeSpulenPopup();
-      location.reload();
-    });
-  });
-});
-
-let selectedSpuleId = null;
-
-
-function closeSpulenPopup() {
-  document.getElementById('spulen-bearbeiten-popup').classList.add('hidden');
-
-  // Only remove blur if no other popups are open
-  const anyVisiblePopup = document.querySelectorAll('.popup:not(.hidden)').length > 0;
-  if (!anyVisiblePopup) {
-    document.body.classList.remove('blurred');
-  }
-}
-
-</script>
-
-<div id="spulen-bearbeiten-popup" class="popup hidden blur-popup">
-  <div class="popup-content">
-    <h3>Spule bearbeiten</h3>
-    <label for="edit-gesamtmenge">Gesamtmenge (g):</label>
-    <input type="number" id="edit-gesamtmenge" class="popup-input" />
-    <label for="edit-restmenge">Restmenge (g):</label>
-    <input type="number" id="edit-restmenge" class="popup-input" />
-    <label for="edit-in-printer" style="display: block; margin: 0.5em 0;">
-      <input type="checkbox" id="edit-in-printer" />
-      Im Drucker
-    </label>
-    <div class="popup-buttons">
-      <button class="save" id="save-edit">Speichern</button>
-      <button class="delete" id="delete-spule">🗑️ Löschen</button>
-      <button class="cancel" onclick="closeSpulenPopup()">Abbrechen</button>
-    </div>
-  </div>
-</div>
-
-<script>
-function showQrPopup() {
-  const popup = document.getElementById('qr-confirm-popup');
-  if (popup) {
-    popup.classList.remove('hidden');
-    document.body.classList.add('blurred');
-  }
-}
-
-function closeQrPopup() {
-  const popup = document.getElementById('qr-confirm-popup');
-  if (popup) {
-    popup.classList.add('hidden');
-    // Only remove blur if no other popups are open
-    const anyVisiblePopup = document.querySelectorAll('.popup:not(.hidden)').length > 0;
-    if (!anyVisiblePopup) {
-      document.body.classList.remove('blurred');
+    } catch (err) {
+      authBereich.innerHTML = `
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      `;
     }
   }
-}
 
-document.addEventListener("DOMContentLoaded", () => {
-  const confirmButton = document.getElementById("confirm-print");
-  confirmButton.addEventListener("click", () => {
-    closeQrPopup();
-    fetch(`/print_qrcode/${selectedSpuleId}`, {
-      method: "POST"
-    })
-    .then(res => {
+  ladeAuthStatus();
+
+  // Buttons nur für berechtigte Rollen anzeigen
+  (async () => {
+    const buttonContainer = document.getElementById("button-container");
+    const btnTyp = document.getElementById("btn-typ-hinzufuegen");
+    const btnSpule = document.getElementById("btn-spule-hinzufuegen");
+    try {
+      const res = await fetch("/api/userinfo");
       if (res.ok) {
-        alert("QR-Code wurde gedruckt.");
-      } else {
-        return res.text().then(text => { throw new Error(text); });
+        const daten = await res.json();
+        if (["helper", "mod", "admin"].includes(daten.rolle)) {
+          buttonContainer.style.display = "flex";
+        }
       }
-    })
-    .catch(err => alert("Fehler beim Drucken: " + err.message));
-  });
+    } catch (err) {
+      // Bei Fehler nichts anzeigen
+    }
+  })();
 });
-</script>
-
-<div id="qr-confirm-popup" class="popup hidden blur-popup">
-  <div class="popup-content">
-    <h3>QR-Code drucken</h3>
-    <p>Möchtest du wirklich einen QR-Code-Sticker für die ausgewählte Spule drucken?</p>
-    <div class="popup-buttons">
-      <button class="cancel-print" onclick="closeQrPopup()">Abbrechen</button>
-      <button id="confirm-print">Drucken</button>
+  </script>
+  <!-- Bestätigungs-Modal für Typ-Löschen -->
+  <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white rounded-lg w-full max-w-sm p-6 text-center">
+      <h3 class="text-lg font-semibold mb-4">Typ löschen?</h3>
+      <p class="text-sm text-gray-600 mb-6">Möchten Sie diesen Typ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</p>
+      <div class="flex justify-center gap-4">
+        <button id="confirm-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
+        <button id="confirm-ok" class="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700">Löschen</button>
+      </div>
     </div>
   </div>
-</div>
-
+  <div id="benachrichtigung" class="fixed bottom-6 right-6 bg-gray-800 text-white text-sm px-4 py-2 rounded shadow-lg z-50 hidden transition-opacity duration-300"></div>
 </body>
+<!-- Modal -->
+<div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+  <div class="bg-white rounded-lg w-full max-w-md p-6">
+    <h2 class="text-xl font-bold mb-4">Neuen Filamenttyp hinzufügen</h2>
+    <form id="modal-form" class="space-y-4">
+  <div>
+    <label for="name" class="block font-medium mb-1">Name <span class="text-red-500">*</span></label>
+    <input type="text" id="name" name="name" required placeholder="z. B. Bambu Basic" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="material" class="block font-medium mb-1">Material <span class="text-red-500">*</span></label>
+    <input type="text" id="material" name="material" required placeholder="z. B. PLA, PETG" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="farbe" class="block font-medium mb-1">Farbe <span class="text-red-500">*</span></label>
+    <input type="text" id="farbe" name="farbe" required placeholder="z. B. Schwarz, Rot" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="durchmesser" class="block font-medium mb-1">Durchmesser (mm) <span class="text-red-500">*</span></label>
+    <input type="number" step="0.01" id="durchmesser" name="durchmesser" value="1.75" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="hersteller" class="block font-medium mb-1">Hersteller</label>
+    <input type="text" id="hersteller" name="hersteller" placeholder="Optional" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div>
+    <label for="hinweise" class="block font-medium mb-1">Hinweise</label>
+    <textarea id="hinweise" name="hinweise" rows="3" placeholder="Optional" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500"></textarea>
+  </div>
+  <div>
+    <label for="leergewicht" class="block font-medium mb-1">Leergewicht (g) <span class="text-red-500">*</span></label>
+    <input type="number" step="1" min="0" id="leergewicht" name="leergewicht" placeholder="Gewicht der Spule ohne Filament" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+  </div>
+  <div class="flex justify-end gap-2 pt-4">
+    <button type="button" id="modal-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
+    <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Speichern</button>
+  </div>
+</form>
+  </div>
+</div>
 </html>

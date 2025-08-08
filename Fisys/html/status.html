@@ -1,257 +1,200 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Filamentstatus</title>
-  <link rel="stylesheet" href="/static/assets/style.css" />
-  <meta name="theme-color" content="#222">
-  <style>
-    html {
-      background-color: #222;
-    }
-    html {
-      height: 100%;
-    }
-
-    body {
-      min-height: 100%;
-      position: relative;
-      margin: 0;
-      padding: 0;
-      z-index: 0;
-    }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(270deg, #111, #222, #333, #222, #111);
-      background-size: 400% 400%;
-      animation: animated-bg 20s linear infinite;
-      z-index: -1;
-      pointer-events: none;
-    }
-
-    @keyframes animated-bg {
-      0% { background-position: 0% 0%; }
-      50% { background-position: 100% 0%; }
-      100% { background-position: 0% 0%; }
-    }
-    .filament-card {
-      border-radius: 8px;
-      padding: 10px;
-      margin: 10px;
-      background-color: #222;
-      color: white;
-      display: inline-block;
-      width: 200px;
-      vertical-align: top;
-      text-align: center;
-      flex: 0 0 auto;
-    }
-    .stat-box {
-      background-color: #1f1f1f;
-      border-radius: 12px;
-      margin-top: 60px;
-      padding: 0.8em 3em;
-      color: #ccc;
-      text-align: center;
-    }
-    .filament-card img {
-      width: calc(100% - 12px);
-      aspect-ratio: 1 / 1;
-      height: auto;
-      object-fit: cover;
-      border-radius: 25px;
-      padding: 0 6px;
-      margin-top: 6px;
-    }
-    .logo {
-      position: fixed;
-      top: 0em;
-      left: 2em;
-      z-index: 1000;
-    }
-    .logo img {
-      height: 100px;
-      width: auto;
-    }
-    #leer-container,
-    #fastleer-container {
-      background-color: #181818;
-      border-radius: 10px;
-      padding: 1em;
-      display: flex;
-      overflow-x: auto;
-      white-space: nowrap;
-      margin-bottom: 2em;
-    }
-    .top-bar {
-      position: fixed;
-      top: 13px;
-      left: 0;
-      width: 170px;
-      height: 70px;
-      background-color: transparent;
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    .top-bar::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%),
-                   linear-gradient(to right, black 0%, black 90%, transparent 100%);
-      -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%),
-                         linear-gradient(to right, black 0%, black 90%, transparent 100%);
-      mask-composite: intersect;
-      -webkit-mask-composite: destination-in;
-    }
-  </style>
+  <title>Status - Fisys</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <div class="top-bar"></div>
-  <div class="logo">
-    <a href="/"><img src="/static/assets/Fisys Logo.png" alt="Fisys Logo"></a>
-  </div>
+<body class="bg-gray-50 min-h-screen flex">
 
-  <main style="padding: 1em;">
-    <div id="gesamt-info" style="margin: 0 auto 2em auto; display: flex; justify-content: center; gap: 1em;">
-      <div class="stat-box"><p id="anzahl-typen">Typen insgesamt: ...</p></div>
-      <div class="stat-box"><p id="anzahl-spulen">Spulen insgesamt: ...</p></div>
+  <!-- Sidebar -->
+  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
+    <div>
+      <div class="pt-1 pb-1">
+        <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto" />
+      </div>
+      <nav class="px-4 space-y-2">
+        <a href="/" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Dashboard</a>
+        <a href="/spulen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Spulen</a>
+        <a href="/filamentseite.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Filamenttypen</a>
+        <hr class="my-2 border-gray-700" />
+        <a href="/status.html" class="block px-4 py-2 rounded bg-gray-800 font-semibold text-white">Status</a>
+        <a href="/einstellungen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Einstellungen</a>
+      </nav>
     </div>
-    <h2>Gerade im Drucker</h2>
-    <div id="drucker-container" style="background-color: #181818; border-radius: 10px; padding: 1em; display: flex; overflow-x: auto; white-space: nowrap; margin-bottom: 2em;"></div>
-    <h2>Fast leere Typen</h2>
-    <div id="fastleer-container"></div>
+    <div class="mt-auto">
+      <div class="px-4 pb-2" id="user-info-container">
+        <!-- Wird per JS geladen -->
+      </div>
+      <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
+    </div>
+  </aside>
 
-    <h2>Leere Typen</h2>
-    <div id="leer-container"></div>
+  <!-- Main -->
+  <main class="flex-1 flex flex-col ml-64">
+    <header class="bg-gray-50 px-10 pt-10 pb-6">
+      <h1 class="text-3xl font-bold">Status</h1>
+      <p class="text-sm text-gray-500 mt-1">System- und Druckerstatus im Überblick</p>
+    </header>
+
+    <section class="flex-1 pt-4 px-10 pb-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Fast leere oder leere Typen -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold mb-4 border-b pb-2">Fast leere oder leere Typen</h2>
+        <ul id="low-stock-list" class="space-y-3 text-sm text-gray-700">
+          <li class="text-gray-400">Lade Daten...</li>
+        </ul>
+      </div>
+
+      <!-- Meistgenutzte Filamente -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold mb-4 border-b pb-2">Meistgenutzte Filamente</h2>
+        <ul id="top-filaments-list" class="space-y-3 text-sm text-gray-700">
+          <li class="text-gray-400">Lade Daten...</li>
+        </ul>
+      </div>
+
+      <!-- Verbrauch pro Typ in dieser Woche -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold mb-4 border-b pb-2">Verbrauch pro Typ (diese Woche)</h2>
+        <ul id="weekly-usage-list" class="space-y-3 text-sm text-gray-700">
+          <li class="text-gray-400">Lade Daten...</li>
+        </ul>
+      </div>
+
+    </section>
+
+    <script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const createListItem = (id, name, extra, details, statusColor = "bg-gray-50", material = "", farbe = "", durchmesser = "") => `
+    <li class="flex items-center justify-between ${statusColor} p-3 rounded border hover:bg-gray-100 transition">
+      <div>
+        <div class="font-medium">${name}</div>
+        <div class="text-xs text-gray-500">
+          Typ-ID: ${id}
+          ${material ? " • Material: " + material : ""}
+          ${farbe ? " • Farbe: " + farbe : ""}
+          ${durchmesser ? " • " + durchmesser + "mm" : ""}
+          ${details ? " • " + details : ""}
+        </div>
+      </div>
+      ${extra ? `<div class="text-right text-sm text-gray-700">${extra}</div>` : ""}
+    </li>
+  `;
+
+  // Fast leere oder leere Typen
+  const lowStockRes = await fetch("/api/status/low_stock_types");
+  const lowStock = await lowStockRes.json();
+
+  // Für jeden Typ zusätzlich die Spulenanzahl abrufen, falls nicht vorhanden
+  for (let typ of lowStock) {
+    if (!typ.anzahl_spulen) {
+      try {
+        const spulenRes = await fetch(`/typs/${typ.id}/spulen`);
+        if (spulenRes.ok) {
+          const spulen = await spulenRes.json();
+          typ.anzahl_spulen = spulen.length;
+        } else {
+          typ.anzahl_spulen = "?";
+        }
+      } catch {
+        typ.anzahl_spulen = "?";
+      }
+    }
+  }
+
+  const lowStockList = document.getElementById("low-stock-list");
+  lowStockList.innerHTML = lowStock.length
+    ? lowStock.map(t => {
+        let color = "bg-gray-50";
+        if (t.restmenge <= 0) color = "bg-red-100";
+        else if (t.restmenge <= (t.gesamtmenge * 0.1 || 100)) color = "bg-orange-100";
+        return createListItem(
+          t.id,
+          t.name,
+          `${t.restmenge}g übrig`,
+          `Spulen: ${t.anzahl_spulen}`,
+          color,
+          t.material || "",
+          t.farbe || "",
+          t.durchmesser || ""
+        );
+      }).join("")
+    : "<li class='text-gray-400'>Keine fast leeren Typen</li>";
+
+  // Meistgenutzte Filamente
+  const topFilamentsRes = await fetch("/api/status/top_filaments");
+  const topFilaments = await topFilamentsRes.json();
+  const topFilamentsList = document.getElementById("top-filaments-list");
+  topFilamentsList.innerHTML = topFilaments.length
+    ? topFilaments.map(f => createListItem(
+        f.id,
+        f.name,
+        `${f.verbrauch}g gesamt`,
+        null,
+        "bg-blue-50",
+        f.material || "",
+        f.farbe || "",
+        f.durchmesser || ""
+      )).join("")
+    : "<li class='text-gray-400'>Keine Verbrauchsdaten</li>";
+
+  // Wöchentlicher Verbrauch pro Typ
+  const weeklyUsageRes = await fetch("/api/status/weekly_usage");
+  const weeklyUsage = await weeklyUsageRes.json();
+  const weeklyUsageList = document.getElementById("weekly-usage-list");
+      weeklyUsageList.innerHTML = weeklyUsage.length
+        ? weeklyUsage.map(u => {
+            return `
+              <li class="p-3 rounded border bg-green-50">
+                <div class="flex justify-between">
+                  <div>
+                    <div class="font-medium">${u.name}</div>
+                    <div class="text-xs text-gray-500">
+                      Typ-ID: ${u.id}
+                      ${u.material ? " • Material: " + u.material : ""}
+                      ${u.farbe ? " • Farbe: " + u.farbe : ""}
+                      ${u.durchmesser ? " • " + u.durchmesser + "mm" : ""}
+                    </div>
+                  </div>
+                  <div class="text-sm text-gray-700">${u.verbrauch}g</div>
+                </div>
+              </li>
+            `;
+          }).join("")
+        : "<li class='text-gray-400'>Keine Daten für diese Woche</li>";
+});
+    </script>
   </main>
 
-  <script>
-    async function fetchFilamentStatus() {
-      const res = await fetch("/fastleere_data");
-
-      const druckerRes = await fetch("/drucker_data");
-      const druckerData = await druckerRes.json();
-      const druckerContainer = document.getElementById("drucker-container");
-
-      druckerData.forEach(filament => {
-        const div = document.createElement("div");
-        // Farb-Border-Logik einfügen
-        const farbe = filament.farbe?.toLowerCase().replace(/\s+/g, "") || "";
-        let farbschlüssel = "";
-        if (farbe.includes("blau")) farbschlüssel = "blau";
-        else if (farbe.includes("rot")) farbschlüssel = "rot";
-        else if (farbe.includes("grau")) farbschlüssel = "grau";
-        else if (farbe.includes("magenta")) farbschlüssel = "magenta";
-        else if (farbe.includes("pink")) farbschlüssel = "pink";
-        else if (farbe.includes("cyan")) farbschlüssel = "cyan";
-        else if (farbe.includes("birke")) farbschlüssel = "birke";
-        else if (farbe.includes("gelb")) farbschlüssel = "gelb";
-        else if (farbe.includes("schwarz")) farbschlüssel = "schwarz";
-        else if (farbe.includes("weiß") || farbe.includes("weiss")) farbschlüssel = "weiß";
-        else if (farbe.includes("grün")) farbschlüssel = "grün";
-        else if (farbe.includes("orange")) farbschlüssel = "orange";
-        else if (farbe.includes("violett")) farbschlüssel = "violett";
-        else if (farbe.includes("silber")) farbschlüssel = "silber";
-        else if (farbe.includes("gold")) farbschlüssel = "gold";
-        else if (farbe.includes("kupfer")) farbschlüssel = "kupfer";
-        else if (farbe.includes("transparent")) farbschlüssel = "transparent";
-        else if (farbe.includes("natur")) farbschlüssel = "natur";
-        else if (farbe.includes("braun")) farbschlüssel = "braun";
-        if (farbschlüssel) div.classList.add("border-" + farbschlüssel);
-        div.classList.add("filament-card");
-        div.style.cursor = "pointer";
-        div.onclick = () => {
-          window.location.href = `/filamentseite?typ_id=${filament.id}`;
-        };
-        div.innerHTML = `
-          <img src="/static/assets/images/${filament.bildname}" alt="${filament.name}" height="100" />
-          <h3>${filament.name}</h3>
-          <p><strong>Material:</strong> ${filament.material}</p>
-          <p><strong>Farbe:</strong> ${filament.farbe}</p>
-          <p><strong>Ø:</strong> ${filament.durchmesser} mm</p>
-          <p><strong>Spulen im Drucker:</strong> ${filament.spulenanzahl}</p>
-        `;
-        druckerContainer.appendChild(div);
-      });
-
-      if (!druckerContainer.hasChildNodes()) {
-        druckerContainer.innerHTML = "<p>Keine Typen im Drucker</p>";
-      }
-
-      const data = await res.json();
-      const statsRes = await fetch("/stats");
-      const stats = await statsRes.json();
-      document.getElementById("anzahl-typen").textContent = `Typen insgesamt: ${stats.typen}`;
-      document.getElementById("anzahl-spulen").textContent = `Spulen insgesamt: ${stats.spulen}`;
-      const leerContainer = document.getElementById("leer-container");
-      const fastleerContainer = document.getElementById("fastleer-container");
-
-      data.forEach(filament => {
-        const div = document.createElement("div");
-        // Farb-Border-Logik einfügen
-        const farbe = filament.farbe?.toLowerCase().replace(/\s+/g, "") || "";
-        let farbschlüssel = "";
-        if (farbe.includes("blau")) farbschlüssel = "blau";
-        else if (farbe.includes("rot")) farbschlüssel = "rot";
-        else if (farbe.includes("grau")) farbschlüssel = "grau";
-        else if (farbe.includes("magenta")) farbschlüssel = "magenta";
-        else if (farbe.includes("pink")) farbschlüssel = "pink";
-        else if (farbe.includes("cyan")) farbschlüssel = "cyan";
-        else if (farbe.includes("birke")) farbschlüssel = "birke";
-        else if (farbe.includes("gelb")) farbschlüssel = "gelb";
-        else if (farbe.includes("schwarz")) farbschlüssel = "schwarz";
-        else if (farbe.includes("weiß") || farbe.includes("weiss")) farbschlüssel = "weiß";
-        else if (farbe.includes("grün")) farbschlüssel = "grün";
-        else if (farbe.includes("orange")) farbschlüssel = "orange";
-        else if (farbe.includes("violett")) farbschlüssel = "violett";
-        else if (farbe.includes("silber")) farbschlüssel = "silber";
-        else if (farbe.includes("gold")) farbschlüssel = "gold";
-        else if (farbe.includes("kupfer")) farbschlüssel = "kupfer";
-        else if (farbe.includes("transparent")) farbschlüssel = "transparent";
-        else if (farbe.includes("natur")) farbschlüssel = "natur";
-        if (farbschlüssel) div.classList.add("border-" + farbschlüssel);
-        div.classList.add("filament-card");
-        div.style.cursor = "pointer";
-        div.onclick = () => {
-          window.location.href = `/filamentseite?typ_id=${filament.id}`;
-        };
-        div.innerHTML = `
-          <img src="/static/assets/images/${filament.bildname}" alt="${filament.name}" height="100" />
-          <h3>${filament.name}</h3>
-          <p><strong>Material:</strong> ${filament.material}</p>
-          <p><strong>Farbe:</strong> ${filament.farbe}</p>
-          <p><strong>Ø:</strong> ${filament.durchmesser} mm</p>
-          <p style="margin-top: 0.5em; font-weight: bold; color: ${filament.status === "leer" ? "red" : "gold"};">
-            ${filament.status === "leer" ? "LEER" : "FAST LEER"}
-          </p>
-        `;
-        if (filament.status === "leer") {
-          leerContainer.appendChild(div);
-        } else if (filament.status === "fastleer") {
-          fastleerContainer.appendChild(div);
-        }
-      });
-
-      if (!leerContainer.hasChildNodes()) {
-        leerContainer.innerHTML = "<p>Keine leeren Typen 🎉</p>";
-      }
-      if (!fastleerContainer.hasChildNodes()) {
-        fastleerContainer.innerHTML = "<p>Keine fast leeren Typen 🎉</p>";
-      }
-    }
-
-    document.addEventListener("DOMContentLoaded", fetchFilamentStatus);
-  </script>
 </body>
+<script>
+  async function loadUserInfo() {
+    const container = document.getElementById("user-info-container");
+    try {
+      const res = await fetch("/api/userinfo");
+      if (res.ok) {
+        const user = await res.json();
+        container.innerHTML = `
+  <form id="logoutForm" class="flex flex-col items-center">
+    <span class="text-sm text-gray-300 mb-1">Angemeldet als ${user.username}</span>
+    <button type="submit" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition w-full">Logout</button>
+  </form>
+`;
+      } else {
+        container.innerHTML = `
+          <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+        `;
+      }
+    } catch {
+      container.innerHTML = `
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      `;
+    }
+  }
+
+  loadUserInfo();
+</script>
 </html>

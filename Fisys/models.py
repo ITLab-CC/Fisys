@@ -1,7 +1,9 @@
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Integer, String, Float, Text, ForeignKey, Boolean
+from sqlalchemy import Integer, String, Float, Text, ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from datetime import datetime
+from sqlalchemy.sql import func
 
 class Base(DeclarativeBase):
     pass
@@ -30,11 +32,25 @@ class FilamentSpule(Base):
     restmenge: Mapped[float] = mapped_column(Float, nullable=False)
     in_printer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verpackt: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    alt_gewicht: Mapped[float] = mapped_column(Float, default=0)
     typ: Mapped["FilamentTyp"] = relationship("FilamentTyp", back_populates="spulen")
 
     def get_prozent_voll(self):
         return (self.restmenge / self.gesamtmenge) * 100 if self.gesamtmenge else 0.0
+
+
+# Tabelle für Filament-Verbrauchs-Logs
+class FilamentVerbrauch(Base):
+    __tablename__ = 'filament_verbrauch'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    typ_id: Mapped[int] = mapped_column(ForeignKey('filament_typ.typ_id'), nullable=False)
+    verbrauch_in_g: Mapped[float] = mapped_column(Float, nullable=False)
+    datum: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    typ: Mapped["FilamentTyp"] = relationship("FilamentTyp")
 
 
 # Pydantic model for serializing FilamentSpule
@@ -60,3 +76,19 @@ class FilamentSpuleCreate(BaseModel):
     verpackt: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    rolle: Mapped[str] = mapped_column(String, nullable=False, default="user")
+
+class AuthToken(Base):
+    __tablename__ = "auth_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    token: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    rolle: Mapped[str] = mapped_column(String, nullable=False)
+    erstellt_am: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    verwendet: Mapped[bool] = mapped_column(Boolean, default=False)

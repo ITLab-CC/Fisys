@@ -7,3 +7,9 @@ pillow
 python-multipart
 netifaces
 requests
+websockets
+passlib
+bcrypt
+itsdangerous
+python-dotenv
+psycopg2-binary

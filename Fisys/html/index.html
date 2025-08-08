@@ -1,1246 +1,325 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  
-    <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Filament-System IT-Lab</title>
-  
-  <link rel="stylesheet" type="text/css" href="/static/assets/style.css" media="all">
-  <meta name="theme-color" content="#222">
-  <style>
-  /* Input validation error visual feedback */
-  input.invalid {
-    border: 2px solid red;
-    background-color: #441111;
-  }
-  body.popup-open {
-    overflow: hidden;
-  }
-  /* === Gradient-Animation für Body-Hintergrund (jetzt als ::before Pseudoelement) === */
-  html {
-    background-color: #222;
-    height: 100%;
-  }
-
-  body {
-    min-height: 100%;
-    position: relative;
-    margin: 0;
-    padding: 0;
-    z-index: 0;
-  }
-
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background: linear-gradient(270deg, #111, #222, #333, #222, #111);
-    background-size: 400% 400%;
-    animation: animated-bg 20s linear infinite;
-    z-index: -1;
-    pointer-events: none;
-  }
-
-  @keyframes animated-bg {
-    0% { background-position: 0% 0%; }
-    50% { background-position: 100% 0%; }
-    100% { background-position: 0% 0%; }
-  }
-
-  /* Hinzugefügt: Volle Höhe für html und body, Margin/Padding 0 */
-  </style>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-
-  <script>
-    let isAdmin = false;
-
-    function setAdminSession() {
-      const zehnMinuten = Date.now() + 10 * 60 * 1000;
-      localStorage.setItem("adminUntil", zehnMinuten);
-      localStorage.setItem("admin", "true");
-
-    // Aktualisiere Seite, damit alles (Stift etc.) neu angezeigt wird
-      location.reload();
-    }
-
-    function updateAdminStatus() {
-      const adminStatus = document.getElementById("admin-status");
-      const adminUntil = localStorage.getItem("adminUntil");
-      if (adminUntil && Date.now() < parseInt(adminUntil) && localStorage.getItem("admin") === "true") {
-        isAdmin = true;
-      } else {
-        isAdmin = false;
-      }
-
-      if (isAdmin) {
-        adminStatus.style.display = "block";
-        enableAdminInputs();
-      } else {
-        adminStatus.style.display = "none";
-      }
-
-      fetchAndDisplayFilamente(); // <- Liste immer neu laden
-    }
-
-    document.addEventListener("DOMContentLoaded", () => {
-      const adminUntil = localStorage.getItem("adminUntil");
-      isAdmin = adminUntil && Date.now() < parseInt(adminUntil) && localStorage.getItem("admin") === "true";
-
-      updateAdminStatus();
-      if (isAdmin) enableAdminInputs();
-
-      const settingsIcon = document.querySelector(".settings-icon");
-      if (settingsIcon) {
-        settingsIcon.addEventListener("click", () => {
-          const login = document.getElementById("admin-login");
-          const panel = document.getElementById("admin-panel");
-          const imageSettings = document.getElementById("image-settings");
-
-          if (login.style.display === "block" || panel.style.display === "block" || imageSettings.style.display === "block") {
-            hideOverlay();
-            login.style.display = "none";
-            panel.style.display = "none";
-            imageSettings.style.display = "none";
-          } else {
-            if (isAdmin) {
-              panel.style.display = "block";
-            } else {
-              login.style.display = "block";
-            }
-            showOverlay();
-          }
-        });
-      }
-
-      fetchAndDisplayFilamente(); // Initiale Anzeige
-    });
-  </script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fisys - Filamentverwaltung</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Weitere Meta-Tags und Links -->
 </head>
-
-
 <body>
-  <div id="admin-status" style="display:none; position:fixed; top:0; left:50%; transform:translateX(-50%); background:#333; color:white; padding:0.3em 1em; border-radius:0 0 6px 6px; z-index:9999;">
-    ✅ Admin angemeldet
-  </div>
-
-  <div id="blur-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.3); z-index: 999;"></div>
-
-  <div class="top-bar">
-    <div class="logo">
-      <a href="/">
-        <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo">
-      </a>
+  <aside class="fixed top-0 left-0 h-full w-64 bg-[#0f172a] text-white flex flex-col justify-between">
+    <div>
+      <div class="pt-1 pb-1">
+        <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto">
+      </div>
+      <nav class="px-4 space-y-2">
+        <a href="/" class="block px-4 py-2 rounded bg-gray-800 font-semibold text-white">Dashboard</a>
+        <a href="/spulen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Spulen</a>
+        <a href="/filamentseite.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Filamenttypen</a>
+        <hr class="my-2 border-gray-700" />
+        <a href="/status" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Status</a>
+        <a href="/einstellungen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Einstellungen</a>
+      </nav>
     </div>
-    <div class="settings-icon">⚙️</div>
-  </div>
-
-  <div id="admin-login" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); background:rgba(51, 51, 51, 0.9); padding:2em; border-radius:10px; z-index:1001; width: 400px; backdrop-filter: blur(8px);">
-    <p style="margin:0 0 0.5em 0;">🔒 Admin-Passwort</p>
-    <input type="password" id="admin-password" placeholder="Passwort eingeben" style="padding:0.5em; border-radius:5px; width:100%;">
-    <script>
-      document.getElementById("admin-password").addEventListener("keydown", function(event) {
-        if (event.key === "Enter") {
-          event.preventDefault();
-          checkAdminPassword();
-        }
-      });
-    </script>
-    <div style="margin-top:0.5em; text-align:right;">
-      <button onclick="checkAdminPassword()" style="margin-right:0.5em;">OK</button>
-      <button onclick='document.getElementById("admin-login").style.display="none"; hideOverlay();'>Abbrechen</button>
+    <div class="mt-auto">
+      <div class="px-4 pb-2" id="auth-bereich">
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      </div>
+      <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
     </div>
-  </div>
+  </aside>
 
-  <div id="admin-panel" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); background:rgba(51, 51, 51, 0.9); padding:2em; border-radius:10px; z-index:1001; width: 400px; backdrop-filter: blur(8px);">
-    <h3 style="margin:0 0 1em 0;">⚙️ Admin-Einstellungen</h3>
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em;">
-      <button style="padding: 1em; font-size: 1em;" onclick="openImageSettings()">🖼️ Bild-Einstellungen</button>
-      <button style="padding: 1em; font-size: 1em;" onclick="logoutAdmin()">🚪 Abmelden</button>
-      <button style="grid-column: span 2; padding: 1em; font-size: 1em;" onclick="showAddMultipleSpoolsPopup()">➕ Spulen hinzufügen</button>
-      <button style="grid-column: span 2; padding: 1em; font-size: 1em;" onclick='document.getElementById("admin-panel").style.display="none"; hideOverlay();'>❌ Schließen</button>
-    </div>
-  </div>
+  <main class="ml-64 p-10 bg-gray-50 min-h-screen text-gray-900 space-y-10">
+    <header>
+      <h1 class="text-3xl font-bold">Dashboard</h1>
+      <p class="text-sm text-gray-500 mt-1">Willkommen im Fisys-System zur Filamentverwaltung.</p>
+    </header>
 
-  <!-- Popup für mehrere Spulen hinzufügen -->
-  <div id="multiple-spools-popup" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); background:rgba(51,51,51,0.95); padding:2em; border-radius:10px; z-index:1003; width:500px; max-width:90vw; backdrop-filter: blur(8px); color:#fff;">
-    <h3>➕ Mehrere Spulen hinzufügen</h3>
-    <label for="spool-type-select">Filament-Typ:</label>
-    <select id="spool-type-select" style="width:100%; margin-bottom:1em;"></select>
-    <label for="spool-count-input">Anzahl Spulen:</label>
-    <input type="number" id="spool-count-input" min="1" value="1" style="width:100%; margin-bottom:1em;">
-    <div style="display:flex; justify-content:space-between; gap:0.5em;">
-      <button onclick="addMultipleSpools()" style="flex:1;">💾 Hinzufügen</button>
-      <button onclick="document.getElementById('multiple-spools-popup').style.display='none'; hideOverlay();" style="flex:1;">❌ Schließen</button>
-    </div>
-  </div>
-
-  <div id="image-settings" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); background:rgba(51, 51, 51, 0.95); padding:2em; border-radius:10px; z-index:1002; width: 500px; height: 80vh; overflow-y: auto; backdrop-filter: blur(8px);">
-    <h3 style="margin-top:0; text-align:center;">🖼️ Bildverwaltung</h3>
-    <p style="font-size: 0.9em; color: #ccc; text-align: center;">Lade, benenne um oder ordne Bilder Filament-Typen zu</p>
-
-    <div style="margin-bottom: 1em; display: flex; justify-content: center; gap: 1em;">
-      <button onclick="switchImageTab('upload')" style="margin-right: 0.5em;">⬆️ Bild hochladen</button>
-      <button onclick="switchImageTab('manage')">🗂️ Bild-Verwaltung</button>
-    </div>
-
-    <div id="image-upload-tab">
-      <p>Bild hochladen:</p>
-      <input type="file" id="upload-image" accept="image/*">
-      <p style="margin-top:1em;">Neuer Dateiname (optional):</p>
-      <input type="text" id="new-image-name" placeholder="z. B. bambu_weiss.jpg" style="width:100%; margin-bottom:0.5em;">
-      <button id="save-image-btn" style="width:100%; margin-bottom:1em;">💾 Bild speichern</button>
-
-      <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; margin: 1em auto;">
-        <img id="preview-image" src="" alt="Bildvorschau" style="display:none; width: 100%; height: 100%; object-fit: cover; border-radius: 10px;">
+    <!-- KPIs -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-5 rounded-xl shadow-sm">
+        <div class="text-xs text-gray-500">Filamenttypen</div>
+        <div class="text-2xl font-semibold mt-1 rolling-number text-blue-600" data-color="text-blue-600"></div>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm">
+        <div class="text-xs text-gray-500">Spulen</div>
+        <div class="text-2xl font-semibold mt-1 rolling-number text-green-600" data-color="text-green-600"></div>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm">
+        <div class="text-xs text-gray-500">Fast leere Typen</div>
+        <div class="text-2xl font-semibold mt-1 rolling-number text-red-500" data-color="text-red-500"></div>
+      </div>
+      <div class="bg-white p-5 rounded-xl shadow-sm">
+        <div class="text-xs text-gray-500">Verbrauch (7 Tage)</div>
+        <div class="text-2xl font-semibold mt-1 rolling-number text-orange-500" data-color="text-orange-500"></div>
       </div>
     </div>
 
-    <div id="image-manage-tab" style="display:none;">
-      <p>Bild umbenennen:</p>
-      <input type="text" id="rename-old-name" placeholder="Aktueller Dateiname" style="width:100%; margin-bottom:0.5em;">
-      <input type="text" id="rename-new-name" placeholder="Neuer Dateiname" style="width:100%; margin-bottom:0.5em;">
-      <button id="rename-image-btn" style="width:100%; margin-bottom:1em;">🔄 Bild umbenennen</button>
-
-      <p>📂 Bild-Verwaltung:</p>
-      <div id="image-management" style="max-height:140px; overflow-y:auto; border:1px solid #666; padding:0.5em; border-radius:8px;">
-        <p style="font-size:0.9em;">(Lade Bilder...)</p>
-      </div>
-      <p style="margin-top:1em;">Bild einem Filament-Typ zuweisen:</p>
-      <select id="zuweis-name" style="width:100%; margin-bottom:0.5em;"></select>
-      <input type="text" id="zuweis-bildname" placeholder="Bild-Dateiname (z. B. bambu.jpg)" style="width:100%;">
+    <div>
+      <h2 class="text-xl font-semibold mb-4">Im Drucker</h2>
+      <div id="im-drucker-spools" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600"></div>
     </div>
 
-    <div style="margin-top:1em; text-align:center;">
-      <button onclick='document.getElementById("image-settings").style.display="none"; hideOverlay();'>Schließen</button>
-    </div>
-  </div>
-  
-    <div class="center-container">
-    
-        <h1>Filament-System IT-Lab</h1>
-        <h3></h3>
-        <div class="search-bar">
-  <input type="text" placeholder="Suche nach Filament" />
-  <button id="show-form-button" class="action-bar" style="margin-left: 1em; padding: 0.3em 0.8em; font-size: 0.85em;">
-    <span class="icon">+</span>
-    <span class="label">Hinzufügen</span>
-  </button>
-  <a href="/status" style="margin-left: 1em; padding: 0.5em 1em; font-size: 1em; background: #3a3a3a; color: white; border: 1px solid #666; border-radius: 15px; height: 22px; line-height: 1.2em; text-decoration: none; display: inline-flex; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.4); font-family: inherit; font-weight: normal;">
-    Lagerstatus
-  </a>
-</div>
-<div id="pagination"></div>
-
-
-<div class="gray-box">
-  <div id="filament-list-wrapper">
-    <div id="filament-list"></div>
-  </div>
-</div>
-
-
-<!-- Popup für vorhandene Filament-Typen Auswahl -->
-<div id="type-select-popup" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); background:rgba(51,51,51,0.95); padding:2em; border-radius:10px; z-index:1003; width: 500px; max-height: 80vh; overflow-y: auto; backdrop-filter: blur(8px); border: 2px solid white;">
-  <h3>Vorhandene Filament-Typen</h3>
-  <div id="existing-type-list" style="border: 1px solid #666; padding: 0.5em; border-radius: 8px; margin-top: 0.5em; background-color: #2b2b2b;"></div>
-  <div style="margin-top:1em; text-align:right;">
-    <button onclick='document.getElementById("type-select-popup").style.display="none";'>Schließen</button>
-  </div>
-</div>
-
-<script>
-  // let isAdmin = false; // Entfernt: doppelte Deklaration, da bereits im oberen Scriptblock vorhanden.
-
-  function checkAdminPassword() {
-    const input = document.getElementById("admin-password").value;
-    if (input === "Lu#@Mu23") {
-      setAdminSession();
-      localStorage.setItem("admin", "true");
-
-      document.getElementById("admin-password").value = "";
-
-      // ⛔ Fenster ausblenden (jetzt sicher)
-      const login = document.getElementById("admin-login");
-      const panel = document.getElementById("admin-panel");
-
-      if (login) login.style.display = "none";
-      if (panel) panel.style.display = "none";
-
-      hideOverlay();
-      enableAdminInputs();
-      fetchAndDisplayFilamente();
-    } else {
-      alert("❌ Falsches Passwort");
-    }
-  }
-
-  function enableAdminInputs() {
-    if (!isAdmin) return;
-    const fields = ["name","material","farbe","durchmesser","hersteller","leergewicht"];
-    fields.forEach(id => {
-      const el = document.getElementById(id + "-input");
-      if (el) el.disabled = false;
-    });
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    const fields = ["name","material","farbe","durchmesser","hersteller","leergewicht"];
-    fields.forEach(id => {
-      const el = document.getElementById(id + "-input");
-      if (el) el.disabled = true;
-    });
-  });
-function logoutAdmin() {
-  localStorage.removeItem("adminUntil");
-  localStorage.removeItem("admin");
-
-  // Aktualisiere Seite – verhindert Anzeigefehler
-  location.reload();
-}
-</script>
-
-<div id="popup-form">
-  <!-- Button zum Öffnen des vorhandenen Typen-Popups -->
-  <div style="margin-bottom:1em;">
-    <label>Vorhandenen Filament-Typ wählen:</label>
-    <button type="button" onclick='document.getElementById("type-select-popup").style.display="block"; showOverlay();' style="margin-top: 0.5em;">Typ auswählen</button>
-  </div>
-  <!-- Hinweis für Nutzer bzgl. Auswahl/Bearbeitung -->
-  <p style="color: lightgray; margin-bottom: 1em;">ℹ️ Als normaler Nutzer kannst du nur bestehende Filament-Typen auswählen. Eigene Typen kannst du nur als Admin hinzufügen.</p>
-  <form id="filament-form">
-    <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
-      <span style="margin-right: 0.5em;">🔒</span>
-      <input type="text" name="name" id="name-input" placeholder="Name" required autocomplete="off">
-    </div>
-    <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
-      <span style="margin-right: 0.5em;">🔒</span>
-      <input type="text" name="material" id="material-input" placeholder="Material" required autocomplete="off" >
-    </div>
-    <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
-      <span style="margin-right: 0.5em;">🔒</span>
-      <input type="text" name="farbe" id="farbe-input" placeholder="Farbe" required autocomplete="off" >
-    </div>
-    <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
-      <span style="margin-right: 0.5em;">🔒</span>
-      <input type="text" name="durchmesser" id="durchmesser-input" inputmode="decimal" placeholder="Durchmesser (z. B. 1,75)" autocomplete="off">
-    </div>
-    <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
-      <span style="margin-right: 0.5em;">🔒</span>
-      <input type="text" name="hersteller" id="hersteller-input" placeholder="Hersteller (optional)" autocomplete="off" >
-    </div>
-    <div style="display: flex; align-items: center; margin-bottom: 0.5em;">
-      <span style="margin-right: 0.5em;">🔒</span>
-      <input type="number" name="leergewicht" id="leergewicht-input" step="1" min="0" placeholder="Leergewicht (g)" required inputmode="decimal" autocomplete="off">
-    </div>
-    <input type="number" name="gesamtmenge" step="10" placeholder="Gesamtmenge (g)" autocomplete="off">
-    <input type="number" name="restmenge" step="10" placeholder="Restmenge (g)" autocomplete="off">
-    <button type="submit" class="action-bar">
-      <span class="icon">+</span>
-      <span class="label">Speichern</span>
-    </button>
-    <button type="button" onclick="document.getElementById('popup-form').style.display='none'; hideOverlay();" style="margin-left:1em;">Abbrechen</button>
-  </form>
-</div>
-
-<script>
-function showOverlay() {
-  document.getElementById("blur-overlay").style.display = "block";
-  document.body.classList.add("popup-open");
-}
-function hideOverlay() {
-  document.getElementById("blur-overlay").style.display = "none";
-  document.body.classList.remove("popup-open");
-}
-
-
-function openImageSettings() {
-  document.getElementById("admin-panel").style.display = "none";
-  document.getElementById("image-settings").style.display = "block";
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  // Setze isAdmin anhand localStorage, bevor fetchAndDisplayFilamente aufgerufen wird
-  const isAdminLocal = localStorage.getItem("admin") === "true" && Date.now() < parseInt(localStorage.getItem("adminUntil") || "0");
-  if (isAdminLocal) {
-    isAdmin = true;
-    enableAdminInputs();
-  }
-  // Settings-Icon Event-Listener (erneut sicherstellen, dass er gesetzt ist und nicht überschrieben wird)
-  const settingsIcon = document.querySelector(".settings-icon");
-  if (settingsIcon) {
-    settingsIcon.addEventListener("click", () => {
-      const login = document.getElementById("admin-login");
-      const panel = document.getElementById("admin-panel");
-      const imageSettings = document.getElementById("image-settings");
-
-      if (login.style.display === "block" || panel.style.display === "block" || imageSettings.style.display === "block") {
-        hideOverlay();
-        login.style.display = "none";
-        panel.style.display = "none";
-        imageSettings.style.display = "none";
-      } else {
-        if (isAdmin) {
-          panel.style.display = "block";
-        } else {
-          login.style.display = "block";
-        }
-        showOverlay();
-      }
-    });
-  }
-  let filamentData = [];
-  const form = document.getElementById("filament-form");
-    const saveButton = form.querySelector('button[type="submit"]');
-    function validateFilamentForm() {
-      let valid = true;
-      const stillAdmin = localStorage.getItem("admin") === "true" && Date.now() < parseInt(localStorage.getItem("adminUntil") || "0");
-
-      ['name','material','farbe'].forEach(field => {
-        const input = form.querySelector(`[name="${field}"]`);
-        if (!input || input.disabled) return;
-        const value = input.value.trim();
-        if (!value && input.dataset.touched === "true") {
-          valid = false;
-          input.classList.add('invalid');
-          return;
-        }
-
-        if ((field === "material" || field === "farbe") && !/^[A-Za-zÄÖÜäöüß\s\-]+$/.test(value)) {
-          valid = false;
-          input.classList.add('invalid');
-          return;
-        }
-
-        input.classList.remove('invalid');
-      });
-
-      ['durchmesser','leergewicht','gesamtmenge','restmenge'].forEach(field => {
-        const input = form.querySelector(`[name="${field}"]`);
-        if (!input || input.disabled) return;
-        const raw = input.value.trim().replace(',', '.');
-
-        // Neue Prüfung für durchmesser: Nur ganze Zahlen und Kommazahlen, keine Buchstaben
-        if (field === "durchmesser") {
-          if (!/^\d+([.,]\d+)?$/.test(raw)) {
-            valid = false;
-            input.classList.add('invalid');
-            return;
-          }
-        }
-
-        if ((field === "gesamtmenge" || field === "restmenge") && raw === "") {
-          if (!stillAdmin) {
-            valid = false;
-            input.classList.add('invalid');
-          } else {
-            input.classList.remove('invalid');
-          }
-          return;
-        }
-
-        const num = parseFloat(raw);
-        if (isNaN(num) || num <= 0) {
-          if (!(stillAdmin && (field === "gesamtmenge" || field === "restmenge") && raw === "")) {
-            valid = false;
-            input.classList.add('invalid');
-          }
-        } else {
-          input.classList.remove('invalid');
-        }
-      });
-
-      saveButton.disabled = !valid;
-    }
-    form.querySelectorAll('input').forEach(input => {
-      input.addEventListener('input', validateFilamentForm);
-      input.addEventListener('focus', () => {
-        if (!input.disabled) {
-          input.dataset.touched = "true";
-        }
-      });
-    });
-    // Mark all inputs as touched initially so validation styles are applied on load,
-    // but skip gesamtmenge and restmenge for admins
-    form.querySelectorAll('input').forEach(input => {
-      const name = input.getAttribute("name");
-      if (!input.disabled && (!localStorage.getItem("admin") || (name !== "gesamtmenge" && name !== "restmenge"))) {
-        input.dataset.touched = "true";
-      }
-    });
-    validateFilamentForm(); // Trigger initial validation
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    // Prüfe, ob Admin beide Felder leer lässt, dann setze auf null (Adminstatus wird zum Zeitpunkt des Sendens geprüft)
-    const stillAdmin = localStorage.getItem("admin") === "true" && Date.now() < parseInt(localStorage.getItem("adminUntil") || "0");
-    const isTypeOnly = stillAdmin && !form.gesamtmenge.value.trim() && !form.restmenge.value.trim();
-    const payload = {
-      name: form.name.value,
-      material: form.material.value,
-      farbe: form.farbe.value,
-      durchmesser: parseFloat(form.durchmesser.value.trim().replace(',', '.')),
-      leergewicht: parseFloat(form.leergewicht.value),
-      hersteller: form.hersteller.value || null,
-      gesamtmenge: isTypeOnly ? null : parseFloat(form.gesamtmenge.value),
-      restmenge: isTypeOnly ? null : parseFloat(form.restmenge.value),
-      verpackt: true
-    };
-    try {
-      const res = await fetch("/spulen/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        alert("✅ Hinzugefügt!");
-        fetchAndDisplayFilamente();
-        document.getElementById("popup-form").style.display = "none";
-        form.reset();
-        const stillVisible = ["admin-login", "admin-panel", "image-settings", "type-select-popup", "popup-form"].some(id => {
-          const el = document.getElementById(id);
-          return el && el.style.display === "block";
-        });
-        if (!stillVisible) hideOverlay();
-      } else {
-        const err = await res.json();
-        alert("❌ Fehler: " + JSON.stringify(err.detail));
-      }
-    } catch (err) {
-      alert("❌ Netzwerkfehler");
-      console.error(err);
-    }
-  });
-
-  const ITEMS_PER_PAGE = 10;
-  let currentPage = 1;
-
-  function renderPage(data, page = 1) {
-    const container = document.getElementById("filament-list");
-    container.innerHTML = "";
-    const start = (page - 1) * ITEMS_PER_PAGE;
-    const end = start + ITEMS_PER_PAGE;
-    const items = data.slice(start, end);
-
-    items.forEach((typ) => {
-      const box = document.createElement("div");
-      // Rahmenfarbe pro Karte anhand der Farbe setzen
-      const farbe = typ.farbe?.toLowerCase().replace(/\s+/g, "") || "";
-      let farbschlüssel = "";
-      if (farbe.includes("blau")) farbschlüssel = "blau";
-      else if (farbe.includes("rot")) farbschlüssel = "rot";
-      else if (farbe.includes("grau")) farbschlüssel = "grau";
-      else if (farbe.includes("magenta")) farbschlüssel = "magenta";
-      else if (farbe.includes("pink")) farbschlüssel = "pink";
-      else if (farbe.includes("cyan")) farbschlüssel = "cyan";
-      else if (farbe.includes("birke")) farbschlüssel = "birke";
-      else if (farbe.includes("gelb")) farbschlüssel = "gelb";
-      else if (farbe.includes("schwarz")) farbschlüssel = "schwarz";
-      else if (farbe.includes("weiß") || farbe.includes("weiss")) farbschlüssel = "weiß";
-      else if (farbe.includes("grün")) farbschlüssel = "grün";
-      else if (farbe.includes("orange")) farbschlüssel = "orange";
-      else if (farbe.includes("violett")) farbschlüssel = "violett";
-      else if (farbe.includes("silber")) farbschlüssel = "silber";
-      else if (farbe.includes("gold")) farbschlüssel = "gold";
-      else if (farbe.includes("kupfer")) farbschlüssel = "kupfer";
-      else if (farbe.includes("transparent")) farbschlüssel = "transparent";
-      else if (farbe.includes("natur")) farbschlüssel = "natur";
-      else if (farbe.includes("braun")) farbschlüssel = "braun";
-      if (farbschlüssel) box.classList.add("border-" + farbschlüssel);
-      // Neues Styling für die Karten-Boxen
-      box.style.background = "linear-gradient(135deg, rgba(40, 40, 40, 0.95), rgba(30, 30, 30, 0.95))";
-      box.style.boxShadow = "0 8px 20px rgba(0, 0, 0, 0.4)";
-      box.style.borderRadius = "20px";
-      box.style.backdropFilter = "blur(5px)";
-      box.style.transition = "transform 0.2s ease, box-shadow 0.3s ease";
-      box.style.overflow = "hidden";
-      box.style.color = "#fff";
-      box.style.padding = "1em";
-      // Dynamische Breite je nach Bildschirmgröße
-      if (window.innerWidth < 600) {
-        box.style.width = "35vw";
-      } else {
-        box.style.width = "200px";
-      }
-      box.style.textAlign = "left";
-      box.style.margin = "0.5em";
-      box.onmouseenter = () => {
-        box.style.transform = "translateY(-5px)";
-        box.style.boxShadow = "0 12px 24px rgba(0, 0, 0, 0.5)";
-      };
-      box.onmouseleave = () => {
-        box.style.transform = "none";
-        box.style.boxShadow = "0 8px 20px rgba(0, 0, 0, 0.4)";
-      };
-
-      const bildName = typ.bildname || "platzhalter.jpg";
-      // Bild mit Fallback falls nicht gefunden
-      box.innerHTML = `
-        <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; margin-bottom: 1em;">
-          <img src="/static/assets/images/${bildName}" alt="${typ.name}" onerror="this.onerror=null; this.src='/static/assets/images/platzhalter.jpg';" style="width: 100%; height: 100%; object-fit: cover; border-radius: 10px;">
+    <!-- Letzte Änderungen -->
+    <div>
+      <h2 class="text-xl font-semibold mb-4">Letzte Änderungen</h2>
+      <div class="flex flex-col md:flex-row gap-4 items-stretch">
+        <div class="bg-white p-4 rounded-xl shadow-sm flex-1">
+          <h3 class="text-sm font-medium text-gray-800 mb-2">Zuletzt bearbeitete Spulen</h3>
+          <div id="last-edited-spools" class="space-y-3 text-sm text-gray-600">
+            <div class="text-gray-400 italic">Lade letzte Änderungen …</div>
+          </div>
         </div>
-        <h3 style="margin-top: 0;">${typ.name}</h3>
-        <p><strong>Material:</strong> ${typ.material}</p>
-        <p><strong>Farbe:</strong> ${typ.farbe}</p>
-        <p><strong>Durchmesser:</strong> ${typ.durchmesser} mm</p>
-        <p><strong>Hersteller:</strong> ${typ.hersteller || "-"}</p>
-        <p><strong>Anzahl Spulen:</strong> ${typ.spulen.length}</p>
-      `;
-      // --- Admin-Button für Typ-Bearbeiten/Löschen ---
-      if (localStorage.getItem("admin") === "true" && Date.now() < parseInt(localStorage.getItem("adminUntil") || "0")) {
-        // Bearbeiten-Button mit SVG-Icon
-        const editBtn = document.createElement("button");
-        editBtn.className = "bearbeiten-button";
-        editBtn.setAttribute("data-id", typ.id);
-        editBtn.setAttribute("title", "Bearbeiten");
-        editBtn.style.position = "absolute";
-        editBtn.style.top = "10px";
-        editBtn.style.right = "10px";
-        editBtn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" height="18" viewBox="0 0 24 24" width="18" fill="#ffffff">
-            <path d="M0 0h24v24H0z" fill="none"/>
-            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.42l-2.34-2.34a1.003 1.003 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"/>
-          </svg>
-        `;
-        editBtn.onclick = () => {
-          showOverlay();
-          const popup = document.createElement("div");
-          popup.id = "edit-type-popup";
-          popup.style.position = "fixed";
-          popup.style.top = "10%";
-          popup.style.left = "50%";
-          popup.style.transform = "translateX(-50%)";
-          popup.style.background = "rgba(51, 51, 51, 0.95)";
-          popup.style.padding = "2em";
-          popup.style.borderRadius = "10px";
-          popup.style.zIndex = "1003";
-          popup.style.width = "400px";
-          popup.style.color = "#fff";
-          popup.style.backdropFilter = "blur(8px)";
+        <div class="bg-white p-4 rounded-xl shadow-sm flex-1">
+          <h3 class="text-sm font-medium text-gray-800 mb-2">Neu hinzugefügte Spulen</h3>
+          <div id="new-spools" class="space-y-3 text-sm text-gray-600">
+            <div class="text-gray-400 italic">Lade neue Spulen …</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-          popup.innerHTML = `
-            <h3>Typ bearbeiten</h3>
-            <label>Name:</label>
-            <input type="text" id="edit-name" value="${typ.name}" style="width:100%; margin-bottom:0.5em;">
-            <label>Material:</label>
-            <input type="text" id="edit-material" value="${typ.material}" style="width:100%; margin-bottom:0.5em;">
-            <label>Farbe:</label>
-            <input type="text" id="edit-farbe" value="${typ.farbe}" style="width:100%; margin-bottom:0.5em;">
-            <label>Durchmesser:</label>
-            <input type="text" id="edit-durchmesser" value="${typ.durchmesser}" style="width:100%; margin-bottom:0.5em;">
-            <label>Hersteller:</label>
-            <input type="text" id="edit-hersteller" value="${typ.hersteller || ""}" style="width:100%; margin-bottom:1em;">
+    <!-- Platz für geplante Funktionen oder Hinweise -->
+    <div>
+      <h2 class="text-xl font-semibold mb-4">Hinweise &amp; Geplante Funktionen</h2>
+      <div class="bg-white p-4 rounded-xl shadow-sm text-gray-600 text-sm">
+        <ul class="list-disc pl-5 space-y-1">
+          <li>Erweiterte Statistiken und Filtermöglichkeiten</li>
+          <li>Benachrichtigungen bei fast leerem Filament</li>
+          <li>Integration mit Druckaufträgen</li>
+          <li>Mehrsprachigkeit</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+</body>
+  <script>
+    const ws = new WebSocket(`ws://${location.host}/ws/dashboard`);
 
-            <label>Leergewicht (g):</label>
-            <input type="number" id="edit-leergewicht" value="${typ.leergewicht}" step="1" min="0" style="width:100%; margin-bottom:1em;">
+    ws.onopen = () => console.log("✅ WebSocket verbunden mit Dashboard");
+    ws.onclose = () => console.log("❌ Verbindung zum Dashboard-WebSocket getrennt");
+    ws.onerror = (err) => console.error("WebSocket-Fehler:", err);
 
-            <div style="display:flex; justify-content:space-between; gap:0.5em;">
-              <button id="save-edit-btn" style="flex:1;">💾 Speichern</button>
-              <button id="delete-type-btn" style="flex:1;">🗑️ Löschen</button>
-              <button id="close-edit-btn" style="flex:1;">❌ Schließen</button>
+    async function loadDashboardDetails() {
+      const res = await fetch("/api/dashboard-details");
+      const data = await res.json();
+
+      animateRollingNumber(document.querySelector(".text-blue-600"), data.typen ?? 0);
+      animateRollingNumber(document.querySelector(".text-green-600"), data.spulen ?? 0);
+      animateRollingNumber(document.querySelector(".text-red-500"), data.fastleer ?? 0);
+      // Gesamtverbrauch (7 Tage) direkt aus Dashboard-Daten
+      animateRollingNumber(document.querySelector(".text-orange-500"), data.verbrauch_7tage ?? 0, " g");
+
+      const edited = document.querySelector("#last-edited-spools");
+      const added = document.querySelector("#new-spools");
+
+      edited.innerHTML = "";
+      data.letzte_spulen
+        .filter(s => {
+          const created = new Date(s.created_at).getTime();
+          const updated = new Date(s.updated_at).getTime();
+          return updated > created;
+        })
+        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+        .slice(0, 3)
+        .forEach(s => {
+          const diff = s.alt_gewicht - s.neu_gewicht;
+          const color = diff >= 100 ? "text-red-500" : diff >= 50 ? "text-yellow-500" : "text-green-600";
+          const datum = new Date(s.updated_at).toLocaleDateString("de-DE");
+          edited.innerHTML += `
+            <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
+                ID: ${s.spulen_id}
+              </div>
+              <div class="flex justify-between items-center">
+                <div class="text-sm font-semibold text-gray-800">${s.typ_name} (${s.material}, ${s.farbe})</div>
+                <div class="text-xs text-gray-500 ml-2">${datum}</div>
+              </div>
+              <div class="flex justify-between items-center text-xs text-gray-600 space-x-2">
+                <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
+                <div class="flex-1 text-center ${color} font-semibold">–${diff} g</div>
+                <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
+              </div>
             </div>
           `;
-
-          document.body.appendChild(popup);
-
-          document.getElementById("close-edit-btn").onclick = () => {
-            popup.remove();
-            hideOverlay();
-          };
-
-          document.getElementById("save-edit-btn").onclick = async () => {
-            const payload = {
-              name: document.getElementById("edit-name").value,
-              material: document.getElementById("edit-material").value,
-              farbe: document.getElementById("edit-farbe").value,
-              durchmesser: parseFloat(document.getElementById("edit-durchmesser").value.replace(",", ".")),
-              leergewicht: parseFloat(document.getElementById("edit-leergewicht").value),
-              hersteller: document.getElementById("edit-hersteller").value.trim() || null,
-              bildname: typ.bildname // ← damit der alte Bildname beibehalten wird
-            };
-            try {
-              const res = await fetch("/typs/" + encodeURIComponent(typ.id), {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-              });
-              if (res.ok) {
-                alert("✅ Typ aktualisiert.");
-                popup.remove();
-                hideOverlay();
-                fetchAndDisplayFilamente();
-              } else {
-                const err = await res.json();
-                alert("❌ Fehler: " + JSON.stringify(err.detail || "Unbekannter Fehler"));
-              }
-            } catch (err) {
-              alert("❌ Netzwerkfehler");
-              console.error(err);
-            }
-          };
-
-          document.getElementById("delete-type-btn").onclick = async () => {
-            try {
-              // Prüfe zuerst, ob Typ Spulen hat
-              if (typ.spulen && typ.spulen.length > 0) {
-                alert("❌ Typ kann nicht gelöscht werden, da noch Spulen vorhanden sind.");
-                return;
-              }
-
-              if (!confirm("⚠️ Wirklich löschen?")) return;
-
-              const res = await fetch("/typs/" + encodeURIComponent(typ.id), { method: "DELETE" });
-              if (res.ok) {
-                alert("✅ Typ gelöscht.");
-                popup.remove();
-                hideOverlay();
-                fetchAndDisplayFilamente();
-              } else {
-                const err = await res.json();
-                alert("❌ Fehler: " + (err.detail || "Unbekannter Fehler"));
-              }
-            } catch {
-              alert("❌ Netzwerkfehler");
-            }
-          };
-        };
-        box.appendChild(editBtn);
-        box.style.position = "relative";
-      }
-      box.style.cursor = "pointer";
-      box.addEventListener("click", (event) => {
-        if (event.target.closest("button")) return; // Verhindere Navigation bei Klick auf einen Button (wie ✏️)
-        window.location.href = "/typ/" + encodeURIComponent(typ.id);
-      });
-      container.appendChild(box);
-    });
-
-    const totalPages = Math.ceil(data.length / ITEMS_PER_PAGE);
-    const pagination = document.getElementById("pagination");
-    pagination.innerHTML = "";
-
-    if (page > 1) {
-      const prevBtn = document.createElement("button");
-      prevBtn.textContent = "«";
-      prevBtn.onclick = () => {
-        currentPage = page - 1;
-        renderPage(data, currentPage);
-      };
-      pagination.appendChild(prevBtn);
-    }
-
-    for (let i = 1; i <= totalPages; i++) {
-      const btn = document.createElement("button");
-      btn.textContent = i;
-      btn.style.margin = "0 5px";
-      btn.disabled = i === page;
-      btn.onclick = () => {
-        currentPage = i;
-        renderPage(data, i);
-      };
-      pagination.appendChild(btn);
-    }
-
-    if (page < totalPages) {
-      const nextBtn = document.createElement("button");
-      nextBtn.textContent = "»";
-      nextBtn.onclick = () => {
-        currentPage = page + 1;
-        renderPage(data, currentPage);
-      };
-      pagination.appendChild(nextBtn);
-    }
-  }
-
-  async function fetchAndDisplayFilamente() {
-    const stillAdmin = localStorage.getItem("admin") === "true" && Date.now() < parseInt(localStorage.getItem("adminUntil") || "0");
-    isAdmin = stillAdmin;
-    try {
-      const response = await fetch("/typs/");
-      const data = await response.json();
-
-      data.sort((a, b) => a.name.localeCompare(b.name));
-      filamentData = data;
-
-      renderPage(filamentData, currentPage);
-
-      // Fülle das Dropdown für vorhandene Typen
-      const typeListContainer = document.getElementById("existing-type-list");
-      if (typeListContainer) {
-        typeListContainer.innerHTML = "";
-        data.forEach(t => {
-          const item = document.createElement("div");
-          item.style.border = "1px solid #999";
-          item.style.borderRadius = "6px";
-          item.style.padding = "0.5em";
-          item.style.marginBottom = "0.5em";
-          item.style.background = "#3a3a3a";
-          item.style.cursor = "pointer";
-
-          item.innerHTML = `
-            <strong>${t.name}</strong><br/>
-            <small>${t.material}, ${t.farbe}, ${t.durchmesser}mm, ${t.hersteller || "-"}</small><br/>
-            <button type="button" style="margin-top: 0.5em;">Auswählen</button>
-          `;
-
-          item.querySelector("button").addEventListener("click", () => {
-            form.name.value = t.name;
-            form.material.value = t.material;
-            form.farbe.value = t.farbe;
-            form.durchmesser.value = t.durchmesser;
-            form.hersteller.value = t.hersteller || "";
-            form.leergewicht.value = t.leergewicht || 0;
-            // Felder als gültig markieren (rot entfernen)
-            [form.name, form.material, form.farbe, form.durchmesser, form.hersteller].forEach(input => {
-              input.classList.remove("invalid");
-            });
-            form.gesamtmenge.value = "";
-            form.restmenge.value = "";
-
-            // Schließe nur das Popup, lasse Overlay sichtbar
-            document.getElementById("type-select-popup").style.display = "none";
-          });
-
-          typeListContainer.appendChild(item);
         });
-      }
-    } catch (err) {
-      console.error("Fehler beim Abrufen der Filamenttypen:", err);
-    }
-  }
 
-  fetchAndDisplayFilamente();
+      added.innerHTML = "";
+      data.letzte_spulen
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .slice(0, 3)
+        .forEach(s => {
+          const datum = new Date(s.created_at).toLocaleDateString("de-DE");
+          added.innerHTML += `
+            <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
+                ID: ${s.spulen_id}
+              </div>
+              <div class="flex justify-between items-center">
+                <div class="text-sm font-semibold text-gray-800">${s.typ_name}</div>
+                <div class="text-xs text-gray-500 ml-2">${datum}</div>
+              </div>
+              <div class="flex justify-between items-center text-xs text-gray-600">
+                <div class="flex-1">Farbe: ${s.farbe}</div>
+                <div class="flex-1 text-center">Material: ${s.material}</div>
+                <div class="flex-1 text-right">Durchmesser: ${s.durchmesser} mm</div>
+              </div>
+            </div>
+          `;
+        });
 
-  const searchInput = document.querySelector(".search-bar input");
-  searchInput.addEventListener("input", () => {
-    const query = searchInput.value.trim().toLowerCase();
-    const filtered = filamentData.filter(typ =>
-      typ.name.toLowerCase().includes(query) ||
-      typ.material.toLowerCase().includes(query) ||
-      typ.farbe.toLowerCase().includes(query) ||
-      String(typ.durchmesser).toLowerCase().includes(query) ||
-      (typ.hersteller && typ.hersteller.toLowerCase().includes(query))
-    );
-    currentPage = 1;
-    renderPage(filtered, currentPage);
-  });
-
-  document.getElementById("show-form-button").addEventListener("click", () => {
-    const popup = document.getElementById("popup-form");
-    popup.style.display = "block";
-    showOverlay();
-    updateAdminStatus();
-    enableAdminInputs();
-    validateFilamentForm();
-  });
-});
-
-// --- Mehrere Spulen hinzufügen (Admin) ---
-function showAddMultipleSpoolsPopup() {
-  document.getElementById("admin-panel").style.display = "none";
-  hideOverlay();
-  fetch('/typs/')
-    .then(res => res.json())
-    .then(data => {
-      const select = document.getElementById("spool-type-select");
-      select.innerHTML = "";
-      data.forEach(t => {
-        const opt = document.createElement("option");
-        opt.value = t.id;
-        opt.textContent = `${t.name} (${t.material}, ${t.farbe}, ${t.durchmesser}mm)`;
-        select.appendChild(opt);
-      });
-      document.getElementById("multiple-spools-popup").style.display = "block";
-      showOverlay();
-    })
-    .catch(err => {
-      console.error("Fehler beim Laden der Typen:", err);
-      alert("❌ Typen konnten nicht geladen werden.");
-    });
-}
-
-async function addMultipleSpools() {
-  const typId = document.getElementById("spool-type-select").value;
-  const count = parseInt(document.getElementById("spool-count-input").value);
-  if (!typId || isNaN(count) || count <= 0) {
-    alert("❌ Bitte gültige Anzahl und Typ auswählen.");
-    return;
-  }
-
-  let menge = 1000;
-  let typ = null;
-  if (window.filamentData && Array.isArray(filamentData)) {
-    typ = filamentData.find(t => t.id == typId);
-  }
-  if (!typ) {
-    try {
-      const data = await fetch('/typs/').then(res => res.json());
-      typ = data.find(t => t.id == typId);
-    } catch {}
-  }
-  if (typ && typ.spulen && typ.spulen.length > 0 && typ.spulen[0].gesamtmenge) {
-    menge = typ.spulen[0].gesamtmenge;
-  }
-
-  for (let i = 0; i < count; i++) {
-    await fetch("/spulen/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: typ.name,
-        material: typ.material,
-        farbe: typ.farbe,
-        durchmesser: typ.durchmesser,
-        leergewicht: typ.leergewicht || 0,
-        hersteller: typ.hersteller || null,
-        gesamtmenge: menge,
-        restmenge: menge,
-        verpackt: true
-      })
-    });
-  }
-
-  alert(`✅ ${count} Spulen hinzugefügt.`);
-  document.getElementById("multiple-spools-popup").style.display = "none";
-  hideOverlay();
-  fetchAndDisplayFilamente();
-  location.reload();
-}
-
-// Funktion: Spule zu vorhandenem Typ hinzufügen (ORIGINAL)
-async function addSpoolToExistingType() {
-  const selected = document.getElementById("existing-type").value;
-  if (!selected) {
-    alert("❌ Bitte wähle einen Filament-Typ aus.");
-    return;
-  }
-
-  const payload = {
-    name: selected,
-    material: null,
-    farbe: null,
-    durchmesser: null,
-    hersteller: null,
-    gesamtmenge: 0,
-    restmenge: 0
-  };
-
-  try {
-    const res = await fetch("/spulen/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    if (res.ok) {
-      alert("✅ Spule wurde dem vorhandenen Typ hinzugefügt.");
-      // Aktualisiere die Filamentliste
-      if (typeof fetchAndDisplayFilamente === "function") {
-        fetchAndDisplayFilamente();
-      }
-    } else {
-      const err = await res.json();
-      alert("❌ Fehler: " + JSON.stringify(err.detail));
-    }
-  } catch (err) {
-    alert("❌ Netzwerkfehler");
-    console.error(err);
-  }
-}
-
-// Funktion zum Entfernen der Typ-Zuweisung von einem Bild
-async function unassignImage(bildname) {
-  if (!confirm(`Möchtest du die Zuweisung für das Bild "${bildname}" wirklich entfernen?`)) return;
-
-  const response = await fetch(`/bilder/${encodeURIComponent(bildname)}/entferne-typ`, {
-    method: "PATCH"
-  });
-
-  if (response.ok) {
-    alert(`✅ Zuweisung entfernt.`);
-    await loadImageManagement();
-    await fetchAndDisplayFilamente();
-  } else {
-    alert("❌ Fehler beim Entfernen der Zuweisung.");
-  }
-}
-
-async function deleteImage(name) {
-  if (!confirm(`Möchtest du das Bild "${name}" wirklich löschen?`)) return;
-
-  try {
-    const response = await fetch(`/bilder/${encodeURIComponent(name)}`, {
-      method: "DELETE"
-    });
-
-    if (response.ok) {
-      alert("✅ Bild wurde gelöscht.");
-      await loadImageManagement();
-      await fetchAndDisplayFilamente(); // <- nach erfolgreichem Löschen
-    } else {
-      const errorData = await response.json();
-      console.error("Fehler beim Löschen:", errorData);
-      alert("❌ Fehler beim Löschen: " + (errorData.detail || "Unbekannter Fehler."));
-    }
-  } catch (err) {
-    console.error("Netzwerkfehler beim Löschen:", err);
-    if (!err instanceof Response) {
-      alert("❌ Netzwerkfehler beim Löschen.");
-    }
-  }
-}
-
-// ESC schließt nur das oberste sichtbare Popup, Blur wird entfernt wenn kein Popup mehr offen ist
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") {
-    const overlays = [
-      "admin-login",
-      "admin-panel",
-      "image-settings",
-      "type-select-popup",
-      "popup-form"
-    ];
-    let closedOne = false;
-    for (const id of overlays) {
-      const el = document.getElementById(id);
-      if (el && el.style.display === "block") {
-        el.style.display = "none";
-        closedOne = true;
-        break; // close only the first visible one
-      }
-    }
-
-    if (closedOne) {
-      const stillVisible = overlays.some(id => {
-        const el = document.getElementById(id);
-        return el && el.style.display === "block";
-      });
-      if (!stillVisible) hideOverlay();
-    }
-  }
-});
-document.getElementById("upload-image").addEventListener("change", function () {
-  const file = this.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    const img = document.getElementById("preview-image");
-    img.src = e.target.result;
-    img.style.display = "block";
-  };
-  reader.readAsDataURL(file);
-});
-
-document.getElementById("save-image-btn").addEventListener("click", async function () {
-  const fileInput = document.getElementById("upload-image");
-  const file = fileInput.files[0];
-  const customName = document.getElementById("new-image-name").value.trim();
-
-  if (!file) {
-    alert("❌ Bitte wähle ein Bild aus.");
-    return;
-  }
-
-  // Dateityp-Prüfung: Nur JPG oder PNG erlauben
-  const allowedTypes = ['image/jpeg', 'image/png'];
-  if (!allowedTypes.includes(file.type)) {
-    alert("❌ Nur JPG- oder PNG-Dateien erlaubt.");
-    return;
-  }
-
-  let finalFileName;
-  if (customName) {
-    finalFileName = customName.endsWith(".jpg") || customName.endsWith(".png") ? customName : customName + ".jpg";
-  } else {
-    finalFileName = file.name;
-  }
-
-  // NEU: Prüfe, ob der Name bereits existiert
-  const responseCheck = await fetch("/bilder/");
-  const images = await responseCheck.json();
-  if (images.some(img => img.bildname === finalFileName)) {
-    alert("❌ Es existiert bereits ein Bild mit diesem Namen.");
-    return;
-  }
-
-  const renamedFile = new File([file], finalFileName, { type: file.type });
-
-  const formData = new FormData();
-  formData.append("file", renamedFile);
-
-  const response = await fetch("/upload-image/", {
-    method: "POST",
-    body: formData
-  });
-
-  if (response.ok) {
-    alert("✅ Bild erfolgreich gespeichert.");
-    document.getElementById("new-image-name").value = "";
-    document.getElementById("preview-image").style.display = "none";
-    fileInput.value = "";
-    fetchAvailableImages();
-  } else {
-    alert("❌ Fehler beim Speichern.");
-  }
-});
-
-// Bild einem Typ zuweisen
-document.getElementById("zuweis-bildname").addEventListener("keydown", async function (e) {
-  if (e.key === "Enter") {
-    const id = document.getElementById("zuweis-name").value.trim();
-    const bildname = document.getElementById("zuweis-bildname").value.trim();
-    if (!id || !bildname) {
-      alert("Bitte Typname und Bildname angeben.");
-      return;
-    }
-
-    const response = await fetch(`/typs/${encodeURIComponent(id)}/bild?bildname=${encodeURIComponent(bildname)}`, {
-      method: "PATCH"
-    });
-
-    if (response.ok) {
-      alert("✅ Bild wurde zugewiesen.");
-      fetchAndDisplayFilamente();
-    } else {
-      alert("❌ Fehler beim Zuweisen.");
-    }
-  }
-});
-
-async function fetchAvailableImages() {
-  try {
-    const response = await fetch("/bilder/");
-    const images = await response.json();
-    // Functionality for populating image selection removed
-  } catch (err) {
-    console.error("Fehler beim Abrufen der Bildliste:", err);
-  }
-}
-
-// NEU: Funktion zum Laden der Typenliste für das Dropdown
-async function fetchAvailableTypen() {
-  try {
-    const response = await fetch("/typs/");
-    const data = await response.json();
-    const select = document.getElementById("zuweis-name");
-    const previouslySelected = select.value; // speichere alten Wert
-
-    select.innerHTML = "";
-    data.forEach(typ => {
-      const opt = document.createElement("option");
-      opt.value = typ.id;
-      opt.textContent = `${typ.name} (${typ.material}, ${typ.farbe}, ${typ.durchmesser}mm)`;
-      if (String(typ.id) === previouslySelected) {
-        opt.selected = true;
-      }
-      select.appendChild(opt);
-    });
-  } catch (err) {
-    console.error("Fehler beim Abrufen der Typenliste:", err);
-  }
-}
-
-// --- Bildverwaltung: Funktion zum Laden der Bildmanagement-Ansicht ---
-async function loadImageManagement() {
-  try {
-    const files = await (await fetch("/bilder/")).json();
-
-    const container = document.getElementById("image-management");
-    container.innerHTML = "";
-
-    for (const file of files) {
-      // Skip placeholder image so it cannot be deleted
-      if (file.bildname === "platzhalter.jpg") {
-        continue;
-      }
-      const name = file.bildname;
-      const typname = file.typ_name && file.typ_farbe ? `${file.typ_name} (${file.typ_farbe})` : "-";
-      const row = document.createElement("div");
-      row.style.display = "flex";
-      row.style.alignItems = "center";
-      row.style.marginBottom = "0.5em";
-      row.innerHTML = `
-        <img src="/static/assets/images/${name}" alt="${name}" style="width:32px; height:32px; object-fit:cover; border-radius:4px; margin-right:0.5em;">
-        <div style="flex-grow:1;">
-          <div style="font-size:0.9em;">${name}</div>
-          <div style="font-size:0.8em; color:#ccc;">Typ: ${typname}</div>
+      const imDruckerContainer = document.getElementById("im-drucker-spools");
+      imDruckerContainer.innerHTML = "";
+      if (data.im_drucker_spulen && data.im_drucker_spulen.length > 0) {
+        data.im_drucker_spulen.forEach(spule => {
+          imDruckerContainer.innerHTML += `
+  <div class="bg-white rounded-xl shadow-sm max-w-sm w-full mx-auto flex flex-col overflow-hidden border border-gray-200">
+    <div class="relative">
+      <img src="/static/assets/images/${spule.bildname && spule.bildname !== 'null' ? spule.bildname : 'platzhalter.jpg'}" alt="${spule.typ_name}" class="w-full h-32 object-cover object-center" />
+      <div class="absolute top-2 right-2 bg-white bg-opacity-80 text-xs px-2 py-0.5 rounded text-gray-600 border border-gray-300">
+        ID: ${spule.spulen_id}
+      </div>
+    </div>
+    <div class="p-4 flex flex-col space-y-1 text-sm text-gray-700">
+      <div class="font-semibold text-gray-900 text-base">${spule.typ_name}</div>
+      <div class="flex justify-between">
+        <span>Farbe:</span>
+        <span>${spule.farbe}</span>
+      </div>
+      <div class="flex justify-between">
+        <span>Material:</span>
+        <span>${spule.material}</span>
+      </div>
+      <div class="flex justify-between">
+        <span>Durchmesser:</span>
+        <span>${spule.durchmesser} mm</span>
+      </div>
+      <div class="mt-2">
+        <div class="text-xs text-gray-500 mb-1">Restmenge</div>
+        <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+          <div class="h-full rounded-full ${spule.neu_gewicht > 100 ? 'bg-green-500' : spule.neu_gewicht > 50 ? 'bg-yellow-400' : 'bg-red-500'}" style="width: ${spule.gesamtmenge > 0 ? (spule.neu_gewicht / spule.gesamtmenge) * 100 : 0}%"></div>
         </div>
-        <button style="margin-left:0.5em;" onclick="document.getElementById('rename-old-name').value='${name}'; document.getElementById('zuweis-bildname').value='${name}'; document.getElementById('zuweis-name').value='${file.typ_id || ""}';">✏️</button>
-        <button style="margin-left:0.5em;" onclick="unassignImage('${name}')">🚫</button>
-        <button style="margin-left:0.5em;" onclick="deleteImage('${name}')">🗑️</button>
-      `;
-      container.appendChild(row);
+        <div class="text-right text-xs mt-1">${spule.neu_gewicht} g</div>
+      </div>
+    </div>
+  </div>
+`;
+        });
+      } else {
+        imDruckerContainer.innerHTML = `<div class="text-gray-500 italic text-center">Keine Spulen im Drucker</div>`;
+      }
     }
-  } catch (err) {
-    console.error("Fehler beim Laden der Bildverwaltung:", err);
-  }
-}
 
-document.getElementById("image-settings").addEventListener("click", () => {
-  fetchAvailableTypen();
-  fetchAvailableImages();
-  loadImageManagement();
-});
-function switchImageTab(tab) {
-  document.getElementById("image-upload-tab").style.display = tab === "upload" ? "block" : "none";
-  document.getElementById("image-manage-tab").style.display = tab === "manage" ? "block" : "none";
-  
-  if (tab === "manage") {
-    fetchAvailableImages();
-    loadImageManagement();
-  }
-}
-// --- Bild-Typ Dropdown: Speichere Auswahl und halte sie beim Bildname-Fokus ---
-let selectedTypName = "";
+    function animateRollingNumber(element, target, suffix = "") {
+      const digits = String(target).split("");
+      element.innerHTML = ""; // leeren
 
-document.getElementById("zuweis-name").addEventListener("change", function () {
-  selectedTypName = this.value;
-});
+      digits.forEach((digit, idx) => {
+        const digitCol = document.createElement("div");
+        digitCol.className = "inline-block overflow-hidden h-[2rem] w-[1ch] align-bottom";
 
-// Entferne den Fokus-Handler, da er den Wert überschreibt
+        const inner = document.createElement("div");
+        inner.style.transform = `translateY(0px)`;
+
+        for (let i = 0; i <= 9; i++) {
+          const d = document.createElement("div");
+          d.className = "h-[2rem] flex items-center justify-center";
+          d.textContent = i;
+          inner.appendChild(d);
+        }
+
+        digitCol.appendChild(inner);
+        element.appendChild(digitCol);
+
+        setTimeout(() => {
+          inner.className = "transition-transform duration-700 ease-out";
+          inner.style.transform = `translateY(-${parseInt(digit) * 2}rem)`;
+        }, 10);
+      });
+
+      if (suffix) {
+        const suffixSpan = document.createElement("span");
+        suffixSpan.className = "ml-1";
+        suffixSpan.textContent = suffix;
+        element.appendChild(suffixSpan);
+      }
+    }
+
+    // Initial laden & bei WS-Aktualisierung erneut
+    loadDashboardDetails();
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log("📡 Live-Update:", data);
+      if (data.event === "spule_created" || data.event === "spule_deleted") {
+        loadDashboardDetails();
+      } else if (data.event === "spule_updated") {
+        const edited = document.querySelector("#last-edited-spools");
+        fetch("/api/dashboard-details")
+          .then(res => res.json())
+          .then(data => {
+            edited.innerHTML = "";
+            data.letzte_spulen
+              .filter(s => {
+                const created = new Date(s.created_at).getTime();
+                const updated = new Date(s.updated_at).getTime();
+                return updated > created;
+              })
+              .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+              .slice(0, 3)
+              .forEach(s => {
+                const diff = s.alt_gewicht - s.neu_gewicht;
+                const color = diff >= 100 ? "text-red-500" : diff >= 50 ? "text-yellow-500" : "text-green-600";
+                const datum = new Date(s.updated_at).toLocaleDateString("de-DE");
+                edited.innerHTML += `
+                  <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+                    <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
+                      ID: ${s.spulen_id}
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <div class="text-sm font-semibold text-gray-800">${s.typ_name} (${s.material}, ${s.farbe})</div>
+                      <div class="text-xs text-gray-500 ml-2">${datum}</div>
+                    </div>
+                    <div class="flex justify-between items-center text-xs text-gray-600 space-x-2">
+                      <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
+                      <div class="flex-1 text-center ${color} font-semibold">–${diff} g</div>
+                      <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
+                    </div>
+                  </div>
+                `;
+              });
+          });
+      }
+    };
+  </script>
 </script>
-
 <script>
-document.getElementById("rename-image-btn").addEventListener("click", async function () {
-  const oldName = document.getElementById("rename-old-name").value.trim();
-  const newName = document.getElementById("rename-new-name").value.trim();
+  const authBereich = document.getElementById("auth-bereich");
 
-  if (!oldName || !newName) {
-    alert("Bitte sowohl alten als auch neuen Namen angeben.");
-    return;
+  async function checkAuthStatus() {
+    try {
+      const res = await fetch("/api/userinfo");
+      if (!res.ok) throw new Error("Nicht angemeldet");
+      const daten = await res.json();
+
+      // Auth-Bereich dynamisch anpassen (Login/Logout, Benutzername)
+      authBereich.innerHTML = `
+        <form id="logoutForm" class="flex flex-col items-center">
+          <span class="text-sm text-gray-300 mb-1">Angemeldet als ${daten.username}</span>
+          <button type="submit" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition w-full">Logout</button>
+        </form>
+      `;
+
+      document.getElementById("logoutForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await fetch("/logout", { method: "POST" });
+        location.reload();
+      });
+    } catch (err) {
+      // Nicht eingeloggt, Standard-Login-Link bleibt
+    }
   }
 
-  const response = await fetch(`/bilder/rename?old=${encodeURIComponent(oldName)}&new=${encodeURIComponent(newName)}`, {
-    method: "PATCH"
-  });
-
-  if (response.ok) {
-    alert("✅ Bild wurde umbenannt.");
-    fetchAvailableImages();
-    document.getElementById("rename-old-name").value = "";
-    document.getElementById("rename-new-name").value = "";
-  } else {
-    alert("❌ Fehler beim Umbenennen.");
-  }
-});
-
-
-// Helper zum Bild-Typ-Zuweisen direkt im Bildmanagement
-async function assignImageToType(bildname, typname) {
-  if (!bildname || !typname) {
-    alert("❌ Bitte Bildname und Typname angeben.");
-    return;
-  }
-
-  const response = await fetch(`/typs/${encodeURIComponent(typname)}/bild?bildname=${encodeURIComponent(bildname)}`, {
-    method: "PATCH"
-  });
-
-  if (response.ok) {
-    alert(`✅ Bild wurde dem Typ "${typname}" zugewiesen.`);
-    await loadImageManagement();
-    fetchAndDisplayFilamente();
-  } else {
-    alert("❌ Fehler beim Zuweisen.");
-  }
-}
+  checkAuthStatus();
+</script>
+</html>
