@@ -1,3 +1,4 @@
+COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 Tage
 from fastapi import APIRouter, Form, HTTPException, Depends
 from fastapi.responses import RedirectResponse, HTMLResponse
 from sqlalchemy.orm import Session
@@ -7,6 +8,19 @@ from models import User, AuthToken
 import os
 import secrets
 import string
+from fastapi import Request
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+from fastapi import Depends
+from dotenv import load_dotenv
+from itsdangerous import URLSafeSerializer
+
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY fehlt in der .env-Datei oder konnte nicht geladen werden.")
+serializer = URLSafeSerializer(SECRET_KEY)
 
 router = APIRouter()
 
@@ -26,7 +40,8 @@ async def login(
         raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
     
     response = RedirectResponse(url="/", status_code=303)
-    response.set_cookie(key="benutzer", value=benutzername, httponly=True)
+    cookie_wert = serializer.dumps({"username": benutzername})
+    response.set_cookie(key="benutzer", value=cookie_wert, httponly=True, max_age=COOKIE_MAX_AGE)
     return response
 
 @router.get("/register", response_class=HTMLResponse)
@@ -68,7 +83,11 @@ from fastapi.responses import JSONResponse
 
 @router.get("/api/userinfo")
 async def get_userinfo(request: Request, db: Session = Depends(get_db)):
-    benutzer = request.cookies.get("benutzer")
+    raw_cookie = request.cookies.get("benutzer")
+    try:
+        benutzer = serializer.loads(raw_cookie, max_age=COOKIE_MAX_AGE)["username"] if raw_cookie else None
+    except:
+        benutzer = None
     if not benutzer:
         return JSONResponse(status_code=401, content={"detail": "Nicht eingeloggt"})
 
@@ -80,7 +99,11 @@ async def get_userinfo(request: Request, db: Session = Depends(get_db)):
 
 @router.post("/admin/create-token")
 async def create_token(request: Request, db: Session = Depends(get_db)):
-    benutzer = request.cookies.get("benutzer")
+    raw_cookie = request.cookies.get("benutzer")
+    try:
+        benutzer = serializer.loads(raw_cookie)["username"] if raw_cookie else None
+    except:
+        benutzer = None
     if not benutzer:
         raise HTTPException(status_code=401, detail="Nicht eingeloggt")
 
@@ -100,7 +123,11 @@ async def create_token(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/admin/tokens")
 async def list_tokens(request: Request, db: Session = Depends(get_db)):
-    benutzer = request.cookies.get("benutzer")
+    raw_cookie = request.cookies.get("benutzer")
+    try:
+        benutzer = serializer.loads(raw_cookie)["username"] if raw_cookie else None
+    except:
+        benutzer = None
     if not benutzer:
         raise HTTPException(status_code=401, detail="Nicht eingeloggt")
 
@@ -113,7 +140,11 @@ async def list_tokens(request: Request, db: Session = Depends(get_db)):
 
 @router.delete("/admin/token/{token_str}")
 async def delete_token(token_str: str, request: Request, db: Session = Depends(get_db)):
-    benutzer = request.cookies.get("benutzer")
+    raw_cookie = request.cookies.get("benutzer")
+    try:
+        benutzer = serializer.loads(raw_cookie)["username"] if raw_cookie else None
+    except:
+        benutzer = None
     if not benutzer:
         raise HTTPException(status_code=401, detail="Nicht eingeloggt")
 
@@ -128,3 +159,69 @@ async def delete_token(token_str: str, request: Request, db: Session = Depends(g
     db.delete(token_obj)
     db.commit()
     return {"detail": "Token gelöscht"}
+
+@router.patch("/admin/user/{username}/rolle")
+async def update_user_role(username: str, request: Request, db: Session = Depends(get_db)):
+    raw_cookie = request.cookies.get("benutzer")
+    try:
+        benutzer = serializer.loads(raw_cookie)["username"] if raw_cookie else None
+    except:
+        benutzer = None
+    if not benutzer:
+        raise HTTPException(status_code=401, detail="Nicht eingeloggt")
+
+    user = db.query(User).filter(User.username == benutzer).first()
+    if not user or user.rolle not in ["admin", "mod"]:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+    daten = await request.json()
+    neue_rolle = daten.get("rolle")
+    if neue_rolle not in ["user", "helper", "mod", "admin"]:
+        raise HTTPException(status_code=400, detail="Ungültige Rolle")
+
+    ziel_user = db.query(User).filter(User.username == username).first()
+    if not ziel_user:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+
+    ziel_user.rolle = neue_rolle
+    db.commit()
+    return {"detail": "Rolle aktualisiert"}
+
+@router.delete("/admin/user/{username}")
+async def delete_user(username: str, request: Request, db: Session = Depends(get_db)):
+    raw_cookie = request.cookies.get("benutzer")
+    try:
+        benutzer = serializer.loads(raw_cookie)["username"] if raw_cookie else None
+    except:
+        benutzer = None
+    if not benutzer:
+        raise HTTPException(status_code=401, detail="Nicht eingeloggt")
+
+    user = db.query(User).filter(User.username == benutzer).first()
+    if not user or user.rolle not in ["admin", "mod"]:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+    ziel_user = db.query(User).filter(User.username == username).first()
+    if not ziel_user:
+        raise HTTPException(status_code=404, detail="Benutzer nicht gefunden")
+
+    db.delete(ziel_user)
+    db.commit()
+    return {"detail": "Benutzer gelöscht"}
+
+@router.get("/admin/users")
+async def list_users(request: Request, db: Session = Depends(get_db)):
+    raw_cookie = request.cookies.get("benutzer")
+    try:
+        benutzer = serializer.loads(raw_cookie)["username"] if raw_cookie else None
+    except:
+        benutzer = None
+    if not benutzer:
+        raise HTTPException(status_code=401, detail="Nicht eingeloggt")
+
+    user = db.query(User).filter(User.username == benutzer).first()
+    if not user or user.rolle not in ["admin", "mod"]:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+
+    users = db.query(User).all()
+    return [{"username": u.username, "rolle": u.rolle} for u in users]

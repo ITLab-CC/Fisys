@@ -1,6 +1,25 @@
 <!DOCTYPE html>
 <html lang="de">
   <head>
+    <style>
+      .menu-highlight {
+        transition: background-color 0.2s ease, transform 0.3s ease;
+      }
+
+      .highlight-bar {
+        transition: all 0.3s ease;
+        position: absolute;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background-color: #cbd5e1; /* Tailwind's gray-300 */
+        border-radius: 2px;
+      }
+
+      .highlight-container {
+        position: relative;
+      }
+    </style>
     <meta charset="UTF-8" />
     <title>Einstellungen | Fisys</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -41,12 +60,22 @@
         <div class="flex flex-col xl:flex-row gap-8">
           <!-- Seitenmenü -->
           <aside class="w-full xl:w-1/4 bg-white shadow rounded p-4">
-            <h2 class="text-lg font-semibold mb-2">Einstellungen</h2>
-            <nav id="einstellungsMenue" class="space-y-2">
-              <button data-ziel="bilderVerwaltung" class="block w-full text-left px-3 py-2 rounded bg-gray-100 hover:bg-gray-200 text-sm">Bild hochladen</button>
-              <button data-ziel="vorhandeneBilderBlock" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Vorhandene Bilder</button>
-              <button data-ziel="tokenBlockContainer" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Token erstellen</button>
-              <button data-ziel="tokenUebersichtBlockContainer" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Token Übersicht</button>
+            <nav id="einstellungsMenue" class="space-y-4 highlight-container">
+              <div id="highlightBar" class="highlight-bar hidden"></div>
+              <div>
+                <p class="text-sm font-semibold text-gray-500 mb-1">Bildeinstellungen</p>
+                <button data-ziel="bilderVerwaltung" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Bild hochladen</button>
+                <button data-ziel="vorhandeneBilderBlock" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Vorhandene Bilder</button>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-gray-500 mb-1">Tokens</p>
+                <button data-ziel="tokenBlockContainer" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Token erstellen</button>
+                <button data-ziel="tokenUebersichtBlockContainer" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Token Übersicht</button>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-gray-500 mb-1">User</p>
+                <button data-ziel="userVerwaltungBlock" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">User verwalten</button>
+              </div>
             </nav>
           </aside>
 
@@ -92,31 +121,67 @@
 
             <!-- Token-Tabelle -->
             <div id="tokenUebersichtBlockContainer" class="hidden"></div>
+
+            <!-- User-Verwaltung -->
+            <div id="userVerwaltungBlock" class="hidden bg-white p-6 rounded shadow">
+              <h2 class="text-xl font-semibold mb-4">User verwalten</h2>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-sm text-left border">
+                  <thead class="bg-gray-100 border-b">
+                    <tr>
+                      <th class="px-4 py-2">Benutzername</th>
+                      <th class="px-4 py-2">Rolle</th>
+                      <th class="px-4 py-2">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="userTabelleBody"></tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </section>
     </div>
 <script>
     document.addEventListener("DOMContentLoaded", async () => {
-      // Wechsel zwischen Einstellungsbereichen
+      // Highlight-Bar-Referenz
+      const highlightBar = document.getElementById("highlightBar");
+      // Wechsel zwischen Einstellungsbereichen mit Highlight-Bar
       document.getElementById("einstellungsMenue").addEventListener("click", (e) => {
         const ziel = e.target.dataset.ziel;
-        if (!ziel) return;
+        if (!ziel || !e.target.matches("button")) return;
 
-        // Alle Bereichscontainer verstecken
-        const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer"];
+        // Vorheriges Highlight entfernen
+        document.querySelectorAll('#einstellungsMenue button').forEach(btn => {
+          btn.classList.remove('bg-gray-100', 'menu-highlight');
+        });
+        e.target.classList.add('bg-gray-100', 'menu-highlight');
+
+        // Highlight-Bar-Animation
+        const buttonRect = e.target.getBoundingClientRect();
+        const containerRect = e.currentTarget.getBoundingClientRect();
+        const offsetTop = e.target.offsetTop;
+
+        highlightBar.style.top = offsetTop + "px";
+        highlightBar.style.height = e.target.offsetHeight + "px";
+        highlightBar.classList.remove("hidden");
+
+        // Bereiche verstecken und Ziel anzeigen
+        const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock"];
         bereiche.forEach(id => {
           const el = document.getElementById(id);
           if (el) el.classList.add("hidden");
         });
 
-        // Gewählten Bereich anzeigen
         const zielElement = document.getElementById(ziel);
         if (zielElement) zielElement.classList.remove("hidden");
       });
-      // Verstecke sensible Blöcke sofort
-      document.getElementById("bilderVerwaltung").classList.add("hidden");
-      document.getElementById("vorhandeneBilderBlock").classList.add("hidden");
+      // Anfangs alle Bereiche verstecken
+      const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock"];
+      bereiche.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add("hidden");
+      });
       let benutzerRolle = null;
       const tokenBlock = document.createElement("div");
       tokenBlock.className = "bg-white p-6 rounded shadow max-w-xl mt-10";
@@ -397,13 +462,20 @@
     }
 
       if (["helper", "mod", "admin"].includes(benutzerRolle)) {
-        document.getElementById("bilderVerwaltung").classList.remove("hidden");
-        document.getElementById("vorhandeneBilderBlock").classList.remove("hidden");
+        // Bereiche beim Laden weiterhin versteckt lassen, keine .classList.remove("hidden")!
+        // Token-Blöcke nur DOM hinzufügen, aber nicht sichtbar machen
         if (["mod", "admin"].includes(benutzerRolle)) {
           document.getElementById("tokenBlockContainer").appendChild(tokenBlock);
           document.getElementById("tokenUebersichtBlockContainer").appendChild(tokenUebersichtBlock);
-          document.getElementById("tokenBlockContainer").classList.remove("hidden");
-          document.getElementById("tokenUebersichtBlockContainer").classList.remove("hidden");
+          // Sichtbarkeit wird durch Menü gesteuert, nicht hier!
+          // Nach dem Erzeugen des Tokenblocks: Rollen-Optionen beschränken
+          const rolleSelect = tokenBlock.querySelector("#rolle");
+          const erlaubteOptionen = benutzerRolle === "admin" ? ["user", "helper", "mod", "admin"] : ["user", "helper"];
+          [...rolleSelect.options].forEach(opt => {
+            if (opt.value && !erlaubteOptionen.includes(opt.value)) {
+              opt.remove();
+            }
+          });
           ladeTokenTabelle();
           const tokenForm = document.getElementById("tokenForm");
           tokenForm.addEventListener("submit", async (e) => {
@@ -411,6 +483,11 @@
             const rolle = document.getElementById("rolle").value;
             if (!rolle) {
               zeigeBenachrichtigung("Bitte eine Rolle auswählen", "red");
+              return;
+            }
+            const erlaubteRollen = benutzerRolle === "admin" ? ["user", "helper", "mod", "admin"] : ["user", "helper"];
+            if (!erlaubteRollen.includes(rolle)) {
+              zeigeBenachrichtigung("Du darfst nur Tokens für niedrigere Rollen erstellen.", "red");
               return;
             }
             try {
@@ -489,7 +566,120 @@
       console.error("Fehler beim Laden der Tokens:", err);
     }
   }
-  });
+  // User-Tabelle laden und anzeigen
+  // Modales Popup für Rollenbearbeitung
+  function zeigeRollenPopup(username, aktuelleRolle, onConfirm) {
+    const overlay = document.getElementById("rollePopupOverlay");
+    const select = document.getElementById("rollePopupSelect");
+    const confirmBtn = document.getElementById("rollePopupConfirm");
+    const cancelBtn = document.getElementById("rollePopupCancel");
+
+    select.value = aktuelleRolle;
+    overlay.classList.remove("hidden");
+
+    const confirmHandler = () => {
+      const neueRolle = select.value;
+      if (!neueRolle || neueRolle === aktuelleRolle) return;
+      overlay.classList.add("hidden");
+      onConfirm(neueRolle);
+      confirmBtn.removeEventListener("click", confirmHandler);
+    };
+
+    confirmBtn.addEventListener("click", confirmHandler);
+    cancelBtn.onclick = () => overlay.classList.add("hidden");
+  }
+
+      async function ladeBenutzerTabelle() {
+        try {
+          const res = await fetch("/admin/users");
+          if (!res.ok) throw new Error(await res.text());
+          const users = await res.json();
+          const tbody = document.getElementById("userTabelleBody");
+          tbody.innerHTML = "";
+          users.forEach(user => {
+            const tr = document.createElement("tr");
+            tr.className = "border-b";
+            // Benutzername
+            const nameTd = document.createElement("td");
+            nameTd.className = "px-4 py-2";
+            nameTd.textContent = user.username;
+            // Rolle
+            const rolleTd = document.createElement("td");
+            rolleTd.className = "px-4 py-2";
+            rolleTd.textContent = user.rolle;
+            // Aktionen
+            const aktionTd = document.createElement("td");
+            aktionTd.className = "px-4 py-2 space-x-2";
+            // Rollen-Logik für Aktionen
+            const rollenReihenfolge = { user: 0, helper: 1, mod: 2, admin: 3 };
+            const eigeneStufe = rollenReihenfolge[benutzerRolle];
+            const zielStufe = rollenReihenfolge[user.rolle];
+
+            if (
+              (benutzerRolle === "admin") ||
+              (benutzerRolle === "mod" && zielStufe < eigeneStufe)
+            ) {
+              // Button Rolle bearbeiten
+              const rolleBtn = document.createElement("button");
+              rolleBtn.textContent = "Rolle bearbeiten";
+              rolleBtn.className = "px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600";
+              rolleBtn.addEventListener("click", () => {
+                zeigeRollenPopup(user.username, user.rolle, async (neueRolle) => {
+                  try {
+                    const res = await fetch(`/admin/user/${encodeURIComponent(user.username)}/rolle`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ rolle: neueRolle })
+                    });
+                    if (!res.ok) throw new Error(await res.text());
+                    zeigeBenachrichtigung("Rolle geändert.", "blue");
+                    ladeBenutzerTabelle();
+                  } catch (err) {
+                    zeigeBenachrichtigung("Fehler beim Ändern der Rolle.", "red");
+                  }
+                });
+              });
+              aktionTd.appendChild(rolleBtn);
+
+              // Button Löschen
+              const loeschBtn = document.createElement("button");
+              loeschBtn.textContent = "Löschen";
+              loeschBtn.className = "px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700";
+              loeschBtn.addEventListener("click", () => {
+                zeigePopup(`Benutzer ${user.username} wirklich löschen?`, async () => {
+                  try {
+                    const res = await fetch(`/admin/users/${encodeURIComponent(user.username)}`, { method: "DELETE" });
+                    if (!res.ok) throw new Error(await res.text());
+                    zeigeBenachrichtigung("Benutzer gelöscht.", "blue");
+                    ladeBenutzerTabelle();
+                  } catch (err) {
+                    zeigeBenachrichtigung("Fehler beim Löschen des Benutzers.", "red");
+                  }
+                });
+              });
+              aktionTd.appendChild(loeschBtn);
+            } else {
+              aktionTd.textContent = "-";
+            }
+
+            tr.appendChild(nameTd);
+            tr.appendChild(rolleTd);
+            tr.appendChild(aktionTd);
+            tbody.appendChild(tr);
+          });
+        } catch (err) {
+          const tbody = document.getElementById("userTabelleBody");
+          if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-gray-500">Fehler beim Laden der Benutzerliste.</td></tr>`;
+          }
+        }
+      }
+
+  // User-Tabelle beim Laden anzeigen, wenn Rolle mod oder admin
+  if (["mod", "admin"].includes(benutzerRolle)) {
+    ladeBenutzerTabelle();
+  }
+});
   </script>
   <div id="popupOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
     <div class="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center">
@@ -509,6 +699,22 @@
       <div class="flex justify-center gap-4">
         <button id="typPopupCancel" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm">Abbrechen</button>
         <button id="typPopupConfirm" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Typ ändern</button>
+      </div>
+    </div>
+  </div>
+  <div id="rollePopupOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center">
+      <p class="mb-2 text-sm text-gray-800">Wähle eine neue Rolle:</p>
+      <select id="rollePopupSelect" class="w-full mb-4 px-3 py-2 border rounded text-sm focus:outline-none focus:ring">
+        <option value="">-- Rolle auswählen --</option>
+        <option value="user">User</option>
+        <option value="helper">Helper</option>
+        <option value="mod">Mod</option>
+        <option value="admin">Admin</option>
+      </select>
+      <div class="flex justify-center gap-4">
+        <button id="rollePopupCancel" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm">Abbrechen</button>
+        <button id="rollePopupConfirm" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Rolle ändern</button>
       </div>
     </div>
   </div>

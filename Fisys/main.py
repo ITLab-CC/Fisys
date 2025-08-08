@@ -255,7 +255,8 @@ def patch_typ(typ_id: int, update: FilamentTypCreate, db: Session = Depends(get_
     if not typ:
         raise HTTPException(status_code=404, detail="Typ nicht gefunden")
     for field, value in update.dict().items():
-        setattr(typ, field, value)
+        if field != "bildname":
+            setattr(typ, field, value)
     db.commit()
     db.refresh(typ)
     return typ

@@ -141,13 +141,8 @@ async function loadSpulen() {
             <p class="whitespace-nowrap text-ellipsis"><strong>Leergewicht:</strong> ${spule.typ && spule.typ.leergewicht ? spule.typ.leergewicht : 0} g</p>
           </div>
         </div>
-        <div class="mt-4 flex gap-2">
-          <button class="flex-1 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 transition" onclick='openEditModal(${JSON.stringify(spule)})'>
-            Spule bearbeiten
-          </button>
-          <button class="delete-btn flex-1 bg-red-600 text-white rounded px-4 py-2 hover:bg-red-700 transition" data-id="${spule.spulen_id}">
-            Löschen
-          </button>
+        <div class="mt-4 flex gap-2" data-rollen-buttons>
+          <!-- Buttons werden später via JavaScript basierend auf Rolle eingefügt -->
         </div>
       </div>
     </div>
@@ -155,25 +150,42 @@ async function loadSpulen() {
 `;
     container.appendChild(el);
 
-    el.querySelector(".delete-btn").addEventListener("click", () => {
-      const confirmModal = document.getElementById("confirm-modal");
-      const confirmOk = document.getElementById("confirm-ok");
-      const confirmCancel = document.getElementById("confirm-cancel");
+    fetch("/api/userinfo").then(res => {
+      if (res.ok) {
+        res.json().then(user => {
+          if (["helper", "mod", "admin"].includes(user.rolle)) {
+            const buttonContainer = el.querySelector("[data-rollen-buttons]");
+            buttonContainer.innerHTML = `
+              <button class="flex-1 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 transition" onclick='openEditModal(${JSON.stringify(spule)})'>
+                Spule bearbeiten
+              </button>
+              <button class="delete-btn flex-1 bg-red-600 text-white rounded px-4 py-2 hover:bg-red-700 transition" data-id="${spule.spulen_id}">
+                Löschen
+              </button>
+            `;
+            buttonContainer.querySelector(".delete-btn").addEventListener("click", () => {
+              const confirmModal = document.getElementById("confirm-modal");
+              const confirmOk = document.getElementById("confirm-ok");
+              const confirmCancel = document.getElementById("confirm-cancel");
 
-      confirmModal.classList.remove("hidden");
+              confirmModal.classList.remove("hidden");
 
-      confirmOk.onclick = async () => {
-        confirmModal.classList.add("hidden");
-        const res = await fetch(`/spulen/${spule.spulen_id}`, { method: "DELETE" });
-        if (res.ok) {
-          loadSpulen();
-        } else {
-          alert("Fehler beim Löschen der Spule.");
-        }
-      };
-      confirmCancel.onclick = () => {
-        confirmModal.classList.add("hidden");
-      };
+              confirmOk.onclick = async () => {
+                confirmModal.classList.add("hidden");
+                const res = await fetch(`/spulen/${spule.spulen_id}`, { method: "DELETE" });
+                if (res.ok) {
+                  loadSpulen();
+                } else {
+                  alert("Fehler beim Löschen der Spule.");
+                }
+              };
+              confirmCancel.onclick = () => {
+                confirmModal.classList.add("hidden");
+              };
+            });
+          }
+        });
+      }
     });
   });
 }
