@@ -65,6 +65,7 @@ let currentEditSpule = null;
 async function loadSpulen() {
   const params = new URLSearchParams(window.location.search);
   const typId = params.get("typ_id");
+  const spuleId = params.get("spule_id");
 
   // Button "Alle Spulen anzeigen" ein-/ausblenden
   const showAllBtn = document.getElementById("show-all-btn");
@@ -94,6 +95,9 @@ async function loadSpulen() {
   container.innerHTML = "";
 
   spulen.forEach(spule => {
+    if (spuleId && String(spule.spulen_id) !== spuleId) {
+      return; // Nur diese Spule anzeigen
+    }
     const el = document.createElement("div");
 
     const radius = 16;

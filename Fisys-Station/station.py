@@ -140,7 +140,7 @@ def generate_qr_code(data):
             spule = hole_spule(spulen_id)
             typ_id = spule["typ_id"] if spule else 0
 
-        qr_data = f"https://fisys.it-lab.cc/typ/{typ_id}/id{spulen_id}"
+        qr_data = f"https://fisys.it-lab.cc/spulen.html?spule_id={spulen_id}"
     except:
         qr_data = str(data)
 
@@ -1146,7 +1146,10 @@ def verarbeite_qr_code_in_drucker(barcode):
     # URL-Format unterstützen (/idXYZ)
     if isinstance(barcode, str) and "/id" in barcode:
         try:
-            barcode = barcode.rstrip("/").split("/id")[-1]
+            spulen_id = barcode.rstrip("/").split("/id")[-1]
+            if spulen_id.startswith("="):
+                spulen_id = spulen_id[1:]
+            return spulen_id
         except Exception:
             pass
     try:
