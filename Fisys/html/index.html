@@ -95,7 +95,7 @@
   </main>
 </body>
   <script>
-    const ws = new WebSocket(`ws://${location.host}/ws/dashboard`);
+    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/dashboard`);
 
     ws.onopen = () => console.log("✅ WebSocket verbunden mit Dashboard");
     ws.onclose = () => console.log("❌ Verbindung zum Dashboard-WebSocket getrennt");
