@@ -907,15 +907,26 @@ def finish_add_spool(volle_spule=False):
 
 def verarbeite_qr_code(barcode):
     global zuletzt_gescannte_spule
-    # If a full URL was scanned, extract the trailing ID
-    if isinstance(barcode, str) and "/id" in barcode:
-        try:
-            barcode = barcode.rstrip("/").split("/id")[-1]
-        except Exception:
-            pass
+    # Unterstützt neues Format ...?spule_id=123 (nur Ziffern extrahieren)
+    if isinstance(barcode, str) and "spule_id=" in barcode:
+        frag = barcode.split("spule_id=")[-1]
+        nummer = ""
+        for ch in frag:
+            if ch.isdigit():
+                nummer += ch
+            else:
+                break
+        barcode = nummer
+    # Fallback: altes Format .../id123 oder .../id=123
+    elif isinstance(barcode, str) and "/id" in barcode:
+        id_teil = barcode.rstrip("/").split("/id")[-1]
+        if id_teil.startswith("="):
+            id_teil = id_teil[1:]
+        barcode = id_teil
+
     try:
         spulen_id = int(barcode)
-    except ValueError:
+    except (ValueError, TypeError):
         if ausgabe_label:
             ausgabe_label.config(text="❌ QR-Code enthält keine gültige ID.")
         return
@@ -1143,18 +1154,21 @@ def verarbeite_qr_code(barcode):
     scheduled_tasks.append(root.after(2500, wiegeansicht))
 
 def verarbeite_qr_code_in_drucker(barcode):
-    # URL-Format unterstützen (/idXYZ)
-    if isinstance(barcode, str) and "/id" in barcode:
-        try:
-            spulen_id = barcode.rstrip("/").split("/id")[-1]
-            if spulen_id.startswith("="):
-                spulen_id = spulen_id[1:]
-            return spulen_id
-        except Exception:
-            pass
+    # URL-Format unterstützen (.../spule_id=123)
+    if isinstance(barcode, str) and "spule_id=" in barcode:
+        frag = barcode.split("spule_id=")[-1]
+        # nur führende Ziffern übernehmen (bis erstes Nicht‑Ziffern-Zeichen)
+        nummer = ""
+        for ch in frag:
+            if ch.isdigit():
+                nummer += ch
+            else:
+                break
+        barcode = nummer
+
     try:
         spulen_id = int(barcode)
-    except ValueError:
+    except (ValueError, TypeError):
         messagebox.showerror("Fehler", "❌ QR-Code enthält keine gültige Spulen-ID.")
         zeige_auswahlansicht()
         return
