@@ -1102,35 +1102,40 @@ def verarbeite_qr_code(barcode):
                     # PATCH wie vorher, wenn nicht leer
                     payload = {"restmenge": netto, "in_printer": False}
                     try:
-                        response = requests.patch(
+                        payload = {
+                            "restmenge": float(netto),
+                            "in_printer": False
+                        }
+                        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+                        r = requests.patch(
                             f"http://{SERVER_IP}:8000/spulen/{spulen_id}",
-                            headers={"Content-Type": "application/json"},
+                            headers=headers,
                             json=payload,
-                            timeout=3
+                            timeout=5
                         )
-                        if response.ok:
+                        if not r.ok:
+                            raise RuntimeError(f"PATCH fehlgeschlagen ({r.status_code}): {r.text}")
+
+                        for widget in center_frame.winfo_children():
+                            widget.destroy()
+                        bestaetigt_frame = tk.Frame(center_frame, bg="#1e1e1e")
+                        bestaetigt_frame.pack(expand=True, fill="both")
+                        bestaetigt_label = tk.Label(
+                            bestaetigt_frame,
+                            text="✅ Gewicht wurde übernommen.",
+                            font=("Helvetica Neue", 34, "bold"),
+                            fg="white", bg="#1e1e1e"
+                        )
+                        bestaetigt_label.pack(expand=True)
+
+                        def cleanup_and_return():
                             for widget in center_frame.winfo_children():
                                 widget.destroy()
-                            bestaetigt_frame = tk.Frame(center_frame, bg="#1e1e1e")
-                            bestaetigt_frame.pack(expand=True, fill="both")
-                            bestaetigt_label = tk.Label(
-                                bestaetigt_frame,
-                                text="✅ Gewicht wurde übernommen.",
-                                font=("Helvetica Neue", 34, "bold"),
-                                fg="white", bg="#1e1e1e"
-                            )
-                            bestaetigt_label.pack(expand=True)
+                            zeige_auswahlansicht()
 
-                            def cleanup_and_return():
-                                for widget in center_frame.winfo_children():
-                                    widget.destroy()
-                                zeige_auswahlansicht()
-
-                            root.after(2000, cleanup_and_return)
-                        else:
-                            messagebox.showerror("Fehler", f"❌ Aktualisierung fehlgeschlagen: {response.status_code}")
+                        root.after(2000, cleanup_and_return)
                     except Exception as e:
-                        messagebox.showerror("Fehler", f"❌ Fehler beim Speichern:\n{e}")
+                        messagebox.showerror("Fehler", f"❌ Aktualisierung fehlgeschlagen:\n{e}")
 
             buttons_frame = tk.Frame(wiege_frame, bg="#1e1e1e")
             buttons_frame.pack(pady=30, expand=True)
@@ -1181,28 +1186,24 @@ def verarbeite_qr_code_in_drucker(barcode):
         return
 
     # PATCH: in_printer=True
+# PATCH inline ausführen: nur erlaubte Felder & korrekte Typen
     try:
         aktuelle_rest = int(spule.get("restmenge") or 0)
         payload = {
-            "restmenge": aktuelle_rest,
+            "restmenge": float(aktuelle_rest),
             "in_printer": True
         }
-        response = requests.patch(
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        r = requests.patch(
             f"http://{SERVER_IP}:8000/spulen/{spulen_id}",
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers=headers,
             json=payload,
-            timeout=3
+            timeout=5
         )
-        if not response.ok:
-            # Fehlermeldung inkl. Body, damit 422/Validierungsfehler sichtbar sind
-            messagebox.showerror(
-                "Fehler",
-                f"❌ Aktualisierung fehlgeschlagen: {response.status_code}\n{response.text}"
-            )
-            zeige_auswahlansicht()
-            return
+        if not r.ok:
+            raise RuntimeError(f"PATCH fehlgeschlagen ({r.status_code}): {r.text}")
     except Exception as e:
-        messagebox.showerror("Fehler", f"❌ Fehler beim Speichern:\n{e}")
+        messagebox.showerror("Fehler", f"❌ Aktualisierung fehlgeschlagen:\n{e}")
         zeige_auswahlansicht()
         return
 
