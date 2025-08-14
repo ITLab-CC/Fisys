@@ -394,38 +394,44 @@ async def update_spule(spulen_id: int, spule_update: FilamentSpuleCreate, db: Se
 
 # PATCH-Endpoint für Spule
 @app.patch("/spulen/{spulen_id}", response_model=FilamentSpuleRead)
-def patch_spule(spulen_id: int, update: SpuleUpdate, db: Session = Depends(get_db)):
+async def patch_spule(spulen_id: int, update: SpuleUpdate, db: Session = Depends(get_db)):
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule nicht gefunden")
-    verbrauch = spule.restmenge - update.restmenge
-    spule.alt_gewicht = spule.restmenge
-    spule.restmenge = update.restmenge
-    if verbrauch > 0:
-        eintrag = FilamentVerbrauch(
-            typ_id=spule.typ_id,
-            verbrauch_in_g=verbrauch
-        )
-        db.add(eintrag)
+
+    # Verbrauch nur berechnen, wenn restmenge übergeben wurde
+    if update.restmenge is not None:
+        verbrauch = spule.restmenge - update.restmenge
+        spule.alt_gewicht = spule.restmenge
+        spule.restmenge = update.restmenge
+
+        if verbrauch > 0:
+            eintrag = FilamentVerbrauch(typ_id=spule.typ_id, verbrauch_in_g=verbrauch)
+            db.add(eintrag)
+
+    # in_printer prüfen/setzen (max. 4)
     if update.in_printer is not None:
-        # Prüfung: Maximal 4 Spulen im Drucker
         if update.in_printer and not spule.in_printer:
             in_printer_count = db.query(FilamentSpule).filter_by(in_printer=True).count()
             if in_printer_count >= 4:
                 raise HTTPException(status_code=400, detail="Maximale Anzahl an Spulen im Drucker erreicht. Entferne zuerst eine.")
         spule.in_printer = update.in_printer
+
+    # gesamtmenge optional setzen
     if update.gesamtmenge is not None:
         spule.gesamtmenge = update.gesamtmenge
+
     db.commit()
     db.refresh(spule)
-    # WebSocket-Dashboard-Benachrichtigung
-    import asyncio
-    asyncio.create_task(notify_dashboard({
+
+    # Dashboard sicher benachrichtigen
+    await notify_dashboard({
         "event": "spule_updated",
         "spule_id": spule.spulen_id,
         "restmenge": spule.restmenge,
         "gesamtmenge": spule.gesamtmenge
-    }))
+    })
+
     return spule
 
 @app.delete("/spulen/{spulen_id}")

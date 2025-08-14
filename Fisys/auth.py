@@ -36,12 +36,22 @@ async def login(
     db: Session = Depends(get_db)
 ):
     user = db.query(User).filter(User.username == benutzername).first()
-    if not user or not bcrypt.verify(passwort, user.password_hash):
-        raise HTTPException(status_code=401, detail="Ungültige Zugangsdaten")
-    
+    if not user:
+        return RedirectResponse("/login?error=user_not_found", status_code=303)
+
+    if not bcrypt.verify(passwort, user.password_hash):
+        return RedirectResponse("/login?error=wrong_password", status_code=303)
+
     response = RedirectResponse(url="/", status_code=303)
     cookie_wert = serializer.dumps({"username": benutzername})
-    response.set_cookie(key="benutzer", value=cookie_wert, httponly=True, max_age=COOKIE_MAX_AGE)
+    response.set_cookie(
+        key="benutzer",
+        value=cookie_wert,
+        httponly=True,
+        max_age=COOKIE_MAX_AGE,
+        samesite="lax"
+        # secure=True  # bei HTTPS aktivieren
+    )
     return response
 
 @router.get("/register", response_class=HTMLResponse)
@@ -58,23 +68,27 @@ async def register(
     token = token.replace("-", "").upper()
     token_obj = db.query(AuthToken).filter(AuthToken.token == token, AuthToken.verwendet == False).first()
     if not token_obj:
-        raise HTTPException(status_code=403, detail="Ungültiger Registrierungscode")
-    token_obj.verwendet = True
-    db.add(token_obj)
+        return RedirectResponse("/register?error=invalid_token", status_code=303)
 
     if db.query(User).filter(User.username == benutzername).first():
-        raise HTTPException(status_code=409, detail="Benutzername existiert bereits")
+        return RedirectResponse("/register?error=user_exists", status_code=303)
 
     password_hash = bcrypt.hash(passwort)
     neuer_nutzer = User(username=benutzername, password_hash=password_hash, rolle=token_obj.rolle)
     db.add(neuer_nutzer)
+
+    # Token als benutzt markieren
+    token_obj.verwendet = True
+    db.add(token_obj)
     db.commit()
-    return RedirectResponse(url="/login", status_code=303)
+
+    # Nach erfolgreicher Registrierung auf Login leiten (mit Erfolgshinweis)
+    return RedirectResponse("/login?error=registered_success", status_code=303)
 
 
 @router.api_route("/logout", methods=["GET", "POST"])
 async def logout():
-    response = RedirectResponse(url="/login", status_code=303)
+    response = RedirectResponse(url="/login?error=logout_success", status_code=303)
     response.delete_cookie("benutzer")
     return response
 

@@ -37,6 +37,11 @@
       <div class="mb-6 text-center">
         <h1 class="text-xl font-bold text-gray-700">Anmeldung</h1>
       </div>
+      <div id="errorBox" class="hidden mb-4">
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+          <span id="errorText" class="block sm:inline"></span>
+        </div>
+      </div>
       <form method="POST" action="/login" class="space-y-4">
         <div>
           <label for="benutzername" class="block text-sm font-medium text-gray-600">Benutzername</label>
@@ -55,4 +60,34 @@
     </div>
   </div>
 </body>
+<script>
+  (function () {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get("error");
+      if (!err) return;
+
+      const map = {
+        user_not_found: "Benutzer existiert nicht.",
+        wrong_password: "Passwort ist falsch.",
+        invalid_token: "Ungültiger Registrierungscode.",
+        login_required: "Bitte zuerst anmelden.",
+        unknown: "Unbekannter Fehler."
+      };
+
+      const text = map[err] || decodeURIComponent(err).replace(/_/g, " ");
+      const box = document.getElementById("errorBox");
+      const label = document.getElementById("errorText");
+      if (box && label) {
+        label.textContent = text;
+        box.classList.remove("hidden");
+      }
+
+      // Optional: automatisch nach 6s ausblenden
+      setTimeout(() => box && box.classList.add("hidden"), 6000);
+    } catch (e) {
+      // fail silently
+    }
+  })();
+</script>
 </html>
