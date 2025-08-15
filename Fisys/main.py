@@ -747,10 +747,11 @@ def get_fastleere_typen(db: Session = Depends(get_db)):
     typen = db.query(FilamentTyp).all()
     for typ in typen:
         spulen = typ.spulen
-        if len(spulen) == 0:
+        anzahl_spulen = len(spulen)
+        gesamt_restmenge = sum(float(s.restmenge or 0) for s in spulen)
+        if anzahl_spulen == 0:
             status = "leer"
         else:
-            gesamt_restmenge = sum(s.restmenge for s in spulen)
             if gesamt_restmenge < 800:
                 status = "fastleer"
             else:
@@ -763,6 +764,8 @@ def get_fastleere_typen(db: Session = Depends(get_db)):
             "durchmesser": typ.durchmesser,
             "hersteller": typ.hersteller,
             "bildname": typ.bildname,
+            "anzahl_spulen": anzahl_spulen,
+            "restmenge": gesamt_restmenge,
             "status": status
         })
     return result
@@ -994,20 +997,42 @@ from datetime import datetime, timedelta
 # Neuer API-Endpunkt: Typen mit niedrigem Lagerbestand
 @app.get("/api/status/low_stock_types")
 def get_low_stock_types(db: Session = Depends(get_db)):
-    """Gibt alle Typen zurück, die leer oder fast leer sind."""
+    """Gibt alle Typen zurück, die leer oder fast leer sind.
+    Kriterium:
+      - leer: keine Spulen ODER Gesamt-Rest <= 0
+      - fastleer: Rest <= 10% der Gesamtmenge (über alle Spulen) ODER (falls Gesamt unbekannt/0) Rest <= 100g
+    """
     typen = db.query(FilamentTyp).all()
     result = []
     for typ in typen:
-        gesamt_rest = sum([spule.restmenge for spule in typ.spulen])
-        # Schwellenwert: unter 10% oder weniger als 100g
-        if gesamt_rest <= 0 or (typ.spulen and gesamt_rest <= (typ.spulen[0].gesamtmenge * 0.1)) or gesamt_rest <= 100:
+        spulen = typ.spulen or []
+        anzahl_spulen = len(spulen)
+        gesamt_rest = sum(float(s.restmenge or 0) for s in spulen)
+        gesamt_kap = sum(float(s.gesamtmenge or 0) for s in spulen)
+
+        status = None
+        if anzahl_spulen == 0 or gesamt_rest <= 0:
+            status = "leer"
+        else:
+            if gesamt_kap > 0:
+                if gesamt_rest <= gesamt_kap * 0.10:
+                    status = "fastleer"
+            else:
+                # Fallback, wenn Gesamtmenge unbekannt ist
+                if gesamt_rest <= 100:
+                    status = "fastleer"
+
+        if status is not None:
             result.append({
                 "id": typ.id,
                 "name": typ.name,
                 "material": typ.material,
                 "farbe": typ.farbe,
                 "durchmesser": typ.durchmesser,
-                "restmenge": gesamt_rest
+                "restmenge": gesamt_rest,
+                "gesamtmenge": gesamt_kap,
+                "anzahl_spulen": anzahl_spulen,
+                "status": status,
             })
     return result
 

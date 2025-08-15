@@ -69,7 +69,8 @@
     <script>
 document.addEventListener("DOMContentLoaded", async () => {
   const createListItem = (id, name, extra, details, statusColor = "bg-gray-50", material = "", farbe = "", durchmesser = "") => `
-    <li class="flex items-center justify-between ${statusColor} p-3 rounded border hover:bg-gray-100 transition">
+  <li class="${statusColor} p-0 rounded border">
+    <a href="/spulen.html?typ_id=${id}" class="flex items-center justify-between p-3 rounded hover:bg-gray-100 transition block" aria-label="Spulen von Typ ${name} ansehen">
       <div>
         <div class="font-medium">${name}</div>
         <div class="text-xs text-gray-500">
@@ -81,48 +82,50 @@ document.addEventListener("DOMContentLoaded", async () => {
         </div>
       </div>
       ${extra ? `<div class="text-right text-sm text-gray-700">${extra}</div>` : ""}
-    </li>
-  `;
+    </a>
+  </li>
+`;
 
-  // Fast leere oder leere Typen
-  const lowStockRes = await fetch("/api/status/low_stock_types");
-  const lowStock = await lowStockRes.json();
+  // Fast leere oder leere Typen – aus /fastleere_data
+  try {
+    const res = await fetch("/fastleere_data");
+    const items = res.ok ? await res.json() : [];
 
-  // Für jeden Typ zusätzlich die Spulenanzahl abrufen, falls nicht vorhanden
-  for (let typ of lowStock) {
-    if (!typ.anzahl_spulen) {
-      try {
-        const spulenRes = await fetch(`/typs/${typ.id}/spulen`);
-        if (spulenRes.ok) {
-          const spulen = await spulenRes.json();
-          typ.anzahl_spulen = spulen.length;
-        } else {
-          typ.anzahl_spulen = "?";
-        }
-      } catch {
-        typ.anzahl_spulen = "?";
-      }
-    }
+    items.sort((a, b) => (a.status === "leer" ? 0 : 1) - (b.status === "leer" ? 0 : 1));
+
+    const lowStockList = document.getElementById("low-stock-list");
+    lowStockList.innerHTML = items.length
+      ? items.map(t => {
+          let color = "bg-gray-50";
+          if (t.status === "leer") color = "bg-red-100";
+          else if (t.status === "fastleer") color = "bg-orange-100";
+
+          const statusText = t.status === "leer" ? "Leer" : (t.status === "fastleer" ? "Fast leer" : "");
+          let detailsText = "";
+          if (t.spulen_anzahl !== undefined && t.spulen_anzahl !== null) {
+            detailsText += `Spulen: ${t.spulen_anzahl}`;
+          }
+          if (t.restmenge !== undefined && t.restmenge !== null) {
+            if (detailsText.length > 0) detailsText += " • ";
+            detailsText += `Rest: ${t.restmenge}g`;
+          }
+
+          return createListItem(
+            t.id,
+            t.name,
+            statusText,              // extra rechts
+            detailsText,            // Detailszeile mit Spulenanzahl und Restmenge
+            color,
+            t.material || "",
+            t.farbe || "",
+            t.durchmesser || ""
+          );
+        }).join("")
+      : "<li class='text-gray-400'>Keine fast leeren Typen</li>";
+  } catch {
+    const lowStockList = document.getElementById("low-stock-list");
+    lowStockList.innerHTML = "<li class='text-gray-400'>Fehler beim Laden</li>";
   }
-
-  const lowStockList = document.getElementById("low-stock-list");
-  lowStockList.innerHTML = lowStock.length
-    ? lowStock.map(t => {
-        let color = "bg-gray-50";
-        if (t.restmenge <= 0) color = "bg-red-100";
-        else if (t.restmenge <= (t.gesamtmenge * 0.1 || 100)) color = "bg-orange-100";
-        return createListItem(
-          t.id,
-          t.name,
-          `${t.restmenge}g übrig`,
-          `Spulen: ${t.anzahl_spulen}`,
-          color,
-          t.material || "",
-          t.farbe || "",
-          t.durchmesser || ""
-        );
-      }).join("")
-    : "<li class='text-gray-400'>Keine fast leeren Typen</li>";
 
   // Meistgenutzte Filamente
   const topFilamentsRes = await fetch("/api/status/top_filaments");
