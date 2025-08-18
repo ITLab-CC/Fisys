@@ -57,6 +57,33 @@
     </div>
 
     <div>
+      <h2 class="text-xl font-semibold mb-4">Druckerstatus</h2>
+      <div id="printer-status" class="bg-white p-5 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <div class="text-sm text-gray-500">Seriennummer</div>
+          <div id="ps-serial" class="text-base font-medium text-gray-800">—</div>
+        </div>
+        <div>
+          <div class="text-sm text-gray-500">Job</div>
+          <div id="ps-job" class="text-base font-medium text-gray-800">—</div>
+        </div>
+        <div class="flex-1 md:mx-6">
+          <div class="text-sm text-gray-500 mb-1">Fortschritt</div>
+          <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div id="ps-progress" class="h-full bg-blue-600 rounded-full" style="width: 0%"></div>
+          </div>
+          <div id="ps-progress-label" class="text-xs text-right text-gray-500 mt-1">0%</div>
+        </div>
+        <div>
+          <div class="text-sm text-gray-500">Status</div>
+          <div id="ps-state" class="text-base font-semibold text-gray-800">—</div>
+          <div id="ps-eta" class="text-xs text-gray-500">ETA: —</div>
+        </div>
+      </div>
+      <div id="printer-status-hint" class="text-xs text-gray-500 mt-2">Warte auf Status vom Drucker …</div>
+    </div>
+
+    <div>
       <h2 class="text-xl font-semibold mb-4">Im Drucker</h2>
       <div id="im-drucker-spools" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600"></div>
     </div>
@@ -100,6 +127,41 @@
     ws.onopen = () => console.log("✅ WebSocket verbunden mit Dashboard");
     ws.onclose = () => console.log("❌ Verbindung zum Dashboard-WebSocket getrennt");
     ws.onerror = (err) => console.error("WebSocket-Fehler:", err);
+
+    function updatePrinterStatus(p) {
+      const hint = document.getElementById("printer-status-hint");
+      if (hint) hint.textContent = "Live verbunden.";
+
+      const serialEl = document.getElementById("ps-serial");
+      const jobEl = document.getElementById("ps-job");
+      const bar = document.getElementById("ps-progress");
+      const barLbl = document.getElementById("ps-progress-label");
+      const stateEl = document.getElementById("ps-state");
+      const etaEl = document.getElementById("ps-eta");
+
+      if (!serialEl || !jobEl || !bar || !barLbl || !stateEl || !etaEl) return;
+
+      serialEl.textContent = p.serial ?? "—";
+      jobEl.textContent = p.job_name ?? (p.state === "printing" ? "(Unbenannter Job)" : "—");
+
+      let prog = Number(p.percent ?? 0);
+      if (!isFinite(prog) || prog < 0) prog = 0;
+      if (prog > 100) prog = 100;
+      bar.style.width = prog + "%";
+      barLbl.textContent = (isFinite(prog) ? prog.toFixed(0) : 0) + "%";
+
+      const stateTxt = String(p.state ?? "—");
+      stateEl.textContent = stateTxt;
+      etaEl.textContent = `ETA: ${p.eta_min != null ? p.eta_min + " min" : "—"}`;
+
+      // Statusfarbe
+      stateEl.classList.remove("text-green-600","text-red-600","text-yellow-600","text-gray-800");
+      let cls = "text-gray-800";
+      if (stateTxt === "printing") cls = "text-green-600";
+      else if (stateTxt === "paused") cls = "text-yellow-600";
+      else if (stateTxt === "failed" || stateTxt === "error") cls = "text-red-600";
+      stateEl.classList.add(cls);
+    }
 
     async function loadDashboardDetails() {
       const res = await fetch("/api/dashboard-details");
@@ -250,6 +312,11 @@
     loadDashboardDetails();
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      // Druckerstatus-Events vom Backend (printer_service push)
+      if (data && ("serial" in data || "percent" in data || "eta_min" in data)) {
+        updatePrinterStatus(data);
+        return; // restliche Dashboard-Events überspringen
+      }
       console.log("📡 Live-Update:", data);
       if (data.event === "spule_created" || data.event === "spule_deleted") {
         loadDashboardDetails();

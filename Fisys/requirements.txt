@@ -13,3 +13,4 @@ bcrypt
 itsdangerous
 python-dotenv
 psycopg2-binary
+paho-mqtt

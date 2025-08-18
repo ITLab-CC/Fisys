@@ -101,11 +101,13 @@ def push_to_dashboard(payload: dict):
 @app.websocket("/ws/dashboard")
 async def websocket_dashboard(ws: WebSocket):
     await ws.accept()
+    print("[WS] Client connected")
     dashboard_connections.append(ws)
     try:
         while True:
             await asyncio.sleep(10)  # Verbindung offen halten
     except WebSocketDisconnect:
+        print("[WS] Client disconnected")
         dashboard_connections.remove(ws)
 
 async def notify_dashboard(data: dict):
@@ -114,6 +116,24 @@ async def notify_dashboard(data: dict):
             await conn.send_json(data)
         except Exception:
             pass
+
+# --- DEBUG: Manuell eine WS-Nachricht schicken ---
+@app.get("/_debug/ws-ping")
+async def debug_ws_ping():
+    sample = {
+        "serial": "TEST123",
+        "state": "printing",
+        "percent": 42,
+        "eta_min": 13,
+        "job_name": "Debug-Job"
+    }
+    await notify_dashboard(sample)
+    return {"sent": sample}
+
+@app.get("/_debug/ws-text")
+async def debug_ws_text():
+    await notify_dashboard({"event": "debug", "message": "Hello from server"})
+    return {"ok": True}
 
 # Statische Dateien (HTML, CSS, JS)
 static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "html"))
