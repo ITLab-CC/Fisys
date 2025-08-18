@@ -14,12 +14,30 @@ from fastapi.responses import FileResponse, JSONResponse
 from qrcode_utils import generate_qrcode_for_spule, delete_qrcode_for_spule
 import shutil
 from auth import router as auth_router
+from printer_service import start_printer_service, stop_printer_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+
+    # Event Loop für Thread->Async Bridge merken
+    import asyncio as _asyncio
+    global APP_EVENT_LOOP
+    APP_EVENT_LOOP = _asyncio.get_running_loop()
+    
+    PRINTER_IP = os.getenv("PRINTER_IP", "192.168.1.50")
+    PRINTER_SERIAL = os.getenv("PRINTER_SERIAL", "X1C123456789")
+    PRINTER_ACCESS = os.getenv("PRINTER_ACCESS_CODE", "changeme")
+
+    start_printer_service(
+        ip=PRINTER_IP,
+        serial=PRINTER_SERIAL,
+        access_code=PRINTER_ACCESS,
+        on_push=push_to_dashboard,     # Dashboard-Push
+        interval_seconds=15            # alle 15s
+    )
+
     # --- Initialen Admin-Token generieren, falls keine Benutzer vorhanden ---
-    from sqlalchemy.orm import Session
     from models import User, AuthToken
     from db import SessionLocal
     import secrets
@@ -29,7 +47,6 @@ async def lifespan(app: FastAPI):
         try:
             existing_users = db.query(User).count()
             if existing_users == 0:
-                import string
                 token_str = secrets.token_urlsafe(6)[:8].upper()
                 token = AuthToken(token=token_str, rolle="admin", verwendet=False)
                 db.add(token)
@@ -38,7 +55,10 @@ async def lifespan(app: FastAPI):
         finally:
             db.close()
     generate_initial_admin_token()
-    yield
+    try:
+        yield
+    finally:
+        stop_printer_service()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -46,11 +66,37 @@ app = FastAPI(lifespan=lifespan)
 # Auth-Router einbinden
 app.include_router(auth_router)
 
+# Event Loop global für Thread->Async Bridge
+APP_EVENT_LOOP = None  # wird im lifespan gesetzt
+
 # --- WebSocket Dashboard Support ---
 from fastapi import WebSocket, WebSocketDisconnect
 import asyncio
 
 dashboard_connections: list[WebSocket] = []
+
+def push_to_dashboard(payload: dict):
+    """Thread-sicher: aus Worker-Threads ins FastAPI-Event-Loop pushen."""
+    try:
+        # Wenn wir im Event-Loop-Thread sind, direkt Task erstellen
+        import asyncio as _asyncio
+        try:
+            loop = _asyncio.get_running_loop()
+            if loop.is_running():
+                loop.create_task(notify_dashboard(payload))
+                return
+        except RuntimeError:
+            # kein laufender Loop in diesem Thread -> unten fallback
+            pass
+
+        # Aus Fremd-Thread: run_coroutine_threadsafe auf den gemerkten Loop
+        global APP_EVENT_LOOP
+        if APP_EVENT_LOOP:
+            _asyncio.run_coroutine_threadsafe(notify_dashboard(payload), APP_EVENT_LOOP)
+        else:
+            print("[PrinterService] Kein Event-Loop gesetzt – konnte nicht pushen")
+    except Exception as e:
+        print(f"[PrinterService] Dashboard push error: {e}")
 
 @app.websocket("/ws/dashboard")
 async def websocket_dashboard(ws: WebSocket):
