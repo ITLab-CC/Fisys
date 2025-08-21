@@ -55,12 +55,35 @@ def _parse_payload(serial: str, raw: bytes) -> dict[str, Any]:
     except Exception:
         eta_min = None
 
+    # --- AMS / Filament detection (current loaded slot) ---
+    filament_name = None
+    filament_tray = None
+    try:
+        if isinstance(data, dict):
+            ams = data.get("ams")
+            if isinstance(ams, dict):
+                tray_now = ams.get("tray_now")
+                trays = ams.get("tray") or ams.get("trays") or []
+                if isinstance(tray_now, int) and isinstance(trays, list) and 0 <= tray_now < len(trays):
+                    slot = trays[tray_now] or {}
+                    filament_tray = tray_now
+                    filament_name = (
+                        slot.get("name")
+                        or slot.get("brand_name")
+                        or slot.get("color_name")
+                        or slot.get("filament_name")
+                    )
+    except Exception:
+        pass
+
     return {
         "serial": serial,
         "state": str(state),
         "percent": percent,
         "eta_min": eta_min,
         "job_name": job_name,
+        "filament_tray": filament_tray,
+        "filament_name": filament_name,
     }
 
 

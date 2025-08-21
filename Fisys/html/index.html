@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fisys - Filamentverwaltung</title>
+  <title>Dashboard | Fisys</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Weitere Meta-Tags und Links -->
 </head>
@@ -123,8 +123,6 @@
         <ul class="list-disc pl-5 space-y-1">
           <li>Erweiterte Statistiken und Filtermöglichkeiten</li>
           <li>Benachrichtigungen bei fast leerem Filament</li>
-          <li>Integration mit Druckaufträgen</li>
-          <li>Mehrsprachigkeit</li>
         </ul>
       </div>
     </div>
@@ -309,8 +307,12 @@
 
       const imDruckerContainer = document.getElementById("im-drucker-spools");
       imDruckerContainer.innerHTML = "";
-      if (data.im_drucker_spulen && data.im_drucker_spulen.length > 0) {
-        data.im_drucker_spulen.forEach(spule => {
+
+      const list = Array.isArray(data.im_drucker_spulen) ? data.im_drucker_spulen.slice(0, 4) : [];
+      while (list.length < 4) list.push(null);
+
+      list.forEach(spule => {
+        if (spule) {
           imDruckerContainer.innerHTML += `
   <div class="bg-white rounded-xl shadow-sm max-w-sm w-full mx-auto flex flex-col overflow-hidden border border-gray-200">
     <div class="relative">
@@ -343,10 +345,14 @@
     </div>
   </div>
 `;
-        });
-      } else {
-        imDruckerContainer.innerHTML = `<div class="text-gray-500 italic text-center">Keine Spulen im Drucker</div>`;
-      }
+        } else {
+          imDruckerContainer.innerHTML += `
+  <div class="bg-white rounded-xl shadow-sm max-w-sm w-full mx-auto flex items-center justify-center border border-dashed border-gray-300 text-gray-400 h-[20rem]">
+    Leer
+  </div>
+`;
+        }
+      });
     }
 
     function animateRollingNumber(element, target, suffix = "") {
