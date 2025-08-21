@@ -4,6 +4,7 @@ import json
 import ssl
 import threading
 import time
+import os
 from typing import Callable, Optional, Any
 
 from paho.mqtt import client as mqtt
@@ -69,27 +70,77 @@ def _parse_payload(serial: str, raw: bytes) -> dict[str, Any]:
 
 def _mqtt_loop(ip: str, serial: str, access_code: str):
     global _latest_payload, _running
-    client = mqtt.Client()
+    # set a deterministic client_id (many brokers/devices require this)
+    client = mqtt.Client(client_id=f"{serial}-fisys-{os.getpid()}", clean_session=True)
+
+    # Authentication
     client.username_pw_set("bblp", access_code)
-    client.tls_set(cert_reqs=ssl.CERT_REQUIRED)  # optional: ca_certs für Pinning
+
+    # TLS — for initial debugging keep handshake permissive; switch to CA-pinned once working
+    # To secure later: set cert_reqs=ssl.CERT_REQUIRED and provide ca_certs
+    client.tls_set(cert_reqs=ssl.CERT_NONE)
+    client.tls_insecure_set(True)
+
     topic = f"device/{serial}/report"
 
-    def on_message(_c, _u, m):
-        nonlocal serial
-        parsed = _parse_payload(serial, m.payload)
-        with _latest_lock:
-            _latest_payload = parsed
+    def on_connect(_c, _u, flags, rc):
+        if rc == 0:
+            # _log.info(f"[MQTT] Connected to {ip}:8883 as {serial}")
+            try:
+                _c.subscribe(topic, qos=0)
+                # _log.info(f"[MQTT] Subscribed: {topic}")
+            except Exception as e:
+                # _log.exception(f"[MQTT] Subscribe failed: {e}")
+                pass
+        else:
+            # _log.error(f"[MQTT] Connect failed rc={rc}")
+            pass
 
+    def on_disconnect(_c, _u, rc):
+        # _log.warning(f"[MQTT] Disconnected rc={rc}")
+        pass
+
+    def on_log(_c, _u, level, buf):
+        # paho internal logs; kept at DEBUG verbosity only
+        # _log.debug(f"[MQTT] {buf}")
+        pass
+
+    def on_subscribe(_c, _u, mid, granted_qos):
+        # _log.info(f"[MQTT] Suback mid={mid} qos={granted_qos}")
+        pass
+
+    def on_message(_c, _u, m):
+        global _latest_payload
+        try:
+            parsed = _parse_payload(serial, m.payload)
+            # _log.info(f"[MQTT] Message on {m.topic}: {parsed}")
+            with _latest_lock:
+                # Nur sinnvolle Payloads übernehmen. "unknown" überschreibt keinen vorhandenen guten Snapshot.
+                if parsed.get("state") == "unknown" and _latest_payload is not None:
+                    # _log.debug("[MQTT] Ignoring 'unknown' payload to preserve last valid snapshot")
+                    pass
+                else:
+                    _latest_payload = parsed
+        except Exception as e:
+            # _log.exception(f"[MQTT] on_message parse error: {e}")
+            pass
+
+    client.on_connect = on_connect
+    client.on_disconnect = on_disconnect
     client.on_message = on_message
+    client.on_log = on_log
+    client.on_subscribe = on_subscribe
 
     while _running:
         try:
+            # _log.info(f"[MQTT] Connecting to {ip}:8883 ...")
             client.connect(ip, 8883, keepalive=60)
-            client.subscribe(topic, qos=0)
-            client.loop_forever()
-        except Exception:
+            # retry_first_connection ensures the loop keeps trying if the first connect fails
+            client.loop_forever(retry_first_connection=True)
+        except Exception as e:
             if not _running:
                 break
+            # _log.exception(f"[MQTT] loop error: {e}")
             time.sleep(2)
     try:
         client.disconnect()
@@ -108,8 +159,12 @@ def _sender_loop(on_push: Callable[[dict[str, Any]], None], interval_seconds: in
         if payload:
             try:
                 on_push(payload)
-            except Exception:
+            except Exception as e:
+                # _log.exception(f"[SENDER] on_push failed: {e}")
                 pass
+        else:
+            # _log.debug("[SENDER] no payload yet")
+            pass
         # Sendeintervall
         for _ in range(interval_seconds):
             if not _running:
@@ -137,12 +192,6 @@ def start_printer_service(*, ip: str, serial: str, access_code: str, on_push: Ca
 def stop_printer_service() -> None:
     global _running, _mqtt_thread, _sender_thread
     _running = False
-    # threads beenden lassen
-    for t in (_mqtt_thread, _sender_thread):
-        if t and t.is_alive():
-            try:
-                t.join(timeout=1.0)
-            except Exception:
-                pass
+    # Threads sind als daemon=True gestartet; kein join, damit Shutdown/Reload nicht blockiert.
     _mqtt_thread = None
     _sender_thread = None

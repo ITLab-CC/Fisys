@@ -58,26 +58,35 @@
 
     <div>
       <h2 class="text-xl font-semibold mb-4">Druckerstatus</h2>
-      <div id="printer-status" class="bg-white p-5 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div class="text-sm text-gray-500">Seriennummer</div>
-          <div id="ps-serial" class="text-base font-medium text-gray-800">—</div>
-        </div>
-        <div>
-          <div class="text-sm text-gray-500">Job</div>
-          <div id="ps-job" class="text-base font-medium text-gray-800">—</div>
-        </div>
-        <div class="flex-1 md:mx-6">
-          <div class="text-sm text-gray-500 mb-1">Fortschritt</div>
-          <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-            <div id="ps-progress" class="h-full bg-blue-600 rounded-full" style="width: 0%"></div>
+      <div id="printer-status" class="bg-white p-5 rounded-xl shadow-sm">
+        <div class="flex flex-col gap-3">
+          <!-- Zeile 1: Name links, Status & ETA rechts -->
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-baseline gap-3">
+              <div id="ps-name" class="text-base font-medium text-gray-900">—</div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div id="ps-state" class="text-sm font-semibold text-gray-800">—</div>
+              <div id="ps-eta" class="text-xs text-gray-500">ETA: —</div>
+            </div>
           </div>
-          <div id="ps-progress-label" class="text-xs text-right text-gray-500 mt-1">0%</div>
-        </div>
-        <div>
-          <div class="text-sm text-gray-500">Status</div>
-          <div id="ps-state" class="text-base font-semibold text-gray-800">—</div>
-          <div id="ps-eta" class="text-xs text-gray-500">ETA: —</div>
+
+          <!-- Zeile 2: Fortschritt mit Prozent rechtsbündig -->
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <div class="text-sm text-gray-500">Fortschritt</div>
+              <div id="ps-progress-label" class="text-xs text-gray-500">0%</div>
+            </div>
+            <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+              <div id="ps-progress" class="h-full bg-blue-600 rounded-full" style="width: 0%"></div>
+            </div>
+          </div>
+
+          <!-- Zeile 3: Job (mit Truncate) -->
+          <div class="flex items-baseline gap-3">
+            <div class="text-sm text-gray-500">Job</div>
+            <div id="ps-job" class="text-base font-medium text-gray-800 truncate max-w-full">—</div>
+          </div>
         </div>
       </div>
       <div id="printer-status-hint" class="text-xs text-gray-500 mt-2">Warte auf Status vom Drucker …</div>
@@ -122,27 +131,88 @@
   </main>
 </body>
   <script>
-    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/dashboard`);
-
-    ws.onopen = () => console.log("✅ WebSocket verbunden mit Dashboard");
-    ws.onclose = () => console.log("❌ Verbindung zum Dashboard-WebSocket getrennt");
-    ws.onerror = (err) => console.error("WebSocket-Fehler:", err);
+    let ws;
+    function connectWS() {
+      const proto = (location.protocol === 'https:') ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}/ws/dashboard`);
+      ws.onopen = () => console.log('WebSocket verbunden mit Dashboard');
+      ws.onclose = () => {
+        console.log('Verbindung zum Dashboard-WebSocket getrennt');
+        setTimeout(connectWS, 1500); // einfacher Reconnect
+      };
+      ws.onerror = (err) => console.error('WebSocket-Fehler:', err);
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        // Druckerstatus-Events vom Backend (printer_service push)
+        if (data && ("serial" in data || "percent" in data || "eta_min" in data)) {
+          updatePrinterStatus(data);
+          return; // restliche Dashboard-Events überspringen
+        }
+        console.log('[Live-Update]', data);
+        if (data.event === 'spule_created' || data.event === 'spule_deleted') {
+          loadDashboardDetails();
+        } else if (data.event === 'spule_updated') {
+          const edited = document.querySelector('#last-edited-spools');
+          fetch('/api/dashboard-details')
+            .then(res => res.json())
+            .then(data => {
+              edited.innerHTML = '';
+              data.letzte_spulen
+                .filter(s => {
+                  const created = new Date(s.created_at).getTime();
+                  const updated = new Date(s.updated_at).getTime();
+                  return updated > created;
+                })
+                .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
+                .slice(0, 3)
+                .forEach(s => {
+                  const diff = s.alt_gewicht - s.neu_gewicht;
+                  const color = diff >= 100 ? 'text-red-500' : diff >= 50 ? 'text-yellow-500' : 'text-green-600';
+                  const datum = new Date(s.updated_at).toLocaleDateString('de-DE');
+                  edited.innerHTML += `
+                    <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+                      <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
+                        ID: ${s.spulen_id}
+                      </div>
+                      <div class="flex justify-between items-center">
+                        <div class="text-sm font-semibold text-gray-800">${s.typ_name} (${s.material}, ${s.farbe})</div>
+                        <div class="text-xs text-gray-500 ml-2">${datum}</div>
+                      </div>
+                      <div class="flex justify-between items-center text-xs text-gray-600 space-x-2">
+                        <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
+                        <div class="flex-1 text-center ${color} font-semibold">–${diff} g</div>
+                        <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
+                      </div>
+                    </div>
+                  `;
+                });
+            });
+        }
+      };
+    }
+    connectWS();
 
     function updatePrinterStatus(p) {
       const hint = document.getElementById("printer-status-hint");
       if (hint) hint.textContent = "Live verbunden.";
 
-      const serialEl = document.getElementById("ps-serial");
+      const nameEl = document.getElementById("ps-name");
       const jobEl = document.getElementById("ps-job");
       const bar = document.getElementById("ps-progress");
       const barLbl = document.getElementById("ps-progress-label");
       const stateEl = document.getElementById("ps-state");
       const etaEl = document.getElementById("ps-eta");
 
-      if (!serialEl || !jobEl || !bar || !barLbl || !stateEl || !etaEl) return;
+      if (!nameEl || !jobEl || !bar || !barLbl || !stateEl || !etaEl) return;
 
-      serialEl.textContent = p.serial ?? "—";
-      jobEl.textContent = p.job_name ?? (p.state === "printing" ? "(Unbenannter Job)" : "—");
+      const printerName = p.model ?? p.printer_name ?? p.name ?? "Bambu X1C";
+      nameEl.textContent = printerName;
+      if (p.job_name) {
+        const truncated = p.job_name.length > 30 ? p.job_name.slice(0, 30) + "…" : p.job_name;
+        jobEl.textContent = truncated;
+      } else {
+        jobEl.textContent = (p.state === "printing" ? "(Unbenannter Job)" : "—");
+      }
 
       let prog = Number(p.percent ?? 0);
       if (!isFinite(prog) || prog < 0) prog = 0;
@@ -162,6 +232,12 @@
       else if (stateTxt === "failed" || stateTxt === "error") cls = "text-red-600";
       stateEl.classList.add(cls);
     }
+
+    // Initialer REST-Fetch, um den letzten bekannten Druckerstatus vor WS-Events anzuzeigen
+    fetch('/api/printer_status')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) updatePrinterStatus(data); })
+      .catch(() => {});
 
     async function loadDashboardDetails() {
       const res = await fetch("/api/dashboard-details");
@@ -310,56 +386,8 @@
 
     // Initial laden & bei WS-Aktualisierung erneut
     loadDashboardDetails();
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      // Druckerstatus-Events vom Backend (printer_service push)
-      if (data && ("serial" in data || "percent" in data || "eta_min" in data)) {
-        updatePrinterStatus(data);
-        return; // restliche Dashboard-Events überspringen
-      }
-      console.log("📡 Live-Update:", data);
-      if (data.event === "spule_created" || data.event === "spule_deleted") {
-        loadDashboardDetails();
-      } else if (data.event === "spule_updated") {
-        const edited = document.querySelector("#last-edited-spools");
-        fetch("/api/dashboard-details")
-          .then(res => res.json())
-          .then(data => {
-            edited.innerHTML = "";
-            data.letzte_spulen
-              .filter(s => {
-                const created = new Date(s.created_at).getTime();
-                const updated = new Date(s.updated_at).getTime();
-                return updated > created;
-              })
-              .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-              .slice(0, 3)
-              .forEach(s => {
-                const diff = s.alt_gewicht - s.neu_gewicht;
-                const color = diff >= 100 ? "text-red-500" : diff >= 50 ? "text-yellow-500" : "text-green-600";
-                const datum = new Date(s.updated_at).toLocaleDateString("de-DE");
-                edited.innerHTML += `
-                  <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
-                    <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
-                      ID: ${s.spulen_id}
-                    </div>
-                    <div class="flex justify-between items-center">
-                      <div class="text-sm font-semibold text-gray-800">${s.typ_name} (${s.material}, ${s.farbe})</div>
-                      <div class="text-xs text-gray-500 ml-2">${datum}</div>
-                    </div>
-                    <div class="flex justify-between items-center text-xs text-gray-600 space-x-2">
-                      <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
-                      <div class="flex-1 text-center ${color} font-semibold">–${diff} g</div>
-                      <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
-                    </div>
-                  </div>
-                `;
-              });
-          });
-      }
-    };
   </script>
-</script>
+  
 <script>
   const authBereich = document.getElementById("auth-bereich");
 

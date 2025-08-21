@@ -74,10 +74,13 @@ from fastapi import WebSocket, WebSocketDisconnect
 import asyncio
 
 dashboard_connections: list[WebSocket] = []
+LATEST_PRINTER_STATUS: dict | None = None
 
 def push_to_dashboard(payload: dict):
     """Thread-sicher: aus Worker-Threads ins FastAPI-Event-Loop pushen."""
     try:
+        global LATEST_PRINTER_STATUS
+        LATEST_PRINTER_STATUS = payload
         # Wenn wir im Event-Loop-Thread sind, direkt Task erstellen
         import asyncio as _asyncio
         try:
@@ -134,6 +137,12 @@ async def debug_ws_ping():
 async def debug_ws_text():
     await notify_dashboard({"event": "debug", "message": "Hello from server"})
     return {"ok": True}
+
+# API endpoint: Get the latest printer status snapshot
+@app.get("/api/printer_status", response_class=JSONResponse)
+def get_printer_status():
+    # Liefert den letzten bekannten Druckerstatus (oder unknown, falls noch keiner empfangen wurde)
+    return LATEST_PRINTER_STATUS or {"state": "unknown"}
 
 # Statische Dateien (HTML, CSS, JS)
 static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "html"))
