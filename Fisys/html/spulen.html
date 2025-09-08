@@ -54,13 +54,33 @@
           Alle Spulen anzeigen
         </button>
       </div>
-      <div id="spulen-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"></div>
+      <div id="spulen-container" class="grid gap-5 grid-cols-[repeat(auto-fit,minmax(540px,1fr))]"></div>
     </section>
   </main>
 
   <script>
 let currentEditSpuleId = null;
 let currentEditSpule = null;
+
+// Userinfo einmalig abrufen und cachen
+let __cachedUserInfo = undefined; // undefined = noch nicht geladen, null = nicht eingeloggt/kein Zugriff
+async function getUserInfoOnce() {
+  if (__cachedUserInfo !== undefined) return __cachedUserInfo;
+  try {
+    const res = await fetch("/api/userinfo");
+    if (!res.ok) {
+      __cachedUserInfo = null;
+      return null;
+    }
+    const data = await res.json();
+    __cachedUserInfo = data;
+    return data;
+  } catch (e) {
+    console.error("Fehler beim Laden von /api/userinfo:", e);
+    __cachedUserInfo = null;
+    return null;
+  }
+}
 
 async function loadSpulen() {
   const params = new URLSearchParams(window.location.search);
@@ -94,6 +114,10 @@ async function loadSpulen() {
   const container = document.getElementById("spulen-container");
   container.innerHTML = "";
 
+  // Rolle einmalig laden und Entscheidung für alle Karten verwenden
+  const user = await getUserInfoOnce();
+  const canManage = !!(user && ["helper", "mod", "admin"].includes(user.rolle));
+
   spulen.forEach(spule => {
     if (spuleId && String(spule.spulen_id) !== spuleId) {
       return; // Nur diese Spule anzeigen
@@ -108,8 +132,8 @@ async function loadSpulen() {
     const rest = spule.restmenge.toFixed(0);
 
     el.innerHTML = `
-  <div class="card-wrapper" style="transform: scale(0.8); transform-origin: top left;">
-    <div class="flex gap-4 bg-white rounded-lg shadow-lg p-6 min-h-[180px] w-[580px]">
+  <div class="card-wrapper">
+    <div class="flex gap-4 bg-white rounded-lg shadow-lg p-6 min-h-[180px] w-full min-w-0 overflow-hidden">
       <div class="flex flex-col items-center justify-center h-full">
         <div class="w-24 h-24 flex items-center justify-center bg-gray-100 rounded-lg shadow-inner">
                       <img src="/static/assets/images/${spule.typ && spule.typ.bildname && spule.typ.bildname !== 'null' ? spule.typ.bildname : 'platzhalter.jpg'}" alt="${spule.typ ? spule.typ.name : 'Unbekannt'}" class="w-full h-32 object-contain bg-white" />
@@ -154,43 +178,37 @@ async function loadSpulen() {
 `;
     container.appendChild(el);
 
-    fetch("/api/userinfo").then(res => {
-      if (res.ok) {
-        res.json().then(user => {
-          if (["helper", "mod", "admin"].includes(user.rolle)) {
-            const buttonContainer = el.querySelector("[data-rollen-buttons]");
-            buttonContainer.innerHTML = `
-              <button class="flex-1 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 transition" onclick='openEditModal(${JSON.stringify(spule)})'>
-                Spule bearbeiten
-              </button>
-              <button class="delete-btn flex-1 bg-red-600 text-white rounded px-4 py-2 hover:bg-red-700 transition" data-id="${spule.spulen_id}">
-                Löschen
-              </button>
-            `;
-            buttonContainer.querySelector(".delete-btn").addEventListener("click", () => {
-              const confirmModal = document.getElementById("confirm-modal");
-              const confirmOk = document.getElementById("confirm-ok");
-              const confirmCancel = document.getElementById("confirm-cancel");
+    if (canManage) {
+      const buttonContainer = el.querySelector("[data-rollen-buttons]");
+      buttonContainer.innerHTML = `
+        <button class="flex-1 bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700 transition" onclick='openEditModal(${JSON.stringify(spule)})'>
+          Spule bearbeiten
+        </button>
+        <button class="delete-btn flex-1 bg-red-600 text-white rounded px-4 py-2 hover:bg-red-700 transition" data-id="${spule.spulen_id}">
+          Löschen
+        </button>
+      `;
+      buttonContainer.querySelector(".delete-btn").addEventListener("click", () => {
+        const confirmModal = document.getElementById("confirm-modal");
+        const confirmOk = document.getElementById("confirm-ok");
+        const confirmCancel = document.getElementById("confirm-cancel");
 
-              confirmModal.classList.remove("hidden");
+        confirmModal.classList.remove("hidden");
 
-              confirmOk.onclick = async () => {
-                confirmModal.classList.add("hidden");
-                const res = await fetch(`/spulen/${spule.spulen_id}`, { method: "DELETE" });
-                if (res.ok) {
-                  loadSpulen();
-                } else {
-                  alert("Fehler beim Löschen der Spule.");
-                }
-              };
-              confirmCancel.onclick = () => {
-                confirmModal.classList.add("hidden");
-              };
-            });
+        confirmOk.onclick = async () => {
+          confirmModal.classList.add("hidden");
+          const res = await fetch(`/spulen/${spule.spulen_id}`, { method: "DELETE" });
+          if (res.ok) {
+            loadSpulen();
+          } else {
+            alert("Fehler beim Löschen der Spule.");
           }
-        });
-      }
-    });
+        };
+        confirmCancel.onclick = () => {
+          confirmModal.classList.add("hidden");
+        };
+      });
+    }
   });
 }
 
@@ -311,9 +329,8 @@ document.getElementById("suchfeld").addEventListener("input", () => {
     window.addEventListener("DOMContentLoaded", async () => {
       const authBereich = document.getElementById("auth-bereich");
       try {
-        const res = await fetch("/api/userinfo");
-        if (res.ok) {
-          const daten = await res.json();
+        const daten = await getUserInfoOnce();
+        if (daten) {
           authBereich.innerHTML = `
             <form id="logoutForm" class="flex flex-col items-center">
               <span class="text-sm text-gray-300 mb-1">Angemeldet als ${daten.username}</span>
