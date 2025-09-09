@@ -286,7 +286,7 @@
       etaEl.textContent = `ETA: ${p.eta_min != null ? p.eta_min + " min" : "—"}`;
 
       // Statusfarbe
-      stateEl.classList.remove("text-blue-400","text-green-400","text-red-400","text-yellow-400","text-gray-800");
+      stateEl.classList.remove("text-blue-400","text-green-400","text-red-400","text-yellow-400","text-gray-200");
       let cls = "text-white";
       if (stateTxt === "RUNNING") cls = "text-blue-400";
       else if (stateTxt === "PAUSE") cls = "text-yellow-400";
