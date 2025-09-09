@@ -35,7 +35,7 @@
           rgba(0, 255, 13, 0.5),
           rgba(255, 0, 0, 0)
         );
-        transform: translateX(-0%);
+        transform: translateX(0%);
         animation: progress-shimmer 3s linear infinite;
         pointer-events: none;
         opacity: 0; /* per JS ein-/ausblenden */
@@ -43,13 +43,13 @@
       /* overlay deprecated */
       /* Background-basierter Shimmer, startet sofort (negativer Offset) */
       @keyframes shimmer-bg {
-        0%   { background-position: -150% 0; }
-        100% { background-position: 150% 0; }
+        0%   { background-position: 145% 0; }
+        100% { background-position: -70% 0; }
       }
       #ps-progress.anim-shimmer {
         background-image: linear-gradient(90deg,
           rgba(255,255,255,0),
-          rgba(0, 255, 13, 0.5),
+          rgba(0, 255, 13, 0.731),
           rgba(255,255,255,0)
         );
         background-size: 300% 100%;
