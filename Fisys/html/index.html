@@ -1,12 +1,68 @@
 <!DOCTYPE html>
 <html lang="de">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dashboard | Fisys</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Weitere Meta-Tags und Links -->
-</head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard | Fisys</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Weitere Meta-Tags und Links -->
+    <style>
+      /* Ruhiger Balken + dezenter Shimmer, robust gegen häufige Updates */
+      #ps-progress {
+        position: relative;
+        overflow: hidden;
+        /* Nur Breiten-Transition, damit Animation nicht beeinflusst wird */
+        transition: width .5s ease-out;
+        min-width: 6px;
+      }
+      @keyframes progress-shimmer {
+        0%   { transform: translateX(-100%); opacity: 0; }
+        15%  { opacity: .32; }
+        50%  { opacity: .20; }
+        85%  { opacity: 0; }
+        100% { transform: translateX(200%); opacity: 0; }
+      }
+      /* Separate Overlay-Child statt ::after, damit Parent-Style-Änderungen
+         (width) die Animation nicht neu starten */
+      #ps-progress .shimmer {
+        content: "";
+        position: absolute;
+        top: 0; bottom: 0;
+        left: 0; width: 45%;
+        min-width: 32px; /* Bei sehr kleinem Fortschritt sichtbar bleiben */
+        background: linear-gradient(90deg,
+          rgba(255,255,255,0),
+          rgba(0, 255, 13, 0.257),
+          rgba(255, 0, 0, 0)
+        );
+        transform: translateX(-0%);
+        animation: progress-shimmer 3s linear infinite;
+        pointer-events: none;
+        opacity: 0; /* per JS ein-/ausblenden */
+      }
+      /* overlay deprecated */
+      /* Background-basierter Shimmer, startet sofort (negativer Offset) */
+      @keyframes shimmer-bg {
+        0%   { background-position: -150% 0; }
+        100% { background-position: 150% 0; }
+      }
+      #ps-progress.anim-shimmer {
+        background-image: linear-gradient(90deg,
+          rgba(255,255,255,0),
+          rgba(0, 255, 13, 0.257),
+          rgba(255,255,255,0)
+        );
+        background-size: 300% 100%;
+        background-position: 500% 0%; /* definierter Startpunkt */
+        background-repeat: no-repeat;
+        animation: shimmer-bg 3s linear infinite;
+        animation-play-state: paused;
+        background-blend-mode: lighten;
+      }
+      #ps-progress.anim-shimmer.shimmer-running { animation-play-state: running; }
+      /* removed overlay styles */
+    </style>
+  </head>
 <body>
   <aside class="fixed top-0 left-0 h-full w-64 bg-[#0f172a] text-white flex flex-col justify-between">
     <div>
@@ -216,8 +272,14 @@
       let prog = Number(p.percent ?? 0);
       if (!isFinite(prog) || prog < 0) prog = 0;
       if (prog > 100) prog = 100;
-      bar.style.width = prog + "%";
-      barLbl.textContent = (isFinite(prog) ? prog.toFixed(0) : 0) + "%";
+      // Nur bei geänderter Ganzzahl-Prozentzahl updaten, um Animation zu schonen
+      const intProg = Math.round(isFinite(prog) ? prog : 0);
+      const lastInt = Number(bar.dataset.lastProgInt ?? "-1");
+      if (intProg !== lastInt) {
+        bar.style.width = intProg + "%";
+        bar.dataset.lastProgInt = String(intProg);
+        barLbl.textContent = intProg + "%";
+      }
 
       const stateTxt = String(p.state ?? "—");
       stateEl.textContent = stateTxt;
@@ -231,6 +293,14 @@
       else if (stateTxt === "FINISH") cls = "text-green-400";
       else if (stateTxt === "FAIL" || stateTxt === "ERROR") cls = "text-red-400";
       stateEl.classList.add(cls);
+
+      // Basis-Klasse einmalig setzen; Startposition bleibt deterministisch
+      if (!bar.classList.contains('anim-shimmer')) {
+        bar.classList.add('anim-shimmer');
+      }
+      // Nur Play-State schalten, um Neustarts zu vermeiden
+      const isRunning = (intProg > 0 && intProg < 100) || /run|print/i.test(stateTxt);
+      bar.classList.toggle('shimmer-running', !!isRunning);
     }
 
     // Initialer REST-Fetch, um den letzten bekannten Druckerstatus vor WS-Events anzuzeigen
