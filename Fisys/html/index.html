@@ -226,14 +226,14 @@
                   const datum = new Date(s.updated_at).toLocaleDateString('de-DE');
                   edited.innerHTML += `
                     <div class="relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
-                      <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
+                      <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-200 select-none pointer-events-none">
                         ID: ${s.spulen_id}
                       </div>
                       <div class="flex justify-between items-center">
-                        <div class="text-sm font-semibold text-gray-800">${s.typ_name} (${s.material}, ${s.farbe})</div>
-                        <div class="text-xs text-gray-500 ml-2">${datum}</div>
+                        <div class="text-sm font-semibold text-white">${s.typ_name} (${s.material}, ${s.farbe})</div>
+                        <div class="text-xs text-gray-200 ml-2">${datum}</div>
                       </div>
-                      <div class="flex justify-between items-center text-xs text-gray-600 space-x-2">
+                      <div class="flex justify-between items-center text-xs text-gray-100 space-x-2">
                         <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
                         <div class="flex-1 text-center ${color} font-semibold">–${diff} g</div>
                         <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
@@ -291,7 +291,7 @@
       if (stateTxt === "RUNNING") cls = "text-blue-400";
       else if (stateTxt === "PAUSE") cls = "text-yellow-400";
       else if (stateTxt === "FINISH") cls = "text-green-400";
-      else if (stateTxt === "FAIL" || stateTxt === "ERROR") cls = "text-red-400";
+      else if (stateTxt === "FAILED" || stateTxt === "ERROR") cls = "text-red-400";
       stateEl.classList.add(cls);
 
       // Basis-Klasse einmalig setzen; Startposition bleibt deterministisch
