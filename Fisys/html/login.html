@@ -7,7 +7,7 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
 </head>
-<body class="min-h-screen flex bg-gray-50">
+<body class="min-h-screen flex bg-gray-800">
   <!-- Sidebar -->
   <aside class="w-64 bg-gray-900 text-white flex flex-col justify-between fixed h-full">
     <div>
@@ -33,9 +33,9 @@
 
   <!-- Main content -->
   <div class="flex-1 flex flex-col ml-64 items-center justify-center">
-    <div class="bg-white shadow-md rounded p-8 w-full max-w-sm mt-10">
+    <div class="bg-gray-700 shadow-md rounded p-8 w-full max-w-sm mt-10">
       <div class="mb-6 text-center">
-        <h1 class="text-xl font-bold text-gray-700">Anmeldung</h1>
+        <h1 class="text-xl font-bold text-white">Anmeldung</h1>
       </div>
       <div id="errorBox" class="hidden mb-4">
         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
@@ -44,17 +44,17 @@
       </div>
       <form method="POST" action="/login" class="space-y-4">
         <div>
-          <label for="benutzername" class="block text-sm font-medium text-gray-600">Benutzername</label>
+          <label for="benutzername" class="block text-sm font-medium text-gray-100">Benutzername</label>
           <input type="text" id="benutzername" name="benutzername" required class="mt-1 w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300" />
         </div>
         <div>
-          <label for="passwort" class="block text-sm font-medium text-gray-600">Passwort</label>
+          <label for="passwort" class="block text-sm font-medium text-gray-100">Passwort</label>
           <input type="password" id="passwort" name="passwort" required class="mt-1 w-full px-4 py-2 border border-gray-300 rounded focus:outline-none focus:ring focus:border-blue-300" />
         </div>
         <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition">Einloggen</button>
         <div class="text-sm text-center mt-4">
-          <span class="text-gray-600">Noch keinen Account?</span>
-          <a href="/register" class="text-blue-600 hover:underline">Registrieren</a>
+          <span class="text-gray-300">Noch keinen Account?</span>
+          <a href="/register" class="text-blue-400 hover:underline">Registrieren</a>
         </div>
       </form>
     </div>
