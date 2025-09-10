@@ -163,11 +163,16 @@ async function loadSpulen() {
                       <img src="/static/assets/images/${spule.typ && spule.typ.bildname && spule.typ.bildname !== 'null' ? spule.typ.bildname : 'platzhalter.jpg'}" alt="${spule.typ ? spule.typ.name : 'Unbekannt'}" class="w-full h-24 object-contain bg-gray-700 rounded-md" />
         </div>
         <div class="flex justify-center mt-6">
-          <svg width="60" height="60" viewBox="0 0 36 36" class="donut" style="transform: rotate(-90deg) scaleY(-1); transform-origin: 50% 50%; display: block; margin: 0 auto;">
-            <circle class="donut-ring" cx="18" cy="18" r="16" fill="transparent" stroke="#e5e7eb" stroke-width="4"/>
-            <circle class="donut-segment" cx="18" cy="18" r="16" fill="transparent" stroke="#3b82f6" stroke-width="4"
-              stroke-dasharray="${percent} ${circumference}" stroke-dashoffset="${offset}"/>
-          </svg>
+          <div class="relative w-[60px] h-[60px]">
+            <svg width="60" height="60" viewBox="0 0 36 36" class="donut" style="transform: rotate(-90deg) scaleY(-1); transform-origin: 50% 50%; display: block; margin: 0 auto;">
+              <circle class="donut-ring" cx="18" cy="18" r="16" fill="transparent" stroke="#e5e7eb" stroke-width="4"/>
+              <circle class="donut-segment" cx="18" cy="18" r="16" fill="transparent" stroke="#3b82f6" stroke-width="4"
+                stroke-dasharray="${percent} ${circumference}" stroke-dashoffset="${offset}"/>
+            </svg>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-xs text-white font-semibold">${rest} g</span>
+            </div>
+          </div>
         </div>
       </div>
       <div class="flex flex-col flex-1 ml-4">
