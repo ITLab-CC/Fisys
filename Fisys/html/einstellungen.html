@@ -17,7 +17,7 @@
       left: 0;
       width: 4px;
       height: 100%;
-      background-color: #cbd5e1; /* Tailwind's gray-300 */
+      background-color: #0073ffaa; 
       border-radius: 2px;
     }
 
@@ -25,7 +25,7 @@
       position: relative;
     }
   </style>
-  <body class="min-h-screen flex bg-gray-50">
+  <body class="min-h-screen flex bg-gray-800">
     <!-- Sidebar -->
     <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
       <div>
@@ -51,30 +51,30 @@
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col ml-64">
-      <header class="bg-gray-50 px-10 py-10 relative">
-        <h1 class="text-3xl font-bold">Einstellungen</h1>
-        <p class="text-sm text-gray-500 mt-1">Verwalte globale Optionen und Systemeinstellungen</p>
+      <header class="bg-gray-800 px-10 py-10 relative">
+        <h1 class="text-3xl text-white font-bold">Einstellungen</h1>
+        <p class="text-sm text-gray-200 mt-1">Verwalte globale Optionen und Systemeinstellungen</p>
       </header>
 
       <section class="flex-1 pt-2 px-10 pb-10">
         <div class="flex flex-col xl:flex-row gap-8">
           <!-- Seitenmenü -->
-          <aside class="w-full xl:w-1/4 bg-white shadow rounded p-4">
+          <aside class="w-full xl:w-1/4 bg-gray-700 border border-gray-600 rounded p-4">
             <nav id="einstellungsMenue" class="space-y-4 highlight-container">
               <div id="highlightBar" class="highlight-bar hidden"></div>
               <div>
-                <p class="text-sm font-semibold text-gray-500 mb-1">Bildeinstellungen</p>
-                <button data-ziel="bilderVerwaltung" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Bild hochladen</button>
-                <button data-ziel="vorhandeneBilderBlock" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Vorhandene Bilder</button>
+                <p class="text-sm font-semibold text-white mb-1">Bildeinstellungen</p>
+                <button data-ziel="bilderVerwaltung" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Bild hochladen</button>
+                <button data-ziel="vorhandeneBilderBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Vorhandene Bilder</button>
               </div>
               <div>
-                <p class="text-sm font-semibold text-gray-500 mb-1">Tokens</p>
-                <button data-ziel="tokenBlockContainer" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Token erstellen</button>
-                <button data-ziel="tokenUebersichtBlockContainer" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">Token Übersicht</button>
+                <p class="text-sm font-semibold text-white mb-1">Tokens</p>
+                <button data-ziel="tokenBlockContainer" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Token erstellen</button>
+                <button data-ziel="tokenUebersichtBlockContainer" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Token Übersicht</button>
               </div>
               <div>
-                <p class="text-sm font-semibold text-gray-500 mb-1">User</p>
-                <button data-ziel="userVerwaltungBlock" class="block w-full text-left px-3 py-2 rounded hover:bg-gray-100 text-sm">User verwalten</button>
+                <p class="text-sm font-semibold text-white mb-1">User</p>
+                <button data-ziel="userVerwaltungBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">User verwalten</button>
               </div>
             </nav>
           </aside>
@@ -82,15 +82,15 @@
           <!-- Inhalt -->
           <div class="flex-1 space-y-10">
             <!-- Filamentbild hochladen -->
-            <div id="bilderVerwaltung" class="hidden bg-white p-6 rounded shadow max-w-xl mt-10">
-              <h2 class="text-xl font-semibold mb-4">Filamentbild hochladen</h2>
+            <div id="bilderVerwaltung" class="hidden bg-gray-700 p-6 rounded shadow max-w-xl mt-10">
+              <h2 class="text-xl text-white font-semibold mb-4">Filamentbild hochladen</h2>
               <form id="uploadForm" class="space-y-3">
                 <div>
-                  <label for="bild" class="block text-sm font-medium text-gray-700 mb-1">Bild auswählen</label>
-                  <input type="file" id="bild" name="file" accept="image/*" class="block w-full text-sm text-gray-700 border rounded px-3 py-2">
+                  <label for="bild" class="block text-sm font-medium text-gray-100 mb-1">Bild auswählen</label>
+                  <input type="file" id="bild" name="file" accept="image/*" class="block w-full text-sm text-gray-200 border border-gray-400 rounded px-3 py-2">
                 </div>
                 <div id="bildVorschauContainer" class="mt-1 hidden">
-                  <p class="text-sm text-gray-600 mb-1">Vorschau:</p>
+                  <p class="text-sm font-medium text-gray-100 mb-1">Vorschau:</p>
                   <img id="bildVorschau" src="" alt="Bildvorschau" class="h-24 rounded border">
                 </div>
                 <div>
@@ -103,11 +103,11 @@
             <div id="tokenBlockContainer" class="hidden"></div>
 
             <!-- Vorhandene Bilder -->
-            <div id="vorhandeneBilderBlock" class="hidden bg-white p-6 rounded shadow">
-              <h2 class="text-xl font-semibold mb-4">Vorhandene Bilder verwalten</h2>
+            <div id="vorhandeneBilderBlock" class="hidden bg-gray-700 p-6 rounded shadow">
+              <h2 class="text-xl text-white font-semibold mb-4">Vorhandene Bilder verwalten</h2>
               <div class="overflow-x-auto">
-                <table class="min-w-full text-sm text-left border">
-                  <thead class="bg-gray-100 border-b">
+                <table class="min-w-full text-gray-200 text-sm text-left border border-gray-400">
+                  <thead class="bg-gray-600 border-b">
                     <tr>
                       <th class="px-4 py-2">Bild</th>
                       <th class="px-4 py-2">Zugewiesener Typ</th>
@@ -123,11 +123,11 @@
             <div id="tokenUebersichtBlockContainer" class="hidden"></div>
 
             <!-- User-Verwaltung -->
-            <div id="userVerwaltungBlock" class="hidden bg-white p-6 rounded shadow">
-              <h2 class="text-xl font-semibold mb-4">User verwalten</h2>
+            <div id="userVerwaltungBlock" class="hidden bg-gray-700 p-6 rounded shadow">
+              <h2 class="text-xl text-white font-semibold mb-4">User verwalten</h2>
               <div class="overflow-x-auto">
-                <table class="min-w-full text-sm text-left border">
-                  <thead class="bg-gray-100 border-b">
+                <table class="min-w-full text-sm text-gray-100 text-left border">
+                  <thead class="bg-gray-600 border-b">
                     <tr>
                       <th class="px-4 py-2">Benutzername</th>
                       <th class="px-4 py-2">Rolle</th>
@@ -153,9 +153,9 @@
 
         // Vorheriges Highlight entfernen
         document.querySelectorAll('#einstellungsMenue button').forEach(btn => {
-          btn.classList.remove('bg-gray-100', 'menu-highlight');
+          btn.classList.remove('bg-gray-600', 'menu-highlight');
         });
-        e.target.classList.add('bg-gray-100', 'menu-highlight');
+        e.target.classList.add('bg-gray-600', 'menu-highlight');
 
         // Highlight-Bar-Animation
         const buttonRect = e.target.getBoundingClientRect();
@@ -184,13 +184,13 @@
       });
       let benutzerRolle = null;
       const tokenBlock = document.createElement("div");
-      tokenBlock.className = "bg-white p-6 rounded shadow max-w-xl mt-10";
+      tokenBlock.className = "bg-gray-700 p-6 rounded shadow max-w-xl mt-10";
       tokenBlock.innerHTML = `
-        <h2 class="text-xl font-semibold mb-4">Registrierungstoken erstellen</h2>
+        <h2 class="text-xl text-white font-semibold mb-4">Registrierungstoken erstellen</h2>
         <form id="tokenForm" class="space-y-4">
           <div>
-            <label for="rolle" class="block text-sm font-medium text-gray-700 mb-1">Rolle auswählen</label>
-            <select id="rolle" name="rolle" required class="block w-full text-sm text-gray-700 border rounded px-3 py-2">
+            <label for="rolle" class="block text-sm font-medium text-gray-200 mb-1">Rolle auswählen</label>
+            <select id="rolle" name="rolle" required class="block w-full text-sm text-gray-200 bg-gray-600 border border-gray-500 rounded px-3 py-2">
               <option value="">-- auswählen --</option>
               <option value="user">User</option>
               <option value="helper">Helper</option>
@@ -204,17 +204,17 @@
         </form>
         <div id="tokenAnzeige" class="mt-4 hidden">
           <p class="text-sm text-gray-700">Token:</p>
-          <code id="generierterToken" class="block text-center mt-1 text-lg font-mono text-blue-600 bg-blue-100 p-2 rounded">________</code>
+          <code id="generierterToken" class="block text-center mt-1 text-lg font-mono text-blue-600 bg-blue-200 p-2 rounded">________</code>
         </div>
       `;
       // Token-Übersicht-Block erstellen
       const tokenUebersichtBlock = document.createElement("div");
-      tokenUebersichtBlock.className = "bg-white p-6 rounded shadow max-w-xl mt-6";
+      tokenUebersichtBlock.className = "bg-gray-700 p-6 rounded shadow max-w-xl mt-6";
       tokenUebersichtBlock.innerHTML = `
-        <h2 class="text-xl font-semibold mb-4">Alle Tokens</h2>
+        <h2 class="text-xl font-semibold text-white mb-4">Alle Tokens</h2>
         <div id="tokenTabelleWrapper" class="overflow-x-auto">
-          <table class="min-w-full text-sm text-left border">
-            <thead class="bg-gray-100 border-b">
+          <table class="min-w-full text-sm text-gray-100 text-left border">
+            <thead class="bg-gray-600 border-b">
               <tr>
                 <th class="px-4 py-2">Token</th>
                 <th class="px-4 py-2">Rolle</th>
@@ -293,7 +293,7 @@
 
             const entknopf = document.createElement("button");
             entknopf.innerText = "Zuweisung entfernen";
-            entknopf.className = "px-2 py-1 bg-yellow-500 text-white rounded text-xs hover:bg-yellow-600";
+            entknopf.className = "px-2 py-1 bg-orange-600 text-white rounded text-xs hover:bg-yellow-600";
 
             entknopf.addEventListener("click", async () => {
               zeigePopup("Zuweisung dieses Bildes entfernen?", async () => {
@@ -670,7 +670,7 @@
         } catch (err) {
           const tbody = document.getElementById("userTabelleBody");
           if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-gray-500">Fehler beim Laden der Benutzerliste.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-gray-200">Fehler beim Laden der Benutzerliste.</td></tr>`;
           }
         }
       }
@@ -682,8 +682,8 @@
 });
   </script>
   <div id="popupOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-    <div class="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center">
-      <p id="popupText" class="mb-4 text-sm text-gray-800">Bist du sicher?</p>
+    <div class="bg-gray-700 rounded shadow-lg p-6 max-w-sm w-full text-center">
+      <p id="popupText" class="mb-4 text-sm text-gray-100">Bist du sicher?</p>
       <div class="flex justify-center gap-4">
         <button id="popupCancel" class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm">Abbrechen</button>
         <button id="popupConfirm" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm">Ja, bestätigen</button>
@@ -691,9 +691,9 @@
     </div>
   </div>
   <div id="typPopupOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-    <div class="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center">
-      <p class="mb-2 text-sm text-gray-800">Wähle einen neuen Typ aus:</p>
-      <select id="typPopupSelect" class="w-full mb-4 px-3 py-2 border rounded text-sm focus:outline-none focus:ring">
+    <div class="bg-gray-700 rounded shadow-lg p-6 max-w-sm w-full text-center">
+      <p class="mb-2 text-sm text-gray-100">Wähle einen neuen Typ aus:</p>
+      <select id="typPopupSelect" class="w-full mb-4 px-3 py-2 border border-gray-500 text-sm text-gray-100 bg-gray-600 focus:outline-none focus:ring">
         <option value="">-- Typ auswählen --</option>
       </select>
       <div class="flex justify-center gap-4">
@@ -703,9 +703,9 @@
     </div>
   </div>
   <div id="rollePopupOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-    <div class="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center">
-      <p class="mb-2 text-sm text-gray-800">Wähle eine neue Rolle:</p>
-      <select id="rollePopupSelect" class="w-full mb-4 px-3 py-2 border rounded text-sm focus:outline-none focus:ring">
+    <div class="bg-gray-700 rounded shadow-lg p-6 max-w-sm w-full text-center">
+      <p class="mb-2 text-sm text-gray-100">Wähle eine neue Rolle:</p>
+      <select id="rollePopupSelect" class="w-full mb-4 px-3 py-2 border border-gray-500 rounded text-sm text-gray-100 bg-gray-600 focus:outline-none focus:ring">
         <option value="">-- Rolle auswählen --</option>
         <option value="user">User</option>
         <option value="helper">Helper</option>
