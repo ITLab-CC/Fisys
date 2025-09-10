@@ -901,6 +901,7 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         .scalar()
     ) or 0
 
+    # Zuletzt bearbeitete Spulen (nach Update-Zeit)
     letzte_spulen = (
         db.query(FilamentSpule)
         .order_by(FilamentSpule.updated_at.desc())
@@ -918,6 +919,25 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "created_at": s.created_at,
         "updated_at": s.updated_at,
     } for s in letzte_spulen]
+
+    # Neu hinzugefügte Spulen (nach Erstellzeit)
+    neue_spulen = (
+        db.query(FilamentSpule)
+        .order_by(FilamentSpule.created_at.desc())
+        .limit(3)
+        .all()
+    )
+    neue_spulen_liste = [{
+        "spulen_id": s.spulen_id,
+        "typ_name": s.typ.name,
+        "farbe": s.typ.farbe,
+        "material": s.typ.material,
+        "durchmesser": s.typ.durchmesser,
+        "alt_gewicht": s.alt_gewicht,
+        "neu_gewicht": s.restmenge,
+        "created_at": s.created_at,
+        "updated_at": s.updated_at,
+    } for s in neue_spulen]
 
     # Ergänzung: Spulen, die aktuell im Drucker sind
     im_drucker_spulen = db.query(FilamentSpule).filter(FilamentSpule.in_printer == True).all()
@@ -979,7 +999,8 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "verbrauch_7tage": int(verbrauch_7tage_sum),
         "im_drucker": im_drucker,
         "im_drucker_spulen": im_drucker_liste,
-        "letzte_spulen": spulen_liste
+        "letzte_spulen": spulen_liste,
+        "neue_spulen": neue_spulen_liste
     }
 
 
@@ -1197,5 +1218,4 @@ if __name__ == "__main__":
         print(f"➡️  http://{ip}:8000")
 
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
 
