@@ -118,7 +118,30 @@ async function loadSpulen() {
   const user = await getUserInfoOnce();
   const canManage = !!(user && ["helper", "mod", "admin"].includes(user.rolle));
 
-  spulen.forEach(spule => {
+  // Liste ggf. nach spuleId filtern
+  const anzuzeigendeSpulen = Array.isArray(spulen)
+    ? spulen.filter(s => !spuleId || String(s.spulen_id) === spuleId)
+    : [];
+
+  // Leerer Zustand anzeigen, wenn keine Spulen vorhanden/gefunden
+  if (!anzuzeigendeSpulen || anzuzeigendeSpulen.length === 0) {
+    const msg = spuleId
+      ? "Keine Spule mit dieser ID gefunden."
+      : (typId ? "Keine Spulen für diesen Typ vorhanden." : "Es sind derzeit keine Spulen vorhanden.");
+    const action = typId
+      ? `<button class=\"mt-4 inline-flex items-center bg-gray-700 text-white px-4 py-2 rounded hover:bg-gray-600 text-sm\" onclick=\"window.location.href='/spulen.html'\">Alle Spulen anzeigen</button>`
+      : "";
+    container.innerHTML = `
+      <div class="col-span-full text-center bg-gray-700/50 border border-gray-600 rounded-lg p-8">
+        <div class="text-2xl text-white font-semibold mb-2">Nichts zu zeigen...</div>
+        <div class="text-gray-300">${msg}</div>
+        ${action}
+      </div>
+    `;
+    return;
+  }
+
+  anzuzeigendeSpulen.forEach(spule => {
     if (spuleId && String(spule.spulen_id) !== spuleId) {
       return; // Nur diese Spule anzeigen
     }

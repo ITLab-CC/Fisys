@@ -924,6 +924,7 @@ def get_dashboard_details(db: Session = Depends(get_db)):
     im_drucker_liste = [{
         "spulen_id": s.spulen_id,
         "typ_name": s.typ.name,
+        "typ_id": s.typ.id,
         "farbe": s.typ.farbe,
         "material": s.typ.material,
         "durchmesser": s.typ.durchmesser,
@@ -1196,6 +1197,5 @@ if __name__ == "__main__":
         print(f"➡️  http://{ip}:8000")
 
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-
 
 
