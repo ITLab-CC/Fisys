@@ -218,9 +218,11 @@ async function loadSpulen() {
         const confirmCancel = document.getElementById("confirm-cancel");
 
         confirmModal.classList.remove("hidden");
+        document.body.classList.add("overflow-hidden");
 
         confirmOk.onclick = async () => {
           confirmModal.classList.add("hidden");
+          document.body.classList.remove("overflow-hidden");
           const res = await fetch(`/spulen/${spule.spulen_id}`, { method: "DELETE" });
           if (res.ok) {
             loadSpulen();
@@ -230,6 +232,7 @@ async function loadSpulen() {
         };
         confirmCancel.onclick = () => {
           confirmModal.classList.add("hidden");
+          document.body.classList.remove("overflow-hidden");
         };
       });
     }
@@ -244,11 +247,13 @@ function openEditModal(spule) {
   document.getElementById('verpackt').checked = spule.verpackt;
   document.getElementById('in_printer').checked = spule.in_printer;
   document.getElementById('edit-modal').classList.remove('hidden');
+  document.body.classList.add("overflow-hidden");
 }
 
 function closeEditModal() {
   currentEditSpuleId = null;
   document.getElementById('edit-modal').classList.add('hidden');
+  document.body.classList.remove("overflow-hidden");
 }
 
 window.addEventListener("DOMContentLoaded", () => {

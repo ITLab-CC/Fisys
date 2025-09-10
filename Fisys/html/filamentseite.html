@@ -155,6 +155,7 @@ window.addEventListener("DOMContentLoaded", () => {
           const form = document.getElementById("modal-form");
           modal.classList.remove("hidden");
           document.body.style.overflow = "hidden";
+          document.body.classList.add("overflow-hidden");
 
           // Formular mit bestehenden Daten füllen
           form.name.value = typ.name;
@@ -183,6 +184,7 @@ window.addEventListener("DOMContentLoaded", () => {
           const confirmCancel = document.getElementById("confirm-cancel");
 
           confirmModal.classList.remove("hidden");
+          document.body.classList.add("overflow-hidden");
 
           // Remove previous handlers first, to avoid stacking
           confirmOk.onclick = null;
@@ -190,6 +192,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
           confirmOk.onclick = async () => {
             confirmModal.classList.add("hidden");
+            document.body.classList.remove("overflow-hidden");
             const res = await fetch(`/typs/${typ.id}`, { method: "DELETE" });
             if (res.ok) {
               loadTypen();
@@ -199,6 +202,7 @@ window.addEventListener("DOMContentLoaded", () => {
           };
           confirmCancel.onclick = () => {
             confirmModal.classList.add("hidden");
+            document.body.classList.remove("overflow-hidden");
           };
         });
       }
@@ -221,10 +225,13 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       modal.classList.remove("hidden");
       document.body.style.overflow = "hidden";
+      document.body.classList.add("overflow-hidden");
     });
 
     cancelBtn.addEventListener("click", () => {
       modal.classList.add("hidden");
+      document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
     });
   }
 
@@ -335,12 +342,14 @@ window.addEventListener("DOMContentLoaded", () => {
     await loadTypenDropdown();
     modalSpule.classList.remove("hidden");
     document.body.style.overflow = "hidden";
+    document.body.classList.add("overflow-hidden");
     darkenSpulenContainer();
   });
 
   cancelSpuleBtn.addEventListener("click", () => {
     modalSpule.classList.add("hidden");
     document.body.style.overflow = "";
+    document.body.classList.remove("overflow-hidden");
     undarkenSpulenContainer();
   });
 
@@ -387,6 +396,8 @@ window.addEventListener("DOMContentLoaded", () => {
       formSpule.reset();
       dropdownSelected.textContent = "Bitte wählen";
       hiddenSelect.value = "";
+      document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
       undarkenSpulenContainer();
       loadTypen();
     } else {
@@ -399,6 +410,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!modalSpule.classList.contains("hidden") && e.key === "Escape") {
       modalSpule.classList.add("hidden");
       document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
       undarkenSpulenContainer();
     }
   });
@@ -408,6 +420,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.target === modalSpule) {
       modalSpule.classList.add("hidden");
       document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
       undarkenSpulenContainer();
     }
   });
@@ -430,11 +443,13 @@ window.addEventListener("DOMContentLoaded", () => {
   addTypBtn.addEventListener("click", () => {
     modal.classList.remove("hidden");
     document.body.style.overflow = "hidden";
+    document.body.classList.add("overflow-hidden");
   });
 
   cancelBtn.addEventListener("click", () => {
     modal.classList.add("hidden");
     document.body.style.overflow = "";
+    document.body.classList.remove("overflow-hidden");
   });
 
   // Schließen bei Escape
@@ -442,6 +457,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!modal.classList.contains("hidden") && e.key === "Escape") {
       modal.classList.add("hidden");
       document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
     }
   });
 
@@ -450,6 +466,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.target === modal) {
       modal.classList.add("hidden");
       document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
     }
   });
 
@@ -486,6 +503,8 @@ window.addEventListener("DOMContentLoaded", () => {
       form.reset();
       form.removeAttribute("data-mode");
       form.removeAttribute("data-id");
+      document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
       loadTypen();
     } else {
       zeigeHinweis("Fehler beim Hinzufügen", "bg-red-600");
@@ -600,7 +619,7 @@ function zeigeHinweis(nachricht, farbe = "bg-gray-800") {
   </div>
   <div>
     <label for="hinweise" class="block text-white font-medium mb-1">Hinweise</label>
-    <textarea id="hinweise" name="hinweise" rows="3" placeholder="Optional" maxlength="100" class="w-full border border-gray-500 bg-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500"></textarea>
+    <textarea id="hinweise" name="hinweise" rows="3" placeholder="Optional" maxlength="100" class="w-full border border-gray-500 bg-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500 resize-none"></textarea>
   </div>
   <div>
     <label for="leergewicht" class="block text-white font-medium mb-1">Leergewicht (g) <span class="text-red-500">*</span></label>

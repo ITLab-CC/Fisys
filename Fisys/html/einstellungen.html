@@ -369,15 +369,17 @@
 
         popupText.innerText = text;
         overlay.classList.remove("hidden");
+        document.body.classList.add("overflow-hidden");
 
         const confirmHandler = () => {
           overlay.classList.add("hidden");
+          document.body.classList.remove("overflow-hidden");
           onConfirm();
           popupConfirm.removeEventListener("click", confirmHandler);
         };
 
         popupConfirm.addEventListener("click", confirmHandler);
-        popupCancel.onclick = () => overlay.classList.add("hidden");
+        popupCancel.onclick = () => { overlay.classList.add("hidden"); document.body.classList.remove("overflow-hidden"); };
       }
 
       const uploadForm = document.getElementById("uploadForm");
@@ -448,17 +450,19 @@
         });
 
       overlay.classList.remove("hidden");
+      document.body.classList.add("overflow-hidden");
 
       const confirmHandler = () => {
         const typId = select.value;
         if (!typId) return;
         overlay.classList.add("hidden");
+        document.body.classList.remove("overflow-hidden");
         onConfirm(typId);
         confirmBtn.removeEventListener("click", confirmHandler);
       };
 
       confirmBtn.addEventListener("click", confirmHandler);
-      cancelBtn.onclick = () => overlay.classList.add("hidden");
+      cancelBtn.onclick = () => { overlay.classList.add("hidden"); document.body.classList.remove("overflow-hidden"); };
     }
 
       if (["helper", "mod", "admin"].includes(benutzerRolle)) {
@@ -576,17 +580,19 @@
 
     select.value = aktuelleRolle;
     overlay.classList.remove("hidden");
+    document.body.classList.add("overflow-hidden");
 
     const confirmHandler = () => {
       const neueRolle = select.value;
       if (!neueRolle || neueRolle === aktuelleRolle) return;
       overlay.classList.add("hidden");
+      document.body.classList.remove("overflow-hidden");
       onConfirm(neueRolle);
       confirmBtn.removeEventListener("click", confirmHandler);
     };
 
     confirmBtn.addEventListener("click", confirmHandler);
-    cancelBtn.onclick = () => overlay.classList.add("hidden");
+    cancelBtn.onclick = () => { overlay.classList.add("hidden"); document.body.classList.remove("overflow-hidden"); };
   }
 
       async function ladeBenutzerTabelle() {
