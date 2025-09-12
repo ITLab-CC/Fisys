@@ -15,6 +15,7 @@ from qrcode_utils import generate_qrcode_for_spule, delete_qrcode_for_spule
 import shutil
 from auth import router as auth_router
 from printer_service import start_printer_service, stop_printer_service
+from models import Printer, PrinterCreate, PrinterUpdate, PrinterRead
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,21 +26,26 @@ async def lifespan(app: FastAPI):
     global APP_EVENT_LOOP
     APP_EVENT_LOOP = _asyncio.get_running_loop()
     
-    PRINTER_IP = os.getenv("PRINTER_IP", "192.168.1.50")
-    PRINTER_SERIAL = os.getenv("PRINTER_SERIAL", "X1C123456789")
-    PRINTER_ACCESS = os.getenv("PRINTER_ACCESS_CODE", "changeme")
+    # Aus der Datenbank konfigurierte Drucker laden und Services starten
+    def _start_selected_printers():
+        db = SessionLocal()
+        try:
+            for p in db.query(Printer).filter(Printer.show_on_dashboard == True).all():
+                start_printer_service(
+                    ip=p.ip,
+                    serial=p.serial,
+                    access_code=p.access_token,
+                    on_push=push_to_dashboard,
+                    interval_seconds=15,
+                    name=p.name,
+                )
+        finally:
+            db.close()
 
-    start_printer_service(
-        ip=PRINTER_IP,
-        serial=PRINTER_SERIAL,
-        access_code=PRINTER_ACCESS,
-        on_push=push_to_dashboard,     # Dashboard-Push
-        interval_seconds=15            # alle 15s
-    )
+    _start_selected_printers()
 
     # --- Initialen Admin-Token generieren, falls keine Benutzer vorhanden ---
     from models import User, AuthToken
-    from db import SessionLocal
     import secrets
 
     def generate_initial_admin_token():
@@ -58,6 +64,21 @@ async def lifespan(app: FastAPI):
     try:
         yield
     finally:
+        # Graceful shutdown: keine neuen Pushes, WS-Verbindungen schließen, Services stoppen
+        global SHUTTING_DOWN
+        SHUTTING_DOWN = True
+        try:
+            for ws in list(dashboard_connections):
+                try:
+                    await ws.close()
+                except Exception:
+                    pass
+                try:
+                    dashboard_connections.remove(ws)
+                except ValueError:
+                    pass
+        except Exception:
+            pass
         stop_printer_service()
 
 
@@ -68,19 +89,24 @@ app.include_router(auth_router)
 
 # Event Loop global für Thread->Async Bridge
 APP_EVENT_LOOP = None  # wird im lifespan gesetzt
+SHUTTING_DOWN = False  # verhindert neue Pushes beim Shutdown
 
 # --- WebSocket Dashboard Support ---
 from fastapi import WebSocket, WebSocketDisconnect
 import asyncio
 
 dashboard_connections: list[WebSocket] = []
-LATEST_PRINTER_STATUS: dict | None = None
+LATEST_PRINTER_STATUSES: dict[str, dict] = {}
 
 def push_to_dashboard(payload: dict):
     """Thread-sicher: aus Worker-Threads ins FastAPI-Event-Loop pushen."""
     try:
-        global LATEST_PRINTER_STATUS
-        LATEST_PRINTER_STATUS = payload
+        if SHUTTING_DOWN:
+            return
+        global LATEST_PRINTER_STATUSES
+        serial = payload.get("serial") or payload.get("printer_serial")
+        if serial:
+            LATEST_PRINTER_STATUSES[serial] = payload
         # Wenn wir im Event-Loop-Thread sind, direkt Task erstellen
         import asyncio as _asyncio
         try:
@@ -109,16 +135,54 @@ async def websocket_dashboard(ws: WebSocket):
     try:
         while True:
             await asyncio.sleep(10)  # Verbindung offen halten
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, asyncio.CancelledError):
         print("[WS] Client disconnected")
-        dashboard_connections.remove(ws)
+        if ws in dashboard_connections:
+            dashboard_connections.remove(ws)
 
 async def notify_dashboard(data: dict):
-    for conn in dashboard_connections:
+    if not dashboard_connections:
+        return
+    for conn in list(dashboard_connections):
         try:
             await conn.send_json(data)
         except Exception:
             pass
+
+
+# ---- Printer Verwaltung (Server-seitig) ----
+def reload_dashboard_printers():
+    """Stoppt alle laufenden Drucker-Services und startet sie entsprechend der DB neu."""
+    stop_printer_service()
+    db = SessionLocal()
+    try:
+        selected = db.query(Printer).filter(Printer.show_on_dashboard == True).all()
+        selected_serials = {p.serial for p in selected}
+        for p in selected:
+            start_printer_service(
+                ip=p.ip,
+                serial=p.serial,
+                access_code=p.access_token,
+                on_push=push_to_dashboard,
+                interval_seconds=15,
+                name=p.name,
+            )
+        # Nicht mehr ausgewählte Stati verwerfen, damit Initial-Fetch sie nicht zurückbringt
+        try:
+            global LATEST_PRINTER_STATUSES
+            for serial in list(LATEST_PRINTER_STATUSES.keys()):
+                if serial not in selected_serials:
+                    del LATEST_PRINTER_STATUSES[serial]
+        except Exception:
+            pass
+        # An Dashboard broadcasten, welche Drucker ausgewählt sind
+        try:
+            selected_list = [{"serial": p.serial, "name": p.name} for p in selected]
+            push_to_dashboard({"event": "printers_selected", "printers": selected_list})
+        except Exception:
+            pass
+    finally:
+        db.close()
 
 # --- DEBUG: Manuell eine WS-Nachricht schicken ---
 @app.get("/_debug/ws-ping")
@@ -138,11 +202,20 @@ async def debug_ws_text():
     await notify_dashboard({"event": "debug", "message": "Hello from server"})
     return {"ok": True}
 
-# API endpoint: Get the latest printer status snapshot
+# API endpoint: Get the latest printer status snapshots (all)
+@app.get("/api/printer_status_all", response_class=JSONResponse)
+def get_printer_status_all():
+    # Liefert den letzten bekannten Status aller Drucker (Map serial -> payload)
+    return LATEST_PRINTER_STATUSES
+
+# (Kompatibilität) Einzelsnapshot (falls legacy-Frontend): nimm beliebigen
 @app.get("/api/printer_status", response_class=JSONResponse)
-def get_printer_status():
-    # Liefert den letzten bekannten Druckerstatus (oder unknown, falls noch keiner empfangen wurde)
-    return LATEST_PRINTER_STATUS or {"state": "unknown"}
+def get_printer_status_single():
+    if not LATEST_PRINTER_STATUSES:
+        return {"state": "unknown"}
+    # gebe den zuletzt aktualisierten (irgendeinen) zurück
+    # Reihenfolge ist in dict nicht garantiert – Ziel: einfache Abwärtskompatibilität
+    return next(iter(LATEST_PRINTER_STATUSES.values()))
 
 # Statische Dateien (HTML, CSS, JS)
 static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "html"))
@@ -532,8 +605,16 @@ def delete_spule_api(
     db.delete(spule)
     db.commit()
 
-    # WebSocket-Dashboard-Benachrichtigung
-    background_tasks.add_task(notify_dashboard, {"event": "spule_deleted", "spule_id": spulen_id})
+    # WebSocket-Dashboard-Benachrichtigung (ohne Starlette BackgroundTasks, um Shutdown zu erleichtern)
+    try:
+        import asyncio as _asyncio
+        if APP_EVENT_LOOP:
+            _asyncio.run_coroutine_threadsafe(
+                notify_dashboard({"event": "spule_deleted", "spule_id": spulen_id}),
+                APP_EVENT_LOOP
+            )
+    except Exception:
+        pass
     return {"detail": f"Spule {spulen_id} wurde gelöscht und Verbrauch von {spule.restmenge}g geloggt"}
 
 
@@ -869,6 +950,57 @@ def serve_settings_html():
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
     return path
+
+
+# ---- Printer CRUD API ----
+@app.get("/api/printers", response_model=List[PrinterRead])
+def list_printers(only_selected: bool = False, db: Session = Depends(get_db)):
+    q = db.query(Printer)
+    if only_selected:
+        q = q.filter(Printer.show_on_dashboard == True)
+    return q.all()
+
+
+@app.post("/api/printers", response_model=PrinterRead)
+def create_printer(pr: PrinterCreate, db: Session = Depends(get_db)):
+    p = Printer(
+        name=pr.name,
+        ip=pr.ip,
+        serial=pr.serial,
+        access_token=pr.access_token,
+        show_on_dashboard=pr.show_on_dashboard,
+    )
+    db.add(p)
+    db.commit()
+    db.refresh(p)
+    # Neu geladen, falls Dashboard-Flag aktiv
+    reload_dashboard_printers()
+    return p
+
+
+@app.patch("/api/printers/{printer_id}", response_model=PrinterRead)
+def update_printer(printer_id: int, pr: PrinterUpdate, db: Session = Depends(get_db)):
+    p = db.get(Printer, printer_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Printer not found")
+    data = pr.dict(exclude_unset=True)
+    for k, v in data.items():
+        setattr(p, k, v)
+    db.commit()
+    db.refresh(p)
+    reload_dashboard_printers()
+    return p
+
+
+@app.delete("/api/printers/{printer_id}")
+def delete_printer(printer_id: int, db: Session = Depends(get_db)):
+    p = db.get(Printer, printer_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="Printer not found")
+    db.delete(p)
+    db.commit()
+    reload_dashboard_printers()
+    return {"detail": "deleted"}
 
 
 # Neuer API-Endpunkt: Statistik für Typen und Spulen
@@ -1218,4 +1350,3 @@ if __name__ == "__main__":
         print(f"➡️  http://{ip}:8000")
 
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
-

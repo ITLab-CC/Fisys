@@ -59,13 +59,17 @@
       <section class="flex-1 pt-2 px-10 pb-10">
         <div class="flex flex-col xl:flex-row gap-8">
           <!-- Seitenmenü -->
-          <aside class="w-full xl:w-1/4 bg-gray-700 border border-gray-600 rounded p-4">
+          <aside class="w-full xl:w-1/4 bg-gray-700 border border-gray-600 rounded p-4 self-start">
             <nav id="einstellungsMenue" class="space-y-4 highlight-container">
               <div id="highlightBar" class="highlight-bar hidden"></div>
               <div>
                 <p class="text-sm font-semibold text-white mb-1">Bildeinstellungen</p>
                 <button data-ziel="bilderVerwaltung" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Bild hochladen</button>
                 <button data-ziel="vorhandeneBilderBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Vorhandene Bilder</button>
+              </div>
+              <div>
+                <p class="text-sm font-semibold text-white mb-1">Drucker</p>
+                <button data-ziel="printerVerwaltungBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Drucker verwalten</button>
               </div>
               <div>
                 <p class="text-sm font-semibold text-white mb-1">Tokens</p>
@@ -81,6 +85,52 @@
 
           <!-- Inhalt -->
           <div class="flex-1 space-y-10">
+            <!-- Drucker verwalten -->
+            <div id="printerVerwaltungBlock" class="hidden bg-gray-700 p-6 rounded shadow max-w-3xl mt-10">
+              <h2 class="text-xl text-white font-semibold mb-4">Drucker</h2>
+              <form id="printerForm" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label class="block text-sm font-medium text-gray-100 mb-1">Name</label>
+                  <input type="text" id="pr-name" class="block w-full text-sm text-gray-200 bg-gray-600 border border-gray-500 rounded px-3 py-2" placeholder="Mein Drucker" required />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-100 mb-1">IP</label>
+                  <input type="text" id="pr-ip" class="block w-full text-sm text-gray-200 bg-gray-600 border border-gray-500 rounded px-3 py-2" placeholder="192.168.1.10" required />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-100 mb-1">Serial</label>
+                  <input type="text" id="pr-serial" class="block w-full text-sm text-gray-200 bg-gray-600 border border-gray-500 rounded px-3 py-2" placeholder="X1C123..." required />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-100 mb-1">Access-Token</label>
+                  <input type="text" id="pr-access" class="block w-full text-sm text-gray-200 bg-gray-600 border border-gray-500 rounded px-3 py-2" placeholder="Access Token" required />
+                </div>
+                <div class="md:col-span-2 flex items-center gap-3 mt-2">
+                  <input type="checkbox" id="pr-show" class="h-4 w-4" checked />
+                  <label for="pr-show" class="text-sm text-gray-100">Auf Dashboard anzeigen</label>
+                </div>
+                <div class="md:col-span-2 mt-2">
+                  <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm">Speichern</button>
+                </div>
+              </form>
+              <div>
+                <h3 class="text-sm font-medium text-white mb-2">Gespeicherte Drucker</h3>
+                <div class="overflow-x-auto">
+                  <table class="min-w-full text-sm text-gray-100 text-left border">
+                    <thead class="bg-gray-600 border-b">
+                      <tr>
+                        <th class="px-4 py-2">Name</th>
+                        <th class="px-4 py-2">IP</th>
+                        <th class="px-4 py-2">Serial</th>
+                        <th class="px-4 py-2">Auf Dashboard</th>
+                        <th class="px-4 py-2">Aktionen</th>
+                      </tr>
+                    </thead>
+                    <tbody id="printerTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
             <!-- Filamentbild hochladen -->
             <div id="bilderVerwaltung" class="hidden bg-gray-700 p-6 rounded shadow max-w-xl mt-10">
               <h2 class="text-xl text-white font-semibold mb-4">Filamentbild hochladen</h2>
@@ -167,7 +217,7 @@
         highlightBar.classList.remove("hidden");
 
         // Bereiche verstecken und Ziel anzeigen
-        const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock"];
+        const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "printerVerwaltungBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock"];
         bereiche.forEach(id => {
           const el = document.getElementById(id);
           if (el) el.classList.add("hidden");
@@ -177,7 +227,7 @@
         if (zielElement) zielElement.classList.remove("hidden");
       });
       // Anfangs alle Bereiche verstecken
-      const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock"];
+      const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "printerVerwaltungBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock"];
       bereiche.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add("hidden");
@@ -360,6 +410,110 @@
       }
 
       ladeBilder();
+
+      // Drucker-Verwaltung
+      const printerForm = document.getElementById("printerForm");
+      const prName = document.getElementById("pr-name");
+      const prIp = document.getElementById("pr-ip");
+      const prSerial = document.getElementById("pr-serial");
+      const prAccess = document.getElementById("pr-access");
+      const prShow = document.getElementById("pr-show");
+      const prTableBody = document.getElementById("printerTableBody");
+
+      async function ladePrinter() {
+        try {
+          const res = await fetch('/api/printers');
+          const list = await res.json();
+          prTableBody.innerHTML = '';
+          (list || []).forEach(p => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b';
+            tr.innerHTML = `
+              <td class="px-4 py-2">${p.name}</td>
+              <td class="px-4 py-2">${p.ip}</td>
+              <td class="px-4 py-2">${p.serial}</td>
+              <td class="px-4 py-2">
+                <label class="inline-flex items-center gap-2">
+                  <input type="checkbox" ${p.show_on_dashboard ? 'checked' : ''} data-action="toggle" data-id="${p.id}" class="h-4 w-4" />
+                  <span>anzeigen</span>
+                </label>
+              </td>
+              <td class="px-4 py-2 space-x-2">
+                <button data-action="delete" data-id="${p.id}" class="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700">Löschen</button>
+              </td>`;
+            prTableBody.appendChild(tr);
+          });
+
+          // Events zuweisen
+          prTableBody.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', async (e) => {
+              const id = e.target.dataset.id;
+              const checked = e.target.checked;
+              try {
+                const res = await fetch(`/api/printers/${id}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ show_on_dashboard: checked })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                zeigeBenachrichtigung('Drucker aktualisiert', 'blue');
+              } catch (err) {
+                zeigeBenachrichtigung('Fehler beim Aktualisieren', 'red');
+              }
+            });
+          });
+
+          prTableBody.querySelectorAll('button[data-action="delete"]').forEach(btn => {
+            btn.addEventListener('click', () => {
+              const id = btn.dataset.id;
+              zeigePopup('Drucker wirklich löschen?', async () => {
+                try {
+                  const res = await fetch(`/api/printers/${id}`, { method: 'DELETE' });
+                  if (!res.ok) throw new Error(await res.text());
+                  zeigeBenachrichtigung('Drucker gelöscht', 'blue');
+                  ladePrinter();
+                } catch (err) {
+                  zeigeBenachrichtigung('Fehler beim Löschen', 'red');
+                }
+              });
+            });
+          });
+        } catch (err) {
+          console.error('Fehler beim Laden der Drucker', err);
+        }
+      }
+
+      if (printerForm) {
+        printerForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          try {
+            const res = await fetch('/api/printers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: prName.value.trim(),
+                ip: prIp.value.trim(),
+                serial: prSerial.value.trim(),
+                access_token: prAccess.value.trim(),
+                show_on_dashboard: !!prShow.checked
+              })
+            });
+            if (!res.ok) throw new Error(await res.text());
+            prName.value = '';
+            prIp.value = '';
+            prSerial.value = '';
+            prAccess.value = '';
+            prShow.checked = true;
+            zeigeBenachrichtigung('Drucker gespeichert', 'blue');
+            ladePrinter();
+          } catch (err) {
+            console.error('Fehler beim Speichern des Druckers', err);
+            zeigeBenachrichtigung('Fehler beim Speichern', 'red');
+          }
+        });
+        // Beim Start die Liste laden
+        ladePrinter();
+      }
 
       function zeigePopup(text, onConfirm) {
         const overlay = document.getElementById("popupOverlay");

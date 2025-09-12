@@ -8,7 +8,7 @@
     <!-- Weitere Meta-Tags und Links -->
     <style>
       /* Ruhiger Balken + dezenter Shimmer, robust gegen häufige Updates */
-      #ps-progress {
+      .ps-progress {
         position: relative;
         overflow: hidden;
         /* Nur Breiten-Transition, damit Animation nicht beeinflusst wird */
@@ -24,7 +24,7 @@
       }
       /* Separate Overlay-Child statt ::after, damit Parent-Style-Änderungen
          (width) die Animation nicht neu starten */
-      #ps-progress .shimmer {
+      .ps-progress .shimmer {
         content: "";
         position: absolute;
         top: 0; bottom: 0;
@@ -46,7 +46,7 @@
         0%   { background-position: 145% 0; }
         100% { background-position: -70% 0; }
       }
-      #ps-progress.anim-shimmer {
+      .ps-progress.anim-shimmer {
         background-image: linear-gradient(90deg,
           rgba(255,255,255,0),
           rgba(0, 255, 13, 0.731),
@@ -59,7 +59,7 @@
         animation-play-state: paused;
         background-blend-mode: lighten;
       }
-      #ps-progress.anim-shimmer.shimmer-running { animation-play-state: running; }
+      .ps-progress.anim-shimmer.shimmer-running { animation-play-state: running; }
       /* removed overlay styles */
 
       /* Pulsierender grüner Balken, wenn Status = FINISH */
@@ -68,7 +68,7 @@
         50%  { background-color: #00ff5e; box-shadow: 0 0 12px 6px rgba(34,197,94,0.45); }
         100% { background-color: #16a34a; box-shadow: 0 0 0 0 rgba(34,197,94,0.55); }
       }
-      #ps-progress.finish-pulse {
+      .ps-progress.finish-pulse {
         /* Überschreibt Shimmer-Hintergrund und setzt grünes Pulsieren */
         background-image: none !important;
         animation: finish-pulse 1.8s ease-in-out infinite;
@@ -126,37 +126,7 @@
 
     <div>
       <h2 class="text-xl font-semibold mb-4">Druckerstatus</h2>
-      <div id="printer-status" class="bg-gray-700 p-5 rounded-xl shadow-sm">
-        <div class="flex flex-col gap-3">
-          <!-- Zeile 1: Name links, Status & ETA rechts -->
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex items-baseline gap-3">
-              <div id="ps-name" class="text-base font-medium text-white">—</div>
-            </div>
-            <div class="flex items-center gap-4">
-              <div id="ps-state" class="text-sm font-semibold text-white">—</div>
-              <div id="ps-eta" class="text-sm text-white"></div>
-            </div>
-          </div>
-
-          <!-- Zeile 2: Fortschritt mit Prozent rechtsbündig -->
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <div class="text-sm text-gray-200">Fortschritt</div>
-              <div id="ps-progress-label" class="text-xs text-gray-200">0%</div>
-            </div>
-            <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div id="ps-progress" class="h-full bg-blue-600 rounded-full" style="width: 0%"></div>
-            </div>
-          </div>
-
-          <!-- Zeile 3: Job (mit Truncate) -->
-          <div class="flex items-baseline gap-3">
-            <div class="text-sm text-white">Job</div>
-            <div id="ps-job" class="text-base font-medium text-gray-300 truncate max-w-full">—</div>
-          </div>
-        </div>
-      </div>
+      <div id="printer-status-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
       <div id="printer-status-hint" class="text-xs text-gray-200 mt-2">Warte auf Status vom Drucker …</div>
     </div>
 
@@ -199,6 +169,7 @@
 </body>
   <script>
     let ws;
+    let selectedPrinterSerials = new Set();
     function connectWS() {
       const proto = (location.protocol === 'https:') ? 'wss' : 'ws';
       ws = new WebSocket(`${proto}://${location.host}/ws/dashboard`);
@@ -216,6 +187,11 @@
           return; // restliche Dashboard-Events überspringen
         }
         console.log('[Live-Update]', data);
+        if (data && data.event === 'printers_selected' && Array.isArray(data.printers)) {
+          selectedPrinterSerials = new Set(data.printers.map(p => p.serial));
+          syncPrinterCards(data.printers);
+          return;
+        }
         if (data.event === 'spule_created' || data.event === 'spule_deleted') {
           loadDashboardDetails();
         } else if (data.event === 'spule_updated') {
@@ -259,32 +235,67 @@
     }
     connectWS();
 
+    function ensurePrinterCard(serial, name) {
+      const container = document.getElementById('printer-status-container');
+      if (!container) return null;
+      let card = container.querySelector(`.ps-card[data-serial="${serial}"]`);
+      if (card) return card;
+      card = document.createElement('div');
+      card.className = 'ps-card bg-gray-700 p-5 rounded-xl shadow-sm';
+      card.dataset.serial = serial;
+      card.innerHTML = `
+        <div class=\"mt-1 space-y-3\">\n          <div class=\"flex items-center justify-between gap-4\">\n            <div class=\"flex items-baseline gap-3\">\n              <div class=\"ps-name text-base font-medium text-white\">${name || '—'}</div>\n            </div>\n            <div class=\"flex items-center gap-4\">\n              <div class=\"ps-state text-sm font-semibold text-white\">—</div>\n              <div class=\"ps-eta text-sm text-white\"></div>\n            </div>\n          </div>\n          <div>\n            <div class=\"flex items-center justify-between mb-1\">\n              <div class=\"text-sm text-gray-200\">Fortschritt</div>\n              <div class=\"ps-progress-label text-xs text-gray-200\">0%</div>\n            </div>\n            <div class=\"w-full h-3 bg-gray-200 rounded-full overflow-hidden\">\n              <div class=\"ps-progress h-full bg-blue-600 rounded-full\" style=\"width: 0%\"></div>\n            </div>\n          </div>\n          <div class=\"flex items-baseline gap-3\">\n            <div class=\"text-sm text-white\">Job</div>\n            <div class=\"ps-job text-base font-medium text-gray-300 truncate max-w-full\">—</div>\n          </div>\n        </div>`;
+      container.appendChild(card);
+      return card;
+    }
+
+    function syncPrinterCards(printers) {
+      const container = document.getElementById('printer-status-container');
+      if (!container) return;
+      const selected = new Set((printers || []).map(p => p.serial));
+      // Entferne Karten, die nicht mehr ausgewählt sind
+      container.querySelectorAll('.ps-card').forEach(card => {
+        const serial = card.dataset.serial;
+        if (serial && !selected.has(serial)) {
+          card.remove();
+        }
+      });
+      // Stelle sicher, dass ausgewählte vorhanden sind
+      (printers || []).forEach(p => ensurePrinterCard(p.serial, p.name));
+    }
+
     function updatePrinterStatus(p) {
       const hint = document.getElementById("printer-status-hint");
       if (hint) hint.textContent = "Live verbunden.";
 
-      const nameEl = document.getElementById("ps-name");
-      const jobEl = document.getElementById("ps-job");
-      const bar = document.getElementById("ps-progress");
-      const barLbl = document.getElementById("ps-progress-label");
-      const stateEl = document.getElementById("ps-state");
-      const etaEl = document.getElementById("ps-eta");
+      const serial = p.serial || p.printer_serial || 'unknown';
+      if (selectedPrinterSerials.size && !selectedPrinterSerials.has(serial)) {
+        // ignorieren, wenn nicht (mehr) ausgewählt
+        return;
+      }
+      const name = p.model ?? p.printer_name ?? p.name ?? "Bambu X1C";
+      const card = ensurePrinterCard(serial, name);
+      if (!card) return;
 
+      const nameEl = card.querySelector('.ps-name');
+      const jobEl = card.querySelector('.ps-job');
+      const bar = card.querySelector('.ps-progress');
+      const barLbl = card.querySelector('.ps-progress-label');
+      const stateEl = card.querySelector('.ps-state');
+      const etaEl = card.querySelector('.ps-eta');
       if (!nameEl || !jobEl || !bar || !barLbl || !stateEl || !etaEl) return;
 
-      const printerName = p.model ?? p.printer_name ?? p.name ?? "Bambu X1C";
-      nameEl.textContent = printerName;
+      nameEl.textContent = name;
       if (p.job_name) {
         const truncated = p.job_name.length > 30 ? p.job_name.slice(0, 30) + "…" : p.job_name;
         jobEl.textContent = truncated;
       } else {
-        jobEl.textContent = (p.state === "printing" ? "(Unbenannter Job)" : "—");
+        jobEl.textContent = (String(p.state).toLowerCase().includes('print') ? "(Unbenannter Job)" : "—");
       }
 
       let prog = Number(p.percent ?? 0);
       if (!isFinite(prog) || prog < 0) prog = 0;
       if (prog > 100) prog = 100;
-      // Nur bei geänderter Ganzzahl-Prozentzahl updaten, um Animation zu schonen
       const intProg = Math.round(isFinite(prog) ? prog : 0);
       const lastInt = Number(bar.dataset.lastProgInt ?? "-1");
       if (intProg !== lastInt) {
@@ -297,30 +308,35 @@
       stateEl.textContent = stateTxt;
       etaEl.textContent = `${p.eta_min != null ? p.eta_min + " min" : ""}`;
 
-      // Statusfarbe
-      stateEl.classList.remove("text-blue-400","text-green-400","text-red-400","text-yellow-400","text-gray-200");
+      stateEl.classList.remove("text-blue-400","text-green-400","text-red-400","text-yellow-400","text-gray-200","text-white");
       let cls = "text-white";
-      if (stateTxt === "RUNNING") cls = "text-blue-400";
-      else if (stateTxt === "PAUSE") cls = "text-yellow-400";
-      else if (stateTxt === "FINISH") cls = "text-green-400";
-      else if (stateTxt === "FAILED" || stateTxt === "ERROR") cls = "text-red-400";
+      if (stateTxt === "RUNNING" || /print|run/i.test(stateTxt)) cls = "text-blue-400";
+      else if (/pause/i.test(stateTxt)) cls = "text-yellow-400";
+      else if (/finish|done/i.test(stateTxt)) cls = "text-green-400";
+      else if (/fail|error/i.test(stateTxt)) cls = "text-red-400";
       stateEl.classList.add(cls);
 
-      // Basis-Klasse einmalig setzen; Startposition bleibt deterministisch
       if (!bar.classList.contains('anim-shimmer')) {
         bar.classList.add('anim-shimmer');
       }
-      // FINISH: grüner, pulsierender Balken
-      bar.classList.toggle('finish-pulse', stateTxt === 'FINISH');
-      // Nur Play-State schalten, um Neustarts zu vermeiden
+      bar.classList.toggle('finish-pulse', /finish|done/i.test(stateTxt));
       const isRunning = (intProg > 0 && intProg < 100) || /run|print/i.test(stateTxt);
       bar.classList.toggle('shimmer-running', !!isRunning);
     }
 
-    // Initialer REST-Fetch, um den letzten bekannten Druckerstatus vor WS-Events anzuzeigen
-    fetch('/api/printer_status')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) updatePrinterStatus(data); })
+    // Initial: ausgewählte Drucker vorab rendern
+    fetch('/api/printers?only_selected=1')
+      .then(r => r.ok ? r.json() : [])
+      .then(list => {
+        selectedPrinterSerials = new Set((list || []).map(p => p.serial));
+        (list || []).forEach(p => ensurePrinterCard(p.serial, p.name));
+      })
+      .catch(() => {});
+
+    // Letzte bekannte Stati einblenden
+    fetch('/api/printer_status_all')
+      .then(r => r.ok ? r.json() : {})
+      .then(map => { Object.values(map || {}).forEach(updatePrinterStatus); })
       .catch(() => {});
 
     async function loadDashboardDetails() {
