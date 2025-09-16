@@ -196,40 +196,13 @@
           loadDashboardDetails();
         } else if (data.event === 'spule_updated') {
           const edited = document.querySelector('#last-edited-spools');
+          if (!edited) return;
           fetch('/api/dashboard-details')
             .then(res => res.json())
             .then(data => {
-              edited.innerHTML = '';
-              data.letzte_spulen
-                .filter(s => {
-                  const created = new Date(s.created_at).getTime();
-                  const updated = new Date(s.updated_at).getTime();
-                  return updated > created;
-                })
-                .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-                .slice(0, 3)
-                .forEach(s => {
-                  const diff = s.alt_gewicht - s.neu_gewicht;
-                  const color = diff >= 100 ? 'text-red-500' : diff >= 50 ? 'text-yellow-500' : 'text-green-600';
-                  const datum = new Date(s.updated_at).toLocaleDateString('de-DE');
-                  edited.innerHTML += `
-                    <div class="relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
-                      <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-200 select-none pointer-events-none">
-                        ID: ${s.spulen_id}
-                      </div>
-                      <div class="flex justify-between items-center">
-                        <div class="text-sm font-semibold text-white">${s.typ_name} (${s.material}, ${s.farbe})</div>
-                        <div class="text-xs text-gray-200 ml-2">${datum}</div>
-                      </div>
-                      <div class="flex justify-between items-center text-xs text-gray-100 space-x-2">
-                        <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
-                        <div class="flex-1 text-center ${color} font-semibold">–${diff} g</div>
-                        <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
-                      </div>
-                    </div>
-                  `;
-                });
-            });
+              renderEditedSpools(data.letzte_spulen, edited);
+            })
+            .catch(() => {});
         }
       };
     }
@@ -339,6 +312,68 @@
       .then(map => { Object.values(map || {}).forEach(updatePrinterStatus); })
       .catch(() => {});
 
+    function toNumber(value) {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function pickEditedSpools(spools) {
+      const list = Array.isArray(spools) ? spools.slice() : [];
+      const changed = list.filter(s => {
+        const alt = toNumber(s && s.alt_gewicht);
+        const neu = toNumber(s && s.neu_gewicht);
+        if (alt !== null && neu !== null && alt !== neu) {
+          return true;
+        }
+        if (!s || !s.updated_at || !s.created_at) {
+          return false;
+        }
+        return new Date(s.updated_at).getTime() > new Date(s.created_at).getTime();
+      });
+      const relevant = changed.length ? changed : list;
+      return relevant.slice(0, 3);
+    }
+
+    function renderEditedSpools(spools, container) {
+      if (!container) return;
+      const entries = pickEditedSpools(spools);
+      container.innerHTML = '';
+      if (!entries.length) {
+        container.innerHTML = '<div class="text-gray-400 italic">Noch keine Änderungen.</div>';
+        return;
+      }
+      const toTime = (value) => value ? new Date(value).getTime() : 0;
+      entries
+        .sort((a, b) => toTime(b.updated_at ?? b.created_at) - toTime(a.updated_at ?? a.created_at))
+        .forEach(s => {
+          const alt = toNumber(s.alt_gewicht) ?? 0;
+          const neu = toNumber(s.neu_gewicht) ?? 0;
+          const diff = alt - neu;
+          const diffDisplay = Math.abs(diff);
+          const diffPrefix = diff >= 0 ? '–' : '+';
+          const color = diff >= 100 ? 'text-red-500' : diff >= 50 ? 'text-yellow-500' : 'text-green-600';
+          const datumQuelle = s.updated_at ?? s.created_at;
+          const datum = datumQuelle ? new Date(datumQuelle).toLocaleDateString('de-DE') : '';
+          container.innerHTML += `
+            <div class="relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-200 select-none pointer-events-none">
+                ID: ${s.spulen_id}
+              </div>
+              <div class="flex justify-between items-center">
+                <div class="text-sm font-semibold text-white">${s.typ_name} (${s.material}, ${s.farbe})</div>
+                <div class="text-xs text-gray-200 ml-2">${datum}</div>
+              </div>
+              <div class="flex justify-between items-center text-xs text-gray-100 space-x-2">
+                <div class="flex-1 text-left">Alt: ${alt} g</div>
+                <div class="flex-1 text-center ${color} font-semibold">${diffPrefix}${diffDisplay} g</div>
+                <div class="flex-1 text-right">Neu: ${neu} g</div>
+              </div>
+            </div>
+          `;
+        });
+    }
+
     async function loadDashboardDetails() {
       const res = await fetch("/api/dashboard-details");
       const data = await res.json();
@@ -352,36 +387,7 @@
       const edited = document.querySelector("#last-edited-spools");
       const added = document.querySelector("#new-spools");
 
-      edited.innerHTML = "";
-      data.letzte_spulen
-        .filter(s => {
-          const created = new Date(s.created_at).getTime();
-          const updated = new Date(s.updated_at).getTime();
-          return updated > created;
-        })
-        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-        .slice(0, 3)
-        .forEach(s => {
-          const diff = s.alt_gewicht - s.neu_gewicht;
-          const color = diff >= 100 ? "text-red-500" : diff >= 50 ? "text-yellow-500" : "text-green-600";
-          const datum = new Date(s.updated_at).toLocaleDateString("de-DE");
-          edited.innerHTML += `
-            <div class="relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
-              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-200 select-none pointer-events-none">
-                ID: ${s.spulen_id}
-              </div>
-              <div class="flex justify-between items-center">
-                <div class="text-sm font-semibold text-white">${s.typ_name} (${s.material}, ${s.farbe})</div>
-                <div class="text-xs text-gray-200 ml-2">${datum}</div>
-              </div>
-              <div class="flex justify-between items-center text-xs text-gray-100 space-x-2">
-                <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
-                <div class="flex-1 text-center ${color} font-semibold">–${diff} g</div>
-                <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
-              </div>
-            </div>
-          `;
-        });
+      renderEditedSpools(data.letzte_spulen, edited);
 
       added.innerHTML = "";
       (data.neue_spulen || [])
