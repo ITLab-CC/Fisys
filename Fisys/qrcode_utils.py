@@ -16,7 +16,7 @@ def generate_qrcode_for_spule(spule):
     if os.path.exists(filepath):
         return
 
-    qr_data = f"https://fisys.it-lab.cc/typ/{spule.typ_id}/id{spule.spulen_id}"
+    qr_data = f"https://fisys.it-lab.cc/spulen.html?spule_id={spule.spulen_id}"
     img = qrcode.make(qr_data, image_factory=PilImage)
     img.save(filepath)
     print(f"📷 QR-Code erstellt für Spule {spule.spulen_id}: {filepath}")

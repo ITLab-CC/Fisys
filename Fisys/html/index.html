@@ -1,13 +1,81 @@
 <!DOCTYPE html>
 <html lang="de">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fisys - Filamentverwaltung</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Weitere Meta-Tags und Links -->
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard | Fisys</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Weitere Meta-Tags und Links -->
+    <style>
+      /* Ruhiger Balken + dezenter Shimmer, robust gegen häufige Updates */
+      .ps-progress {
+        position: relative;
+        overflow: hidden;
+        /* Nur Breiten-Transition, damit Animation nicht beeinflusst wird */
+        transition: width .5s ease-out;
+        min-width: 6px;
+      }
+      @keyframes progress-shimmer {
+        0%   { transform: translateX(-100%); opacity: 0; }
+        15%  { opacity: .32; }
+        50%  { opacity: .20; }
+        85%  { opacity: 0; }
+        100% { transform: translateX(200%); opacity: 0; }
+      }
+      /* Separate Overlay-Child statt ::after, damit Parent-Style-Änderungen
+         (width) die Animation nicht neu starten */
+      .ps-progress .shimmer {
+        content: "";
+        position: absolute;
+        top: 0; bottom: 0;
+        left: 0; width: 45%;
+        min-width: 32px; /* Bei sehr kleinem Fortschritt sichtbar bleiben */
+        background: linear-gradient(90deg,
+          rgba(255,255,255,0),
+          rgba(0, 255, 13, 0.5),
+          rgba(255, 0, 0, 0)
+        );
+        transform: translateX(0%);
+        animation: progress-shimmer 3s linear infinite;
+        pointer-events: none;
+        opacity: 0; /* per JS ein-/ausblenden */
+      }
+      /* overlay deprecated */
+      /* Background-basierter Shimmer, startet sofort (negativer Offset) */
+      @keyframes shimmer-bg {
+        0%   { background-position: 145% 0; }
+        100% { background-position: -70% 0; }
+      }
+      .ps-progress.anim-shimmer {
+        background-image: linear-gradient(90deg,
+          rgba(255,255,255,0),
+          rgba(0, 255, 13, 0.731),
+          rgba(255,255,255,0)
+        );
+        background-size: 300% 100%;
+        background-position: 500% 0%; /* definierter Startpunkt */
+        background-repeat: no-repeat;
+        animation: shimmer-bg 3s linear infinite;
+        animation-play-state: paused;
+        background-blend-mode: lighten;
+      }
+      .ps-progress.anim-shimmer.shimmer-running { animation-play-state: running; }
+      /* removed overlay styles */
+
+      /* Pulsierender grüner Balken, wenn Status = FINISH */
+      @keyframes finish-pulse {
+        0%   { background-color: #16a34a; box-shadow: 0 0 0 0 rgba(34,197,94,0.55); }
+        50%  { background-color: #00ff5e; box-shadow: 0 0 12px 6px rgba(34,197,94,0.45); }
+        100% { background-color: #16a34a; box-shadow: 0 0 0 0 rgba(34,197,94,0.55); }
+      }
+      .ps-progress.finish-pulse {
+        /* Überschreibt Shimmer-Hintergrund und setzt grünes Pulsieren */
+        background-image: none !important;
+        animation: finish-pulse 1.8s ease-in-out infinite;
+      }
+    </style>
+  </head>
+<body class="bg-gray-800 min-h-screen">
   <aside class="fixed top-0 left-0 h-full w-64 bg-[#0f172a] text-white flex flex-col justify-between">
     <div>
       <div class="pt-1 pb-1">
@@ -30,30 +98,36 @@
     </div>
   </aside>
 
-  <main class="ml-64 p-10 bg-gray-50 min-h-screen text-gray-900 space-y-10">
+  <main class="ml-64 p-10 bg-gray-800 min-h-screen text-gray-100 space-y-10">
     <header>
       <h1 class="text-3xl font-bold">Dashboard</h1>
-      <p class="text-sm text-gray-500 mt-1">Willkommen im Fisys-System zur Filamentverwaltung.</p>
+      <p class="text-sm text-gray-200 mt-1">Willkommen im Fisys-System zur Filamentverwaltung.</p>
     </header>
 
     <!-- KPIs -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-white p-5 rounded-xl shadow-sm">
-        <div class="text-xs text-gray-500">Filamenttypen</div>
-        <div class="text-2xl font-semibold mt-1 rolling-number text-blue-600" data-color="text-blue-600"></div>
+      <div class="bg-gray-700 p-5 rounded-xl shadow-sm">
+        <div class="text-xs text-white">Filamenttypen</div>
+        <div class="text-2xl font-semibold mt-1 rolling-number text-blue-300" data-color="text-blue-300"></div>
       </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm">
-        <div class="text-xs text-gray-500">Spulen</div>
-        <div class="text-2xl font-semibold mt-1 rolling-number text-green-600" data-color="text-green-600"></div>
+      <div class="bg-gray-700 p-5 rounded-xl shadow-sm">
+        <div class="text-xs text-white">Spulen</div>
+        <div class="text-2xl font-semibold mt-1 rolling-number text-green-300" data-color="text-green-300"></div>
       </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm">
-        <div class="text-xs text-gray-500">Fast leere Typen</div>
-        <div class="text-2xl font-semibold mt-1 rolling-number text-red-500" data-color="text-red-500"></div>
+      <div class="bg-gray-700 p-5 rounded-xl shadow-sm">
+        <div class="text-xs text-white">Fast leere Typen</div>
+        <div class="text-2xl font-semibold mt-1 rolling-number text-red-400" data-color="text-red-400"></div>
       </div>
-      <div class="bg-white p-5 rounded-xl shadow-sm">
-        <div class="text-xs text-gray-500">Verbrauch (7 Tage)</div>
-        <div class="text-2xl font-semibold mt-1 rolling-number text-orange-500" data-color="text-orange-500"></div>
+      <div class="bg-gray-700 p-5 rounded-xl shadow-sm">
+        <div class="text-xs text-white">Verbrauch (7 Tage)</div>
+        <div class="text-2xl font-semibold mt-1 rolling-number text-orange-300" data-color="text-orange-300"></div>
       </div>
+    </div>
+
+    <div>
+      <h2 class="text-xl font-semibold mb-4">Druckerstatus</h2>
+      <div id="printer-status-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+      <div id="printer-status-hint" class="text-xs text-gray-200 mt-2">Warte auf Status vom Drucker …</div>
     </div>
 
     <div>
@@ -65,14 +139,14 @@
     <div>
       <h2 class="text-xl font-semibold mb-4">Letzte Änderungen</h2>
       <div class="flex flex-col md:flex-row gap-4 items-stretch">
-        <div class="bg-white p-4 rounded-xl shadow-sm flex-1">
-          <h3 class="text-sm font-medium text-gray-800 mb-2">Zuletzt bearbeitete Spulen</h3>
+        <div class="bg-gray-700 p-4 rounded-xl shadow-sm flex-1">
+          <h3 class="text-sm font-medium text-white mb-2">Zuletzt bearbeitete Spulen</h3>
           <div id="last-edited-spools" class="space-y-3 text-sm text-gray-600">
-            <div class="text-gray-400 italic">Lade letzte Änderungen …</div>
+            <div class="text-white italic">Lade letzte Änderungen …</div>
           </div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm flex-1">
-          <h3 class="text-sm font-medium text-gray-800 mb-2">Neu hinzugefügte Spulen</h3>
+        <div class="bg-gray-700 p-4 rounded-xl shadow-sm flex-1">
+          <h3 class="text-sm font-medium text-white mb-2">Neu hinzugefügte Spulen</h3>
           <div id="new-spools" class="space-y-3 text-sm text-gray-600">
             <div class="text-gray-400 italic">Lade neue Spulen …</div>
           </div>
@@ -83,84 +157,254 @@
     <!-- Platz für geplante Funktionen oder Hinweise -->
     <div>
       <h2 class="text-xl font-semibold mb-4">Hinweise &amp; Geplante Funktionen</h2>
-      <div class="bg-white p-4 rounded-xl shadow-sm text-gray-600 text-sm">
+      <div class="bg-gray-700 p-4 rounded-xl shadow-sm text-white text-sm">
         <ul class="list-disc pl-5 space-y-1">
           <li>Erweiterte Statistiken und Filtermöglichkeiten</li>
           <li>Benachrichtigungen bei fast leerem Filament</li>
-          <li>Integration mit Druckaufträgen</li>
-          <li>Mehrsprachigkeit</li>
+          <li>Diverse Bugfixes und Verbesserungen</li>
         </ul>
       </div>
     </div>
   </main>
 </body>
   <script>
-    const ws = new WebSocket(`ws://${location.host}/ws/dashboard`);
+    let ws;
+    let selectedPrinterSerials = new Set();
+    function connectWS() {
+      const proto = (location.protocol === 'https:') ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}/ws/dashboard`);
+      ws.onopen = () => console.log('WebSocket verbunden mit Dashboard');
+      ws.onclose = () => {
+        console.log('Verbindung zum Dashboard-WebSocket getrennt');
+        setTimeout(connectWS, 1500); // einfacher Reconnect
+      };
+      ws.onerror = (err) => console.error('WebSocket-Fehler:', err);
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        // Druckerstatus-Events vom Backend (printer_service push)
+        if (data && ("serial" in data || "percent" in data || "eta_min" in data)) {
+          updatePrinterStatus(data);
+          return; // restliche Dashboard-Events überspringen
+        }
+        console.log('[Live-Update]', data);
+        if (data && data.event === 'printers_selected' && Array.isArray(data.printers)) {
+          selectedPrinterSerials = new Set(data.printers.map(p => p.serial));
+          syncPrinterCards(data.printers);
+          return;
+        }
+        if (data.event === 'spule_created' || data.event === 'spule_deleted') {
+          loadDashboardDetails();
+        } else if (data.event === 'spule_updated') {
+          const edited = document.querySelector('#last-edited-spools');
+          if (!edited) return;
+          fetch('/api/dashboard-details')
+            .then(res => res.json())
+            .then(data => {
+              renderEditedSpools(data.letzte_spulen, edited);
+            })
+            .catch(() => {});
+        }
+      };
+    }
+    connectWS();
 
-    ws.onopen = () => console.log("✅ WebSocket verbunden mit Dashboard");
-    ws.onclose = () => console.log("❌ Verbindung zum Dashboard-WebSocket getrennt");
-    ws.onerror = (err) => console.error("WebSocket-Fehler:", err);
+    function ensurePrinterCard(serial, name) {
+      const container = document.getElementById('printer-status-container');
+      if (!container) return null;
+      let card = container.querySelector(`.ps-card[data-serial="${serial}"]`);
+      if (card) return card;
+      card = document.createElement('div');
+      card.className = 'ps-card bg-gray-700 p-5 rounded-xl shadow-sm';
+      card.dataset.serial = serial;
+      card.innerHTML = `
+        <div class=\"mt-1 space-y-3\">\n          <div class=\"flex items-center justify-between gap-4\">\n            <div class=\"flex items-baseline gap-3\">\n              <div class=\"ps-name text-base font-medium text-white\">${name || '—'}</div>\n            </div>\n            <div class=\"flex items-center gap-4\">\n              <div class=\"ps-state text-sm font-semibold text-white\">—</div>\n              <div class=\"ps-eta text-sm text-white\"></div>\n            </div>\n          </div>\n          <div>\n            <div class=\"flex items-center justify-between mb-1\">\n              <div class=\"text-sm text-gray-200\">Fortschritt</div>\n              <div class=\"ps-progress-label text-xs text-gray-200\">0%</div>\n            </div>\n            <div class=\"w-full h-3 bg-gray-200 rounded-full overflow-hidden\">\n              <div class=\"ps-progress h-full bg-blue-600 rounded-full\" style=\"width: 0%\"></div>\n            </div>\n          </div>\n          <div class=\"flex items-baseline gap-3\">\n            <div class=\"text-sm text-white\">Job</div>\n            <div class=\"ps-job text-base font-medium text-gray-300 truncate max-w-full\">—</div>\n          </div>\n        </div>`;
+      container.appendChild(card);
+      return card;
+    }
+
+    function syncPrinterCards(printers) {
+      const container = document.getElementById('printer-status-container');
+      if (!container) return;
+      const selected = new Set((printers || []).map(p => p.serial));
+      // Entferne Karten, die nicht mehr ausgewählt sind
+      container.querySelectorAll('.ps-card').forEach(card => {
+        const serial = card.dataset.serial;
+        if (serial && !selected.has(serial)) {
+          card.remove();
+        }
+      });
+      // Stelle sicher, dass ausgewählte vorhanden sind
+      (printers || []).forEach(p => ensurePrinterCard(p.serial, p.name));
+    }
+
+    function updatePrinterStatus(p) {
+      const hint = document.getElementById("printer-status-hint");
+      if (hint) hint.textContent = "Live verbunden.";
+
+      const serial = p.serial || p.printer_serial || 'unknown';
+      if (selectedPrinterSerials.size && !selectedPrinterSerials.has(serial)) {
+        // ignorieren, wenn nicht (mehr) ausgewählt
+        return;
+      }
+      const name = p.model ?? p.printer_name ?? p.name ?? "Bambu X1C";
+      const card = ensurePrinterCard(serial, name);
+      if (!card) return;
+
+      const nameEl = card.querySelector('.ps-name');
+      const jobEl = card.querySelector('.ps-job');
+      const bar = card.querySelector('.ps-progress');
+      const barLbl = card.querySelector('.ps-progress-label');
+      const stateEl = card.querySelector('.ps-state');
+      const etaEl = card.querySelector('.ps-eta');
+      if (!nameEl || !jobEl || !bar || !barLbl || !stateEl || !etaEl) return;
+
+      nameEl.textContent = name;
+      if (p.job_name) {
+        const truncated = p.job_name.length > 30 ? p.job_name.slice(0, 30) + "…" : p.job_name;
+        jobEl.textContent = truncated;
+      } else {
+        jobEl.textContent = (String(p.state).toLowerCase().includes('print') ? "(Unbenannter Job)" : "—");
+      }
+
+      let prog = Number(p.percent ?? 0);
+      if (!isFinite(prog) || prog < 0) prog = 0;
+      if (prog > 100) prog = 100;
+      const intProg = Math.round(isFinite(prog) ? prog : 0);
+      const lastInt = Number(bar.dataset.lastProgInt ?? "-1");
+      if (intProg !== lastInt) {
+        bar.style.width = intProg + "%";
+        bar.dataset.lastProgInt = String(intProg);
+        barLbl.textContent = intProg + "%";
+      }
+
+      const stateTxt = String(p.state ?? "—");
+      stateEl.textContent = stateTxt;
+      etaEl.textContent = `${p.eta_min != null ? p.eta_min + " min" : ""}`;
+
+      stateEl.classList.remove("text-blue-400","text-green-400","text-red-400","text-yellow-400","text-gray-200","text-white");
+      let cls = "text-white";
+      if (stateTxt === "RUNNING" || /print|run/i.test(stateTxt)) cls = "text-blue-400";
+      else if (/pause/i.test(stateTxt)) cls = "text-yellow-400";
+      else if (/finish|done/i.test(stateTxt)) cls = "text-green-400";
+      else if (/fail|error/i.test(stateTxt)) cls = "text-red-400";
+      stateEl.classList.add(cls);
+
+      if (!bar.classList.contains('anim-shimmer')) {
+        bar.classList.add('anim-shimmer');
+      }
+      bar.classList.toggle('finish-pulse', /finish|done/i.test(stateTxt));
+      const isRunning = (intProg > 0 && intProg < 100) || /run|print/i.test(stateTxt);
+      bar.classList.toggle('shimmer-running', !!isRunning);
+    }
+
+    // Initial: ausgewählte Drucker vorab rendern
+    fetch('/api/printers?only_selected=1')
+      .then(r => r.ok ? r.json() : [])
+      .then(list => {
+        selectedPrinterSerials = new Set((list || []).map(p => p.serial));
+        (list || []).forEach(p => ensurePrinterCard(p.serial, p.name));
+      })
+      .catch(() => {});
+
+    // Letzte bekannte Stati einblenden
+    fetch('/api/printer_status_all')
+      .then(r => r.ok ? r.json() : {})
+      .then(map => { Object.values(map || {}).forEach(updatePrinterStatus); })
+      .catch(() => {});
+
+    function toNumber(value) {
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function pickEditedSpools(spools) {
+      const list = Array.isArray(spools) ? spools.slice() : [];
+      const changed = list.filter(s => {
+        const alt = toNumber(s && s.alt_gewicht);
+        const neu = toNumber(s && s.neu_gewicht);
+        if (alt !== null && neu !== null && alt !== neu) {
+          return true;
+        }
+        if (!s || !s.updated_at || !s.created_at) {
+          return false;
+        }
+        return new Date(s.updated_at).getTime() > new Date(s.created_at).getTime();
+      });
+      const relevant = changed.length ? changed : list;
+      return relevant.slice(0, 3);
+    }
+
+    function renderEditedSpools(spools, container) {
+      if (!container) return;
+      const entries = pickEditedSpools(spools);
+      container.innerHTML = '';
+      if (!entries.length) {
+        container.innerHTML = '<div class="text-gray-400 italic">Noch keine Änderungen.</div>';
+        return;
+      }
+      const toTime = (value) => value ? new Date(value).getTime() : 0;
+      entries
+        .sort((a, b) => toTime(b.updated_at ?? b.created_at) - toTime(a.updated_at ?? a.created_at))
+        .forEach(s => {
+          const alt = toNumber(s.alt_gewicht) ?? 0;
+          const neu = toNumber(s.neu_gewicht) ?? 0;
+          const diff = alt - neu;
+          const diffDisplay = Math.abs(diff);
+          const diffPrefix = diff >= 0 ? '–' : '+';
+          const color = diff >= 100 ? 'text-red-500' : diff >= 50 ? 'text-yellow-500' : 'text-green-600';
+          const datumQuelle = s.updated_at ?? s.created_at;
+          const datum = datumQuelle ? new Date(datumQuelle).toLocaleDateString('de-DE') : '';
+          container.innerHTML += `
+            <div class="relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-200 select-none pointer-events-none">
+                ID: ${s.spulen_id}
+              </div>
+              <div class="flex justify-between items-center">
+                <div class="text-sm font-semibold text-white">${s.typ_name} (${s.material}, ${s.farbe})</div>
+                <div class="text-xs text-gray-200 ml-2">${datum}</div>
+              </div>
+              <div class="flex justify-between items-center text-xs text-gray-100 space-x-2">
+                <div class="flex-1 text-left">Alt: ${alt} g</div>
+                <div class="flex-1 text-center ${color} font-semibold">${diffPrefix}${diffDisplay} g</div>
+                <div class="flex-1 text-right">Neu: ${neu} g</div>
+              </div>
+            </div>
+          `;
+        });
+    }
 
     async function loadDashboardDetails() {
       const res = await fetch("/api/dashboard-details");
       const data = await res.json();
 
-      animateRollingNumber(document.querySelector(".text-blue-600"), data.typen ?? 0);
-      animateRollingNumber(document.querySelector(".text-green-600"), data.spulen ?? 0);
-      animateRollingNumber(document.querySelector(".text-red-500"), data.fastleer ?? 0);
+      animateRollingNumber(document.querySelector(".text-blue-300"), data.typen ?? 0);
+      animateRollingNumber(document.querySelector(".text-green-300"), data.spulen ?? 0);
+      animateRollingNumber(document.querySelector(".text-red-400"), data.fastleer ?? 0);
       // Gesamtverbrauch (7 Tage) direkt aus Dashboard-Daten
-      animateRollingNumber(document.querySelector(".text-orange-500"), data.verbrauch_7tage ?? 0, " g");
+      animateRollingNumber(document.querySelector(".text-orange-300"), data.verbrauch_7tage ?? 0, " g");
 
       const edited = document.querySelector("#last-edited-spools");
       const added = document.querySelector("#new-spools");
 
-      edited.innerHTML = "";
-      data.letzte_spulen
-        .filter(s => {
-          const created = new Date(s.created_at).getTime();
-          const updated = new Date(s.updated_at).getTime();
-          return updated > created;
-        })
-        .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-        .slice(0, 3)
-        .forEach(s => {
-          const diff = s.alt_gewicht - s.neu_gewicht;
-          const color = diff >= 100 ? "text-red-500" : diff >= 50 ? "text-yellow-500" : "text-green-600";
-          const datum = new Date(s.updated_at).toLocaleDateString("de-DE");
-          edited.innerHTML += `
-            <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
-              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
-                ID: ${s.spulen_id}
-              </div>
-              <div class="flex justify-between items-center">
-                <div class="text-sm font-semibold text-gray-800">${s.typ_name} (${s.material}, ${s.farbe})</div>
-                <div class="text-xs text-gray-500 ml-2">${datum}</div>
-              </div>
-              <div class="flex justify-between items-center text-xs text-gray-600 space-x-2">
-                <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
-                <div class="flex-1 text-center ${color} font-semibold">–${diff} g</div>
-                <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
-              </div>
-            </div>
-          `;
-        });
+      renderEditedSpools(data.letzte_spulen, edited);
 
       added.innerHTML = "";
-      data.letzte_spulen
+      (data.neue_spulen || [])
         .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 3)
         .forEach(s => {
           const datum = new Date(s.created_at).toLocaleDateString("de-DE");
           added.innerHTML += `
-            <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
-              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
+            <div class="relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+              <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-200 select-none pointer-events-none">
                 ID: ${s.spulen_id}
               </div>
               <div class="flex justify-between items-center">
-                <div class="text-sm font-semibold text-gray-800">${s.typ_name}</div>
-                <div class="text-xs text-gray-500 ml-2">${datum}</div>
+                <div class="text-sm font-semibold text-white">${s.typ_name}</div>
+                <div class="text-xs text-gray-200 ml-2">${datum}</div>
               </div>
-              <div class="flex justify-between items-center text-xs text-gray-600">
+              <div class="flex justify-between items-center text-xs text-gray-100">
                 <div class="flex-1">Farbe: ${s.farbe}</div>
                 <div class="flex-1 text-center">Material: ${s.material}</div>
                 <div class="flex-1 text-right">Durchmesser: ${s.durchmesser} mm</div>
@@ -171,44 +415,54 @@
 
       const imDruckerContainer = document.getElementById("im-drucker-spools");
       imDruckerContainer.innerHTML = "";
-      if (data.im_drucker_spulen && data.im_drucker_spulen.length > 0) {
-        data.im_drucker_spulen.forEach(spule => {
+
+      const list = Array.isArray(data.im_drucker_spulen) ? data.im_drucker_spulen.slice(0, 4) : [];
+      while (list.length < 4) list.push(null);
+
+      list.forEach(spule => {
+        if (spule) {
           imDruckerContainer.innerHTML += `
-  <div class="bg-white rounded-xl shadow-sm max-w-sm w-full mx-auto flex flex-col overflow-hidden border border-gray-200">
-    <div class="relative">
-      <img src="/static/assets/images/${spule.bildname && spule.bildname !== 'null' ? spule.bildname : 'platzhalter.jpg'}" alt="${spule.typ_name}" class="w-full h-32 object-cover object-center" />
-      <div class="absolute top-2 right-2 bg-white bg-opacity-80 text-xs px-2 py-0.5 rounded text-gray-600 border border-gray-300">
-        ID: ${spule.spulen_id}
-      </div>
-    </div>
-    <div class="p-4 flex flex-col space-y-1 text-sm text-gray-700">
-      <div class="font-semibold text-gray-900 text-base">${spule.typ_name}</div>
-      <div class="flex justify-between">
-        <span>Farbe:</span>
-        <span>${spule.farbe}</span>
-      </div>
-      <div class="flex justify-between">
-        <span>Material:</span>
-        <span>${spule.material}</span>
-      </div>
-      <div class="flex justify-between">
-        <span>Durchmesser:</span>
-        <span>${spule.durchmesser} mm</span>
-      </div>
-      <div class="mt-2">
-        <div class="text-xs text-gray-500 mb-1">Restmenge</div>
-        <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-          <div class="h-full rounded-full ${spule.neu_gewicht > 100 ? 'bg-green-500' : spule.neu_gewicht > 50 ? 'bg-yellow-400' : 'bg-red-500'}" style="width: ${spule.gesamtmenge > 0 ? (spule.neu_gewicht / spule.gesamtmenge) * 100 : 0}%"></div>
+  <a href="/spulen.html?typ_id=${spule.typ_id}" class="block focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-xl">
+    <div class="bg-gray-700 rounded-xl shadow-sm max-w-sm w-full mx-auto flex flex-col overflow-hidden border border-gray-200 hover:border-blue-400 hover:shadow-md transition">
+      <div class="relative">
+        <img src="/static/assets/images/${spule.bildname && spule.bildname !== 'null' ? spule.bildname : 'platzhalter.jpg'}" alt="${spule.typ_name}" class="w-full h-32 object-cover object-center" />
+        <div class="absolute top-2 right-2 bg-gray-700 bg-opacity-80 text-xs px-2 py-0.5 rounded text-gray-100 border border-gray-100">
+          ID: ${spule.spulen_id}
         </div>
-        <div class="text-right text-xs mt-1">${spule.neu_gewicht} g</div>
+      </div>
+      <div class="p-4 flex flex-col space-y-1 text-sm text-gray-200">
+        <div class="font-semibold text-white text-base">${spule.typ_name}</div>
+        <div class="flex justify-between">
+          <span>Farbe:</span>
+          <span>${spule.farbe}</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Material:</span>
+          <span>${spule.material}</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Durchmesser:</span>
+          <span>${spule.durchmesser} mm</span>
+        </div>
+        <div class="mt-2">
+          <div class="text-xs text-gray-300 mb-1">Restmenge</div>
+          <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div class="h-full rounded-full ${spule.neu_gewicht > 200 ? 'bg-green-500' : spule.neu_gewicht > 100 ? 'bg-orange-400' : 'bg-red-500'}" style="width: ${spule.gesamtmenge > 0 ? (spule.neu_gewicht / spule.gesamtmenge) * 100 : 0}%"></div>
+          </div>
+          <div class="text-right text-xs mt-1">${spule.neu_gewicht} g</div>
+        </div>
       </div>
     </div>
+  </a>
+`;
+        } else {
+          imDruckerContainer.innerHTML += `
+  <div class="bg-gray-700 rounded-xl shadow-sm max-w-sm w-full mx-auto flex items-center justify-center border border-dashed border-gray-300 text-gray-400 h-[20rem]">
+    Leer
   </div>
 `;
-        });
-      } else {
-        imDruckerContainer.innerHTML = `<div class="text-gray-500 italic text-center">Keine Spulen im Drucker</div>`;
-      }
+        }
+      });
     }
 
     function animateRollingNumber(element, target, suffix = "") {
@@ -248,51 +502,8 @@
 
     // Initial laden & bei WS-Aktualisierung erneut
     loadDashboardDetails();
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log("📡 Live-Update:", data);
-      if (data.event === "spule_created" || data.event === "spule_deleted") {
-        loadDashboardDetails();
-      } else if (data.event === "spule_updated") {
-        const edited = document.querySelector("#last-edited-spools");
-        fetch("/api/dashboard-details")
-          .then(res => res.json())
-          .then(data => {
-            edited.innerHTML = "";
-            data.letzte_spulen
-              .filter(s => {
-                const created = new Date(s.created_at).getTime();
-                const updated = new Date(s.updated_at).getTime();
-                return updated > created;
-              })
-              .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
-              .slice(0, 3)
-              .forEach(s => {
-                const diff = s.alt_gewicht - s.neu_gewicht;
-                const color = diff >= 100 ? "text-red-500" : diff >= 50 ? "text-yellow-500" : "text-green-600";
-                const datum = new Date(s.updated_at).toLocaleDateString("de-DE");
-                edited.innerHTML += `
-                  <div class="relative flex flex-col bg-gray-50 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
-                    <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-500 select-none pointer-events-none">
-                      ID: ${s.spulen_id}
-                    </div>
-                    <div class="flex justify-between items-center">
-                      <div class="text-sm font-semibold text-gray-800">${s.typ_name} (${s.material}, ${s.farbe})</div>
-                      <div class="text-xs text-gray-500 ml-2">${datum}</div>
-                    </div>
-                    <div class="flex justify-between items-center text-xs text-gray-600 space-x-2">
-                      <div class="flex-1 text-left">Alt: ${s.alt_gewicht} g</div>
-                      <div class="flex-1 text-center ${color} font-semibold">–${diff} g</div>
-                      <div class="flex-1 text-right">Neu: ${s.neu_gewicht} g</div>
-                    </div>
-                  </div>
-                `;
-              });
-          });
-      }
-    };
   </script>
-</script>
+  
 <script>
   const authBereich = document.getElementById("auth-bereich");
 

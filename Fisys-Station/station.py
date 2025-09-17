@@ -140,7 +140,7 @@ def generate_qr_code(data):
             spule = hole_spule(spulen_id)
             typ_id = spule["typ_id"] if spule else 0
 
-        qr_data = f"https://fisys.it-lab.cc/typ/{typ_id}/id{spulen_id}"
+        qr_data = f"https://fisys.it-lab.cc/spulen.html?spule_id={spulen_id}"
     except:
         qr_data = str(data)
 
@@ -907,15 +907,26 @@ def finish_add_spool(volle_spule=False):
 
 def verarbeite_qr_code(barcode):
     global zuletzt_gescannte_spule
-    # If a full URL was scanned, extract the trailing ID
-    if isinstance(barcode, str) and "/id" in barcode:
-        try:
-            barcode = barcode.rstrip("/").split("/id")[-1]
-        except Exception:
-            pass
+    # Unterstützt neues Format ...?spule_id=123 (nur Ziffern extrahieren)
+    if isinstance(barcode, str) and "spule_id=" in barcode:
+        frag = barcode.split("spule_id=")[-1]
+        nummer = ""
+        for ch in frag:
+            if ch.isdigit():
+                nummer += ch
+            else:
+                break
+        barcode = nummer
+    # Fallback: altes Format .../id123 oder .../id=123
+    elif isinstance(barcode, str) and "/id" in barcode:
+        id_teil = barcode.rstrip("/").split("/id")[-1]
+        if id_teil.startswith("="):
+            id_teil = id_teil[1:]
+        barcode = id_teil
+
     try:
         spulen_id = int(barcode)
-    except ValueError:
+    except (ValueError, TypeError):
         if ausgabe_label:
             ausgabe_label.config(text="❌ QR-Code enthält keine gültige ID.")
         return
@@ -1091,35 +1102,40 @@ def verarbeite_qr_code(barcode):
                     # PATCH wie vorher, wenn nicht leer
                     payload = {"restmenge": netto, "in_printer": False}
                     try:
-                        response = requests.patch(
+                        payload = {
+                            "restmenge": float(netto),
+                            "in_printer": False
+                        }
+                        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+                        r = requests.patch(
                             f"http://{SERVER_IP}:8000/spulen/{spulen_id}",
-                            headers={"Content-Type": "application/json"},
+                            headers=headers,
                             json=payload,
-                            timeout=3
+                            timeout=5
                         )
-                        if response.ok:
+                        if not r.ok:
+                            raise RuntimeError(f"PATCH fehlgeschlagen ({r.status_code}): {r.text}")
+
+                        for widget in center_frame.winfo_children():
+                            widget.destroy()
+                        bestaetigt_frame = tk.Frame(center_frame, bg="#1e1e1e")
+                        bestaetigt_frame.pack(expand=True, fill="both")
+                        bestaetigt_label = tk.Label(
+                            bestaetigt_frame,
+                            text="✅ Gewicht wurde übernommen.",
+                            font=("Helvetica Neue", 34, "bold"),
+                            fg="white", bg="#1e1e1e"
+                        )
+                        bestaetigt_label.pack(expand=True)
+
+                        def cleanup_and_return():
                             for widget in center_frame.winfo_children():
                                 widget.destroy()
-                            bestaetigt_frame = tk.Frame(center_frame, bg="#1e1e1e")
-                            bestaetigt_frame.pack(expand=True, fill="both")
-                            bestaetigt_label = tk.Label(
-                                bestaetigt_frame,
-                                text="✅ Gewicht wurde übernommen.",
-                                font=("Helvetica Neue", 34, "bold"),
-                                fg="white", bg="#1e1e1e"
-                            )
-                            bestaetigt_label.pack(expand=True)
+                            zeige_auswahlansicht()
 
-                            def cleanup_and_return():
-                                for widget in center_frame.winfo_children():
-                                    widget.destroy()
-                                zeige_auswahlansicht()
-
-                            root.after(2000, cleanup_and_return)
-                        else:
-                            messagebox.showerror("Fehler", f"❌ Aktualisierung fehlgeschlagen: {response.status_code}")
+                        root.after(2000, cleanup_and_return)
                     except Exception as e:
-                        messagebox.showerror("Fehler", f"❌ Fehler beim Speichern:\n{e}")
+                        messagebox.showerror("Fehler", f"❌ Aktualisierung fehlgeschlagen:\n{e}")
 
             buttons_frame = tk.Frame(wiege_frame, bg="#1e1e1e")
             buttons_frame.pack(pady=30, expand=True)
@@ -1143,15 +1159,21 @@ def verarbeite_qr_code(barcode):
     scheduled_tasks.append(root.after(2500, wiegeansicht))
 
 def verarbeite_qr_code_in_drucker(barcode):
-    # URL-Format unterstützen (/idXYZ)
-    if isinstance(barcode, str) and "/id" in barcode:
-        try:
-            barcode = barcode.rstrip("/").split("/id")[-1]
-        except Exception:
-            pass
+    # URL-Format unterstützen (.../spule_id=123)
+    if isinstance(barcode, str) and "spule_id=" in barcode:
+        frag = barcode.split("spule_id=")[-1]
+        # nur führende Ziffern übernehmen (bis erstes Nicht‑Ziffern-Zeichen)
+        nummer = ""
+        for ch in frag:
+            if ch.isdigit():
+                nummer += ch
+            else:
+                break
+        barcode = nummer
+
     try:
         spulen_id = int(barcode)
-    except ValueError:
+    except (ValueError, TypeError):
         messagebox.showerror("Fehler", "❌ QR-Code enthält keine gültige Spulen-ID.")
         zeige_auswahlansicht()
         return
@@ -1164,28 +1186,24 @@ def verarbeite_qr_code_in_drucker(barcode):
         return
 
     # PATCH: in_printer=True
+# PATCH inline ausführen: nur erlaubte Felder & korrekte Typen
     try:
         aktuelle_rest = int(spule.get("restmenge") or 0)
         payload = {
-            "restmenge": aktuelle_rest,
+            "restmenge": float(aktuelle_rest),
             "in_printer": True
         }
-        response = requests.patch(
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        r = requests.patch(
             f"http://{SERVER_IP}:8000/spulen/{spulen_id}",
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers=headers,
             json=payload,
-            timeout=3
+            timeout=5
         )
-        if not response.ok:
-            # Fehlermeldung inkl. Body, damit 422/Validierungsfehler sichtbar sind
-            messagebox.showerror(
-                "Fehler",
-                f"❌ Aktualisierung fehlgeschlagen: {response.status_code}\n{response.text}"
-            )
-            zeige_auswahlansicht()
-            return
+        if not r.ok:
+            raise RuntimeError(f"PATCH fehlgeschlagen ({r.status_code}): {r.text}")
     except Exception as e:
-        messagebox.showerror("Fehler", f"❌ Fehler beim Speichern:\n{e}")
+        messagebox.showerror("Fehler", f"❌ Aktualisierung fehlgeschlagen:\n{e}")
         zeige_auswahlansicht()
         return
 

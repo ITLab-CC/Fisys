@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Filamenttyp – Fisys</title>
+  <title>Filamenttypen | Fisys</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="min-h-screen flex bg-gray-50">
+<body class="min-h-screen flex bg-gray-800">
   <!-- Sidebar -->
   <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
     <div>
@@ -32,9 +32,9 @@
 
   <!-- Main content -->
   <div class="flex-1 flex flex-col ml-64">
-    <header class="bg-gray-50 px-10 py-10">
-      <h1 class="text-3xl font-bold">Filamenttypen</h1>
-      <p class="text-sm text-gray-500 mt-1">Alle verfügbaren Typen im Überblick</p>
+    <header class="bg-gray-800 px-10 py-10">
+      <h1 class="text-3xl text-white font-bold">Filamenttypen</h1>
+      <p class="text-sm text-gray-200 mt-1">Alle verfügbaren Typen im Überblick</p>
     </header>
 
     <section class="flex-1 pt-2 px-10 pb-10">
@@ -43,7 +43,8 @@
           type="text"
           id="suchfeld"
           placeholder="Filamenttyp suchen..."
-          class="w-full md:w-1/3 px-4 py-2 border border-gray-300 rounded shadow-sm text-sm focus:outline-none focus:ring focus:border-blue-300"
+          maxlength="50"
+          class="w-full md:w-1/3 px-4 py-2 text-white bg-gray-700 border border-gray-200 rounded shadow-sm text-sm focus:outline-none focus:ring focus:border-blue-300"
         />
         <div class="flex gap-2" id="button-container" style="display: none;">
           <button id="btn-typ-hinzufuegen" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">+ Typ hinzufügen</button>
@@ -51,29 +52,29 @@
         </div>
       </div>
       <!-- Modal Spule hinzufügen -->
-      <div id="modal-spule" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-        <div class="bg-white rounded-lg w-full max-w-md p-6">
-          <h2 class="text-xl font-bold mb-4">Neue Spule hinzufügen</h2>
+      <div id="modal-spule" class="fixed inset-0 bg-black bg-opacity-20 flex items-center justify-center hidden z-50">
+        <div class="bg-gray-700 rounded-lg w-full max-w-md p-6">
+          <h2 class="text-xl text-white font-bold mb-4">Neue Spule hinzufügen</h2>
           <form id="modal-spule-form" class="space-y-4">
             <div>
-              <label for="spule-typ" class="block font-medium mb-1">Filamenttyp <span class="text-red-500">*</span></label>
+              <label for="spule-typ" class="block text-white font-medium mb-1">Filamenttyp <span class="text-red-500">*</span></label>
               <div class="relative">
-                <button id="dropdown-button" type="button" class="w-full bg-white border border-gray-300 rounded px-3 py-2 text-left focus:outline-none focus:ring focus:border-blue-500 flex justify-between items-center">
-                  <span id="dropdown-selected">Bitte wählen</span>
+                <button id="dropdown-button" type="button" class="w-full bg-gray-600 border border-gray-500 rounded px-3 py-2 text-left focus:outline-none focus:ring focus:border-blue-500 flex justify-between items-center">
+                  <span id="dropdown-selected" class="text-white">Bitte wählen</span>
                   <svg class="w-4 h-4 ml-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <div id="dropdown-container" class="absolute z-10 hidden w-full bg-white border border-gray-300 rounded mt-1 shadow-lg">
-                  <input type="text" id="dropdown-search" placeholder="Suchen..." class="w-full px-3 py-2 border-b border-gray-300 text-sm focus:outline-none">
+                <div id="dropdown-container" class="absolute z-10 hidden text-white w-full bg-gray-600 border border-gray-500 rounded mt-1 shadow-lg">
+                  <input type="text" id="dropdown-search" placeholder="Suchen..." maxlength="50" class="w-full px-3 py-2 bg-gray-600 text-white border-b border-gray-300 text-sm focus:outline-none">
                   <ul id="dropdown-list" class="max-h-48 overflow-auto"></ul>
                 </div>
               </div>
               <input type="hidden" id="spule-typ" name="spule-typ" required />
             </div>
             <div>
-              <label for="gesamtmenge" class="block font-medium mb-1">Gesamtmenge (g) <span class="text-red-500">*</span></label>
-              <input type="number" id="gesamtmenge" name="gesamtmenge" min="1" step="1" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+              <label for="gesamtmenge" class="block text-white font-medium mb-1">Gesamtmenge (g) <span class="text-red-500">*</span></label>
+              <input type="number" id="gesamtmenge" name="gesamtmenge" min="1" max="99999" step="1" inputmode="numeric" oninput="this.value = this.value.replace(/\D/g,'').slice(0,5)" required class="w-full bg-gray-600 text-white border border-gray-500 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
             </div>
             <div class="flex justify-end gap-2 pt-4">
               <button type="button" id="modal-spule-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
@@ -82,7 +83,7 @@
           </form>
         </div>
       </div>
-      <div id="spulen-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-4"></div>
+      <div id="spulen-container" class="grid gap-8 mt-4 justify-center grid-cols-[repeat(auto-fill,minmax(384px,384px))]"></div>
     </section>
   </div>
 
@@ -111,15 +112,15 @@ window.addEventListener("DOMContentLoaded", () => {
     typen.forEach(typ => {
       const el = document.createElement("div");
       el.innerHTML = `
-        <div class="bg-white rounded-xl shadow-sm max-w-sm w-full mx-auto flex flex-col overflow-hidden border border-gray-200">
+        <div class="bg-gray-700 rounded-xl shadow-sm max-w-sm w-full mx-auto flex flex-col overflow-hidden border border-gray-200">
           <div class="relative">
             <img src="/static/assets/images/${typ.bildname && typ.bildname !== 'null' ? typ.bildname : 'platzhalter.jpg'}" alt="${typ.name}" class="w-full h-32 object-cover" />
-            <div class="absolute top-2 right-2 bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full">
+            <div class="absolute top-2 right-2 bg-gray-700 text-white text-sm px-2 py-0.5 rounded-lg">
               ${typ.spulen.length}
             </div>
           </div>
-          <div class="p-4 flex flex-col space-y-1 text-sm text-gray-700">
-            <div class="font-semibold text-gray-900 text-base">${typ.name}</div>
+          <div class="p-4 flex flex-col space-y-1 text-sm text-gray-200">
+            <div class="font-semibold text-white text-base">${typ.name}</div>
             <div class="flex justify-between"><span>Material:</span><span>${typ.material}</span></div>
             <div class="flex justify-between"><span>Farbe:</span><span>${typ.farbe}</span></div>
             <div class="flex justify-between"><span>Durchmesser:</span><span>${typ.durchmesser} mm</span></div>
@@ -131,7 +132,7 @@ window.addEventListener("DOMContentLoaded", () => {
                 Spulen ansehen
               </a>
               ${["mod", "admin"].includes(daten.rolle) ? `
-                <button data-id="${typ.id}" class="bearbeite-typ-btn px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition text-sm font-medium">
+                <button data-id="${typ.id}" class="bearbeite-typ-btn px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition text-sm font-medium">
                   Bearbeiten
                 </button>
               ` : ""}
@@ -154,6 +155,7 @@ window.addEventListener("DOMContentLoaded", () => {
           const form = document.getElementById("modal-form");
           modal.classList.remove("hidden");
           document.body.style.overflow = "hidden";
+          document.body.classList.add("overflow-hidden");
 
           // Formular mit bestehenden Daten füllen
           form.name.value = typ.name;
@@ -182,6 +184,7 @@ window.addEventListener("DOMContentLoaded", () => {
           const confirmCancel = document.getElementById("confirm-cancel");
 
           confirmModal.classList.remove("hidden");
+          document.body.classList.add("overflow-hidden");
 
           // Remove previous handlers first, to avoid stacking
           confirmOk.onclick = null;
@@ -189,6 +192,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
           confirmOk.onclick = async () => {
             confirmModal.classList.add("hidden");
+            document.body.classList.remove("overflow-hidden");
             const res = await fetch(`/typs/${typ.id}`, { method: "DELETE" });
             if (res.ok) {
               loadTypen();
@@ -198,6 +202,7 @@ window.addEventListener("DOMContentLoaded", () => {
           };
           confirmCancel.onclick = () => {
             confirmModal.classList.add("hidden");
+            document.body.classList.remove("overflow-hidden");
           };
         });
       }
@@ -220,10 +225,13 @@ window.addEventListener("DOMContentLoaded", () => {
       }
       modal.classList.remove("hidden");
       document.body.style.overflow = "hidden";
+      document.body.classList.add("overflow-hidden");
     });
 
     cancelBtn.addEventListener("click", () => {
       modal.classList.add("hidden");
+      document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
     });
   }
 
@@ -283,10 +291,10 @@ window.addEventListener("DOMContentLoaded", () => {
     dropdownList.innerHTML = "";
     typenCache.forEach(typ => {
       const li = document.createElement("li");
-      li.className = "px-3 py-2 hover:bg-blue-100 cursor-pointer";
+      li.className = "px-3 py-2 hover:bg-gray-500 cursor-pointer";
       li.innerHTML = `
         <div class="font-semibold">${typ.name}</div>
-        <div class="text-xs text-gray-500">${typ.material}, ${typ.farbe}, ${typ.durchmesser} mm</div>
+        <div class="text-xs text-gray-200">${typ.material}, ${typ.farbe}, ${typ.durchmesser} mm</div>
       `;
       li.addEventListener("click", () => {
         dropdownSelected.innerHTML = `
@@ -334,12 +342,14 @@ window.addEventListener("DOMContentLoaded", () => {
     await loadTypenDropdown();
     modalSpule.classList.remove("hidden");
     document.body.style.overflow = "hidden";
+    document.body.classList.add("overflow-hidden");
     darkenSpulenContainer();
   });
 
   cancelSpuleBtn.addEventListener("click", () => {
     modalSpule.classList.add("hidden");
     document.body.style.overflow = "";
+    document.body.classList.remove("overflow-hidden");
     undarkenSpulenContainer();
   });
 
@@ -386,6 +396,8 @@ window.addEventListener("DOMContentLoaded", () => {
       formSpule.reset();
       dropdownSelected.textContent = "Bitte wählen";
       hiddenSelect.value = "";
+      document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
       undarkenSpulenContainer();
       loadTypen();
     } else {
@@ -398,6 +410,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!modalSpule.classList.contains("hidden") && e.key === "Escape") {
       modalSpule.classList.add("hidden");
       document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
       undarkenSpulenContainer();
     }
   });
@@ -407,11 +420,11 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.target === modalSpule) {
       modalSpule.classList.add("hidden");
       document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
       undarkenSpulenContainer();
     }
   });
   // Style für das Abdunkeln von #spulen-container
-  // Fügt dies am Ende des <script> Blocks hinzu, damit es im <head> geladen wird
   const style = document.createElement("style");
   style.innerHTML = `
     #spulen-container.spulen-dimmed {
@@ -430,11 +443,13 @@ window.addEventListener("DOMContentLoaded", () => {
   addTypBtn.addEventListener("click", () => {
     modal.classList.remove("hidden");
     document.body.style.overflow = "hidden";
+    document.body.classList.add("overflow-hidden");
   });
 
   cancelBtn.addEventListener("click", () => {
     modal.classList.add("hidden");
     document.body.style.overflow = "";
+    document.body.classList.remove("overflow-hidden");
   });
 
   // Schließen bei Escape
@@ -442,6 +457,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!modal.classList.contains("hidden") && e.key === "Escape") {
       modal.classList.add("hidden");
       document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
     }
   });
 
@@ -450,6 +466,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.target === modal) {
       modal.classList.add("hidden");
       document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
     }
   });
 
@@ -486,6 +503,8 @@ window.addEventListener("DOMContentLoaded", () => {
       form.reset();
       form.removeAttribute("data-mode");
       form.removeAttribute("data-id");
+      document.body.style.overflow = "";
+      document.body.classList.remove("overflow-hidden");
       loadTypen();
     } else {
       zeigeHinweis("Fehler beim Hinzufügen", "bg-red-600");
@@ -562,9 +581,9 @@ function zeigeHinweis(nachricht, farbe = "bg-gray-800") {
   </script>
   <!-- Bestätigungs-Modal für Typ-Löschen -->
   <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg w-full max-w-sm p-6 text-center">
-      <h3 class="text-lg font-semibold mb-4">Typ löschen?</h3>
-      <p class="text-sm text-gray-600 mb-6">Möchten Sie diesen Typ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</p>
+    <div class="bg-gray-700 rounded-lg w-full max-w-sm p-6 text-center">
+      <h3 class="text-lg text-white font-semibold mb-4">Typ löschen?</h3>
+      <p class="text-sm text-gray-200 mb-6">Möchten Sie diesen Typ wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</p>
       <div class="flex justify-center gap-4">
         <button id="confirm-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
         <button id="confirm-ok" class="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700">Löschen</button>
@@ -575,36 +594,36 @@ function zeigeHinweis(nachricht, farbe = "bg-gray-800") {
 </body>
 <!-- Modal -->
 <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
-  <div class="bg-white rounded-lg w-full max-w-md p-6">
-    <h2 class="text-xl font-bold mb-4">Neuen Filamenttyp hinzufügen</h2>
+  <div class="bg-gray-700 rounded-lg w-full max-w-md p-6">
+    <h2 class="text-xl text-white font-bold mb-4">Neuen Filamenttyp hinzufügen</h2>
     <form id="modal-form" class="space-y-4">
   <div>
-    <label for="name" class="block font-medium mb-1">Name <span class="text-red-500">*</span></label>
-    <input type="text" id="name" name="name" required placeholder="z. B. Bambu Basic" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+    <label for="name" class="block text-white font-medium mb-1">Name <span class="text-red-500">*</span></label>
+    <input type="text" id="name" name="name" required placeholder="z. B. Bambu Basic" maxlength="25" class="w-full border border-gray-500 bg-gray-600 text-white px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
   </div>
   <div>
-    <label for="material" class="block font-medium mb-1">Material <span class="text-red-500">*</span></label>
-    <input type="text" id="material" name="material" required placeholder="z. B. PLA, PETG" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+    <label for="material" class="block text-white font-medium mb-1">Material <span class="text-red-500">*</span></label>
+    <input type="text" id="material" name="material" required placeholder="z. B. PLA, PETG" maxlength="10" class="w-full border border-gray-500 bg-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
   </div>
   <div>
-    <label for="farbe" class="block font-medium mb-1">Farbe <span class="text-red-500">*</span></label>
-    <input type="text" id="farbe" name="farbe" required placeholder="z. B. Schwarz, Rot" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+    <label for="farbe" class="block text-white font-medium mb-1">Farbe <span class="text-red-500">*</span></label>
+    <input type="text" id="farbe" name="farbe" required placeholder="z. B. Schwarz, Rot" maxlength="25" class="w-full border border-gray-500 bg-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
   </div>
   <div>
-    <label for="durchmesser" class="block font-medium mb-1">Durchmesser (mm) <span class="text-red-500">*</span></label>
-    <input type="number" step="0.01" id="durchmesser" name="durchmesser" value="1.75" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+    <label for="durchmesser" class="block text-white font-medium mb-1">Durchmesser (mm) <span class="text-red-500">*</span></label>
+    <input type="number" step="0.01" id="durchmesser" name="durchmesser" value="1.75" inputmode="decimal" oninput="if(this.value && this.value.toString().length>10){this.value=this.value.toString().slice(0,10)}" required class="w-full border border-gray-500 bg-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
   </div>
   <div>
-    <label for="hersteller" class="block font-medium mb-1">Hersteller</label>
-    <input type="text" id="hersteller" name="hersteller" placeholder="Optional" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+    <label for="hersteller" class="block text-white font-medium mb-1">Hersteller</label>
+    <input type="text" id="hersteller" name="hersteller" placeholder="Optional" maxlength="25" class="w-full border border-gray-500 bg-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
   </div>
   <div>
-    <label for="hinweise" class="block font-medium mb-1">Hinweise</label>
-    <textarea id="hinweise" name="hinweise" rows="3" placeholder="Optional" class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500"></textarea>
+    <label for="hinweise" class="block text-white font-medium mb-1">Hinweise</label>
+    <textarea id="hinweise" name="hinweise" rows="3" placeholder="Optional" maxlength="100" class="w-full border border-gray-500 bg-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500 resize-none"></textarea>
   </div>
   <div>
-    <label for="leergewicht" class="block font-medium mb-1">Leergewicht (g) <span class="text-red-500">*</span></label>
-    <input type="number" step="1" min="0" id="leergewicht" name="leergewicht" placeholder="Gewicht der Spule ohne Filament" required class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+    <label for="leergewicht" class="block text-white font-medium mb-1">Leergewicht (g) <span class="text-red-500">*</span></label>
+    <input type="number" step="1" min="0" max="99999" id="leergewicht" name="leergewicht" placeholder="Gewicht der Spule ohne Filament" inputmode="numeric" oninput="this.value = this.value.replace(/\D/g,'').slice(0,5)" required class="w-full border border-gray-500 bg-gray-600 text-white rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
   </div>
   <div class="flex justify-end gap-2 pt-4">
     <button type="button" id="modal-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>

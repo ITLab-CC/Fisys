@@ -92,3 +92,42 @@ class AuthToken(Base):
     rolle: Mapped[str] = mapped_column(String, nullable=False)
     erstellt_am: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     verwendet: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+# Drucker-Konfiguration
+class Printer(Base):
+    __tablename__ = "printers"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    ip: Mapped[str] = mapped_column(String, nullable=False)
+    serial: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    access_token: Mapped[str] = mapped_column(String, nullable=False)
+    show_on_dashboard: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+# Pydantic Schemata für Printer-API
+class PrinterCreate(BaseModel):
+    name: str
+    ip: str
+    serial: str
+    access_token: str
+    show_on_dashboard: bool = True
+
+
+class PrinterUpdate(BaseModel):
+    name: str | None = None
+    ip: str | None = None
+    serial: str | None = None
+    access_token: str | None = None
+    show_on_dashboard: bool | None = None
+
+
+class PrinterRead(BaseModel):
+    id: int
+    name: str
+    ip: str
+    serial: str
+    access_token: str
+    show_on_dashboard: bool
+    model_config = ConfigDict(from_attributes=True)
