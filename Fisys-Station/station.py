@@ -368,7 +368,7 @@ def zeige_wiegehinweis(callback):
 
     headline = tk.Label(
         hinweis_frame,
-        text="Bitte Waage einschalten, schauen ob sie genullt ist \nund danach Spule auf die Waage legen.",
+        text="1. Waage einschalten  2.schauen ob sie genullt ist \n3. Spule auf die Waage legen.",
         font=("Helvetica Neue", 30, "bold"),
         fg="white", bg="#1e1e1e"
     )
@@ -978,27 +978,72 @@ def verarbeite_qr_code(barcode):
             scanner_frame.pack_forget()
 
         wiege_frame = tk.Frame(center_frame, bg="#1e1e1e")
-        wiege_frame.pack(expand=True)
+        wiege_frame.pack(expand=True, fill="both")
 
         global TESTGEWICHT_GRAMM
         TESTGEWICHT_GRAMM = None
-        headline = tk.Label(wiege_frame, text="⚖️ Spule wird gewogen...", font=("Helvetica Neue", 34, "bold"), fg="white", bg="#1e1e1e")
-        headline.pack(pady=20)
 
-        # Testgewicht bearbeiten (ersetzt durch echtes Wiegen)
+        headline = tk.Label(
+            wiege_frame,
+            text="⚖️ Spule wiegen",
+            font=("Helvetica Neue", 34, "bold"),
+            fg="white", bg="#1e1e1e"
+        )
+        headline.pack(pady=(25, 10))
+
+        schritte_frame = tk.Frame(wiege_frame, bg="#1e1e1e")
+        schritte_frame.pack(pady=(10, 0))
+
+        schritte = [
+            ("1", "Waage einschalten"),
+            ("2", "Sicherstellen, dass 0.0 g angezeigt wird"),
+            ("3", "Spule mittig auflegen"),
+            ("4", "Auf „Gewicht übernehmen” tippen")
+        ]
+
+        for nummer, text in schritte:
+            container = tk.Frame(schritte_frame, bg="#1e1e1e")
+            container.pack(anchor="w", pady=6)
+            badge = tk.Label(
+                container,
+                text=nummer,
+                font=("Helvetica Neue", 18, "bold"),
+                fg="#1e1e1e", bg="#f1f1f1",
+                width=3, height=1,
+                relief="flat"
+            )
+            badge.pack(side="left", padx=(0, 12))
+            tk.Label(
+                container,
+                text=text,
+                font=("Helvetica Neue", 20),
+                fg="white", bg="#1e1e1e"
+            ).pack(side="left")
+
+        status_label = tk.Label(
+            wiege_frame,
+            text="Waage wird ausgelesen…",
+            font=("Helvetica Neue", 20),
+            fg="#d0d0d0", bg="#1e1e1e"
+        )
+        status_label.pack(pady=(20, 10))
+
         from hid import enumerate
 
-        dymo = next((d for d in enumerate() if "DYMO" in d.get("manufacturer_string", "")), None)
-        if dymo:
-            gewicht = lese_gewicht(dymo["path"])
-            if gewicht is not None:
-                TESTGEWICHT_GRAMM = gewicht
+        def aktualisiere_anzeige():
+            nonlocal status_label
+            dymo = next((d for d in enumerate() if "DYMO" in d.get("manufacturer_string", "")), None)
+            if dymo:
+                gewicht = lese_gewicht(dymo["path"])
+                if gewicht is not None:
+                    status_label.config(text=f"Aktueller Messwert: {gewicht:.1f} g")
+                    return gewicht
+                status_label.config(text="⚠️ Messwert konnte nicht gelesen werden.")
             else:
-                print("⚠️ Gewicht konnte nicht gelesen werden.")
-                TESTGEWICHT_GRAMM = None
-        else:
-            print("❌ DYMO-Waage nicht gefunden.")
-            TESTGEWICHT_GRAMM = None
+                status_label.config(text="❌ Waage wurde nicht gefunden.")
+            return None
+
+        TESTGEWICHT_GRAMM = aktualisiere_anzeige()
 
         def zeige_detailinfos():
             # Sicherer Zugriff auf zuletzt_gescannte_spule
@@ -1009,76 +1054,90 @@ def verarbeite_qr_code(barcode):
                 if not isinstance(widget, tk.Button):
                     widget.destroy()
 
-            detail_headline = tk.Label(wiege_frame, text="Spulendetails", font=("Helvetica Neue", 34, "bold"), fg="white", bg="#1e1e1e")
-            detail_headline.pack(pady=(0, 10))
+            detail_headline = tk.Label(
+                wiege_frame,
+                text="Spule prüfen",
+                font=("Helvetica Neue", 34, "bold"),
+                fg="white", bg="#1e1e1e"
+            )
+            detail_headline.pack(pady=(0, 20))
 
-            info_label = None
-
-            # Typdaten abrufen
             typ_id = zuletzt_gescannte_spule["typ_id"]
             typ_daten = hole_typ(typ_id)
 
-            typtext = "Typdaten:\n"
+            info_container = tk.Frame(wiege_frame, bg="#1e1e1e")
+            info_container.pack(pady=10)
+
+            def baue_info_box(parent, titel, werte):
+                box = tk.Frame(parent, bg="#292929", bd=0, relief="flat")
+                box.pack(side="left", padx=12, fill="y")
+                tk.Label(
+                    box,
+                    text=titel,
+                    font=("Helvetica Neue", 18, "bold"),
+                    fg="white", bg="#292929"
+                ).pack(anchor="w", pady=(12, 8), padx=16)
+                for label_text, value_text in werte:
+                    tk.Label(
+                        box,
+                        text=f"{label_text}: {value_text}",
+                        font=("Helvetica Neue", 16),
+                        fg="#d9d9d9", bg="#292929",
+                        anchor="w"
+                    ).pack(anchor="w", padx=16, pady=2)
+
+            spulen_infos = [
+                ("Spulen-ID", zuletzt_gescannte_spule.get('spulen_id', '–')),
+                ("Typ-ID", zuletzt_gescannte_spule.get('typ_id', '–')),
+                ("Gesamtgewicht", f"{zuletzt_gescannte_spule.get('gesamtmenge', '–')} g"),
+                ("Aktuelles Restgewicht", f"{zuletzt_gescannte_spule.get('restmenge', '–')} g"),
+                ("Im Drucker", "Ja" if zuletzt_gescannte_spule.get('in_printer') else "Nein")
+            ]
+            baue_info_box(info_container, "Spule", spulen_infos)
+
             if typ_daten:
-                typtext += (
-                    f"Name: {typ_daten.get('name', '-')}\n"
-                    f"Farbe: {typ_daten.get('farbe', '-')}\n"
-                    f"Hersteller: {typ_daten.get('hersteller', '-')}\n"
-                    f"Material: {typ_daten.get('material', '-')}\n"
-                    f"Durchmesser: {typ_daten.get('durchmesser', '-')}\n"
-                )
+                typ_infos = [
+                    ("Name", typ_daten.get('name', '–')),
+                    ("Farbe", typ_daten.get('farbe', '–')),
+                    ("Material", typ_daten.get('material', '–')),
+                    ("Durchmesser", f"{typ_daten.get('durchmesser', '–')} mm"),
+                    ("Hersteller", typ_daten.get('hersteller', '–'))
+                ]
             else:
-                typtext += "❌ Keine Typdaten gefunden.\n"
+                typ_infos = [("Hinweis", "Keine Typdaten gefunden")]
+            baue_info_box(info_container, "Filamenttyp", typ_infos)
 
-            spulentext = (
-                f"Spulendaten:\n"
-                f"ID: {zuletzt_gescannte_spule['spulen_id']}\n"
-                f"Typ-ID: {zuletzt_gescannte_spule['typ_id']}\n"
-                f"Gesamt: {zuletzt_gescannte_spule['gesamtmenge']} g\n"
-                f"Rest: {zuletzt_gescannte_spule['restmenge']} g\n"
-                f"In Printer: {zuletzt_gescannte_spule['in_printer']}"
-            )
-
-            info_frame = tk.Frame(wiege_frame, bg="#1e1e1e")
-            info_frame.pack(pady=20)
-
-            typ_label = tk.Label(info_frame, text=typtext, font=("Helvetica Neue", 18), fg="white", bg="#1e1e1e", justify="left", anchor="nw")
-            typ_label.grid(row=0, column=0, padx=10, sticky="n")
-
-            spule_label = tk.Label(info_frame, text=spulentext, font=("Helvetica Neue", 18), fg="white", bg="#1e1e1e", justify="left", anchor="nw")
-            spule_label.grid(row=0, column=1, padx=10, sticky="n")
-
-            # --- Insert calculation of leergewicht and nettogewicht before creating gewicht_label ---
             leergewicht = (typ_daten.get("leergewicht") if typ_daten else 0) or 0
-            nettogewicht = max(0, TESTGEWICHT_GRAMM - leergewicht)
-
-            # NEU: Leererkennung und entsprechendes Label
-            if nettogewicht <= 5:
-                gewicht_label = tk.Label(
-                    wiege_frame,
-                    text="⚠️ Spule wurde als leer erkannt.",
-                    font=("Helvetica Neue", 28, "bold"),
-                    fg="white",
-                    bg="#1e1e1e",
-                    justify="center"
-                )
-                gewicht_label.pack(pady=(5, 5))
-                spule_leer = True
-            else:
-                gewicht_label = tk.Label(
-                    wiege_frame,
-                    text=(
-                        f"Bruttogewicht (mit Spule): {TESTGEWICHT_GRAMM} g\n"
-                        f"Leergewicht der Spule: {leergewicht} g\n"
-                        f"Nettogewicht (Filament): {nettogewicht} g"
-                    ),
-                    font=("Helvetica Neue", 15),
-                    fg="white",
-                    bg="#1e1e1e",
-                    justify="left"
-                )
-                gewicht_label.pack(pady=(5, 5))
+            if TESTGEWICHT_GRAMM is None:
+                nettogewicht = 0
+                gewicht_text = "⚠️ Gewicht konnte nicht gelesen werden."
+                gewicht_subtext = "Bitte Waage prüfen und erneut versuchen."
                 spule_leer = False
+            else:
+                nettogewicht = max(0, TESTGEWICHT_GRAMM - leergewicht)
+                if nettogewicht <= 5:
+                    gewicht_text = "⚠️ Spule wirkt leer"
+                    gewicht_subtext = f"Messwert: {TESTGEWICHT_GRAMM} g · Leergewicht: {leergewicht} g"
+                    spule_leer = True
+                else:
+                    gewicht_text = f"Aktuelles Filamentgewicht: {nettogewicht} g"
+                    gewicht_subtext = f"Brutto: {TESTGEWICHT_GRAMM} g · Leergewicht: {leergewicht} g"
+                    spule_leer = False
+
+            gewicht_frame = tk.Frame(wiege_frame, bg="#1e1e1e")
+            gewicht_frame.pack(pady=(20, 10))
+            tk.Label(
+                gewicht_frame,
+                text=gewicht_text,
+                font=("Helvetica Neue", 26, "bold"),
+                fg="white", bg="#1e1e1e"
+            ).pack()
+            tk.Label(
+                gewicht_frame,
+                text=gewicht_subtext,
+                font=("Helvetica Neue", 18),
+                fg="#c0c0c0", bg="#1e1e1e"
+            ).pack(pady=(6, 0))
 
 
             def erneut_starten():
@@ -1138,7 +1197,7 @@ def verarbeite_qr_code(barcode):
                         messagebox.showerror("Fehler", f"❌ Aktualisierung fehlgeschlagen:\n{e}")
 
             buttons_frame = tk.Frame(wiege_frame, bg="#1e1e1e")
-            buttons_frame.pack(pady=30, expand=True)
+            buttons_frame.pack(pady=(30, 20))
 
             retry_button = tk.Button(buttons_frame, text="Zurück", font=("Helvetica Neue", 24, "bold"),
                                      bg="white", fg="#1e1e1e", relief="flat", padx=40, pady=20,
