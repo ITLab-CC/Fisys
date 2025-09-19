@@ -32,6 +32,7 @@ class FilamentSpule(Base):
     restmenge: Mapped[float] = mapped_column(Float, nullable=False)
     in_printer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     verpackt: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    printer_serial: Mapped[Optional[str]] = mapped_column(ForeignKey('printers.serial'), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     alt_gewicht: Mapped[float] = mapped_column(Float, default=0)
@@ -61,6 +62,7 @@ class FilamentSpuleRead(BaseModel):
     restmenge: float
     in_printer: bool
     verpackt: bool
+    printer_serial: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
 class FilamentSpuleCreate(BaseModel):
@@ -74,6 +76,7 @@ class FilamentSpuleCreate(BaseModel):
     restmenge: Optional[float] = None
     in_printer: Optional[bool] = False
     verpackt: Optional[bool] = False
+    printer_serial: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 class User(Base):

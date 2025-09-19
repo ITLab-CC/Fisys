@@ -318,6 +318,7 @@ class FilamentSpuleRead(BaseModel):
     in_printer: bool
     verpackt: bool
     alt_gewicht: float  # neu hinzugefügt
+    printer_serial: Optional[str] = None
     typ: Optional[FilamentTypRead] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -336,12 +337,14 @@ class FilamentSpuleCreate(BaseModel):
     restmenge: Optional[float] = None
     in_printer: Optional[bool] = False
     verpackt: Optional[bool] = None
+    printer_serial: Optional[str] = None
 
 # PATCH-Modell für Spule
 class SpuleUpdate(BaseModel):
     restmenge: float
     in_printer: Optional[bool] = None
     gesamtmenge: Optional[float] = None
+    printer_serial: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -352,6 +355,15 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def _normalize_printer_serial(db: Session, serial: Optional[str]) -> Optional[str]:
+    """Return a valid printer serial (or None) ensuring it exists in the DB."""
+    if not serial:
+        return None
+    printer = db.query(Printer).filter(Printer.serial == serial).first()
+    if not printer:
+        raise HTTPException(status_code=404, detail=f"Drucker mit Seriennummer '{serial}' nicht gefunden")
+    return printer.serial
 
 # API Endpoints
 
@@ -435,6 +447,14 @@ async def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)
         return JSONResponse({"detail": f"Nur Typ '{typ.name}' wurde erstellt oder verwendet"}, status_code=201)
 
     is_verpackt = getattr(spule, "verpackt", None)
+    assigned_serial: Optional[str] = None
+    if spule.in_printer:
+        if not spule.printer_serial:
+            raise HTTPException(status_code=400, detail="Bitte Seriennummer des Druckers angeben, wenn die Spule im Drucker ist.")
+        assigned_serial = _normalize_printer_serial(db, spule.printer_serial)
+    else:
+        assigned_serial = None
+
     if not is_verpackt:
         match = db.query(FilamentSpule).join(FilamentTyp).filter(
             FilamentSpule.verpackt == True,
@@ -448,6 +468,7 @@ async def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)
             match.gesamtmenge = spule.gesamtmenge
             match.restmenge = spule.restmenge
             match.in_printer = spule.in_printer if spule.in_printer is not None else False
+            match.printer_serial = assigned_serial if match.in_printer else None
             db.commit()
             db.refresh(match)
             generate_qrcode_for_spule(match)
@@ -464,7 +485,8 @@ async def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)
         gesamtmenge=spule.gesamtmenge,
         restmenge=spule.restmenge,
         in_printer=spule.in_printer if spule.in_printer is not None else False,
-        verpackt=spule.verpackt or False
+        verpackt=spule.verpackt or False,
+        printer_serial=assigned_serial if spule.in_printer else None
     )
     db.add(new_spule)
     db.commit()
@@ -498,7 +520,8 @@ def read_spule(spulen_id: int, db: Session = Depends(get_db)):
         "typ_id": spule.typ_id,
         "gesamtmenge": spule.gesamtmenge,
         "restmenge": spule.restmenge,
-        "in_printer": spule.in_printer
+        "in_printer": spule.in_printer,
+        "printer_serial": spule.printer_serial
     }
 
 
@@ -520,13 +543,23 @@ async def update_spule(spulen_id: int, spule_update: FilamentSpuleCreate, db: Se
                 verbrauch_in_g=verbrauch
             )
             db.add(eintrag)
+    target_in_printer = spule.in_printer if spule_update.in_printer is None else spule_update.in_printer
     if spule_update.in_printer is not None:
         # Prüfung: Maximal 4 Spulen im Drucker
         if spule_update.in_printer and not spule.in_printer:
             in_printer_count = db.query(FilamentSpule).filter_by(in_printer=True).count()
             if in_printer_count >= 4:
                 raise HTTPException(status_code=400, detail="Maximale Anzahl an Spulen im Drucker erreicht. Entferne zuerst eine.")
-        spule.in_printer = spule_update.in_printer
+
+    new_serial = spule.printer_serial
+    if spule_update.printer_serial is not None:
+        new_serial = _normalize_printer_serial(db, spule_update.printer_serial)
+
+    if target_in_printer and not new_serial:
+        raise HTTPException(status_code=400, detail="Bitte einen Drucker auswählen, solange die Spule im Drucker markiert ist.")
+
+    spule.in_printer = target_in_printer
+    spule.printer_serial = new_serial if target_in_printer else None
     if spule_update.verpackt is not None:
         spule.verpackt = spule_update.verpackt
     db.commit()
@@ -558,12 +591,21 @@ async def patch_spule(spulen_id: int, update: SpuleUpdate, db: Session = Depends
             db.add(eintrag)
 
     # in_printer prüfen/setzen (max. 4)
-    if update.in_printer is not None:
-        if update.in_printer and not spule.in_printer:
-            in_printer_count = db.query(FilamentSpule).filter_by(in_printer=True).count()
-            if in_printer_count >= 4:
-                raise HTTPException(status_code=400, detail="Maximale Anzahl an Spulen im Drucker erreicht. Entferne zuerst eine.")
-        spule.in_printer = update.in_printer
+    target_in_printer = spule.in_printer if update.in_printer is None else update.in_printer
+    if update.in_printer is not None and update.in_printer and not spule.in_printer:
+        in_printer_count = db.query(FilamentSpule).filter_by(in_printer=True).count()
+        if in_printer_count >= 4:
+            raise HTTPException(status_code=400, detail="Maximale Anzahl an Spulen im Drucker erreicht. Entferne zuerst eine.")
+
+    new_serial = spule.printer_serial
+    if update.printer_serial is not None:
+        new_serial = _normalize_printer_serial(db, update.printer_serial)
+
+    if target_in_printer and not new_serial:
+        raise HTTPException(status_code=400, detail="Bitte einen Drucker auswählen, solange die Spule im Drucker markiert ist.")
+
+    spule.in_printer = target_in_printer
+    spule.printer_serial = new_serial if target_in_printer else None
 
     # gesamtmenge optional setzen
     if update.gesamtmenge is not None:
@@ -1085,7 +1127,8 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "gesamtmenge": s.gesamtmenge,
         "created_at": s.created_at,
         "updated_at": s.updated_at,
-        "bildname": s.typ.bildname  # neu hinzugefügt
+        "bildname": s.typ.bildname,
+        "printer_serial": s.printer_serial
     } for s in im_drucker_spulen]
 
     # Auch im Drucker gruppiert nach Typ (wie /drucker_data)
@@ -1136,10 +1179,44 @@ def get_dashboard_details(db: Session = Depends(get_db)):
     }
 
 
+@app.get("/api/printer_spools")
+def get_printer_spools(db: Session = Depends(get_db)):
+    printers = {p.serial: p for p in db.query(Printer).all()}
+    spulen = db.query(FilamentSpule).filter(FilamentSpule.in_printer == True).all()
+    result: dict[str, dict] = {}
+
+    def _bucket(key: str | None) -> dict:
+        bucket_key = key or "_unassigned"
+        if bucket_key not in result:
+            printer_obj = printers.get(key) if key else None
+            result[bucket_key] = {
+                "serial": key,
+                "printer_name": printer_obj.name if printer_obj else None,
+                "spools": []
+            }
+        return result[bucket_key]
+
+    for spule in spulen:
+        bucket = _bucket(spule.printer_serial)
+        bucket["spools"].append({
+            "spulen_id": spule.spulen_id,
+            "typ_name": spule.typ.name if spule.typ else None,
+            "farbe": spule.typ.farbe if spule.typ else None,
+            "material": spule.typ.material if spule.typ else None,
+            "durchmesser": spule.typ.durchmesser if spule.typ else None,
+            "restmenge": spule.restmenge,
+            "gesamtmenge": spule.gesamtmenge,
+            "printer_serial": spule.printer_serial,
+            "bildname": spule.typ.bildname if spule.typ else None
+        })
+
+    return result
+
+
 
 # Neuer PATCH-Endpoint: Toggle in_printer für eine Spule
 @app.patch("/api/spule/{spulen_id}/toggle_in_printer")
-def toggle_in_printer(spulen_id: int, db: Session = Depends(get_db)):
+def toggle_in_printer(spulen_id: int, printer_serial: Optional[str] = None, db: Session = Depends(get_db)):
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule nicht gefunden")
@@ -1150,10 +1227,18 @@ def toggle_in_printer(spulen_id: int, db: Session = Depends(get_db)):
         if in_printer_count >= 4:
             raise HTTPException(status_code=400, detail="Maximale Anzahl an Spulen im Drucker erreicht. Entferne zuerst eine.")
 
+    if not spule.in_printer:
+        resolved_serial = _normalize_printer_serial(db, printer_serial or spule.printer_serial)
+        if not resolved_serial:
+            raise HTTPException(status_code=400, detail="Bitte einen Drucker auswählen, solange die Spule im Drucker markiert ist.")
+        spule.printer_serial = resolved_serial
+    else:
+        spule.printer_serial = None
+
     spule.in_printer = not spule.in_printer
     db.commit()
     db.refresh(spule)
-    return {"spulen_id": spulen_id, "in_printer": spule.in_printer}
+    return {"spulen_id": spulen_id, "in_printer": spule.in_printer, "printer_serial": spule.printer_serial}
 
 # Neuer API-Endpunkt: Nur den in_printer-Status einer Spule abfragen
 @app.get("/api/spule/{spulen_id}/in_printer")
@@ -1161,7 +1246,7 @@ def get_in_printer_status(spulen_id: int, db: Session = Depends(get_db)):
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule nicht gefunden")
-    return {"in_printer": spule.in_printer}
+    return {"in_printer": spule.in_printer, "printer_serial": spule.printer_serial}
 
 
 # Neuer API-Endpoint: Filamente im Drucker (nach Typ gruppiert, mit Spulenanzahl)

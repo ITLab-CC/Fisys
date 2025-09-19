@@ -62,6 +62,7 @@
   <script>
 let currentEditSpuleId = null;
 let currentEditSpule = null;
+let cachedPrinters = null;
 
 // Userinfo einmalig abrufen und cachen
 let __cachedUserInfo = undefined; // undefined = noch nicht geladen, null = nicht eingeloggt/kein Zugriff
@@ -81,6 +82,49 @@ async function getUserInfoOnce() {
     __cachedUserInfo = null;
     return null;
   }
+}
+
+async function getPrintersOnce() {
+  if (Array.isArray(cachedPrinters)) return cachedPrinters;
+  try {
+    const res = await fetch("/api/printers");
+    if (!res.ok) throw new Error("Fehler beim Laden der Drucker");
+    const list = await res.json();
+    cachedPrinters = Array.isArray(list) ? list : [];
+  } catch (err) {
+    console.error("Fehler beim Laden von /api/printers:", err);
+    cachedPrinters = [];
+  }
+  return cachedPrinters;
+}
+
+async function populatePrinterSelect(selectedSerial) {
+  const wrapper = document.getElementById('printer-select-wrapper');
+  const select = document.getElementById('printer_serial');
+  if (!wrapper || !select) return;
+  const printers = await getPrintersOnce();
+  select.innerHTML = '<option value="">Drucker wählen…</option>';
+  printers.forEach(printer => {
+    const option = document.createElement('option');
+    option.value = printer.serial;
+    option.textContent = `${printer.name} (${printer.serial})`;
+    select.appendChild(option);
+  });
+  if (selectedSerial && !printers.some(p => p.serial === selectedSerial)) {
+    const fallback = document.createElement('option');
+    fallback.value = selectedSerial;
+    fallback.textContent = `Unbekannter Drucker (${selectedSerial})`;
+    select.appendChild(fallback);
+  }
+  select.value = selectedSerial || '';
+}
+
+function updatePrinterSelectVisibility(isChecked) {
+  const wrapper = document.getElementById('printer-select-wrapper');
+  const select = document.getElementById('printer_serial');
+  if (!wrapper || !select) return;
+  wrapper.classList.toggle('hidden', !isChecked);
+  select.disabled = !isChecked;
 }
 
 async function loadSpulen() {
@@ -244,19 +288,28 @@ async function loadSpulen() {
   });
 }
 
-function openEditModal(spule) {
+async function openEditModal(spule) {
   currentEditSpuleId = spule.spulen_id;
   currentEditSpule = spule;
   document.getElementById('gesamtmenge').value = spule.gesamtmenge;
   document.getElementById('restmenge').value = spule.restmenge;
   document.getElementById('verpackt').checked = spule.verpackt;
-  document.getElementById('in_printer').checked = spule.in_printer;
+  const inPrinterCheckbox = document.getElementById('in_printer');
+  inPrinterCheckbox.checked = spule.in_printer;
+  await populatePrinterSelect(spule.printer_serial || '');
+  updatePrinterSelectVisibility(inPrinterCheckbox.checked);
   document.getElementById('edit-modal').classList.remove('hidden');
   document.body.classList.add("overflow-hidden");
 }
 
 function closeEditModal() {
   currentEditSpuleId = null;
+  currentEditSpule = null;
+  updatePrinterSelectVisibility(false);
+  const printerSelect = document.getElementById('printer_serial');
+  if (printerSelect) {
+    printerSelect.value = '';
+  }
   document.getElementById('edit-modal').classList.add('hidden');
   document.body.classList.remove("overflow-hidden");
 }
@@ -268,6 +321,19 @@ window.addEventListener("DOMContentLoaded", () => {
     closeEditModal();
   });
 
+  const inPrinterCheckbox = document.getElementById('in_printer');
+  inPrinterCheckbox.addEventListener('change', async (e) => {
+    const checked = e.target.checked;
+    updatePrinterSelectVisibility(checked);
+    if (checked) {
+      const preselected = currentEditSpule && currentEditSpule.printer_serial ? currentEditSpule.printer_serial : document.getElementById('printer_serial').value || '';
+      await populatePrinterSelect(preselected);
+    } else {
+      const select = document.getElementById('printer_serial');
+      if (select) select.value = '';
+    }
+  });
+
   document.getElementById('edit-form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
@@ -275,6 +341,12 @@ window.addEventListener("DOMContentLoaded", () => {
     const restmenge = Number(document.getElementById('restmenge').value);
     const verpackt = document.getElementById('verpackt').checked;
     const in_printer = document.getElementById('in_printer').checked;
+    const printerSerialValue = in_printer ? document.getElementById('printer_serial').value : '';
+
+    if (in_printer && !printerSerialValue) {
+      alert("Bitte wählen Sie einen Drucker aus, bevor Sie die Spule als 'Im Drucker' speichern.");
+      return;
+    }
 
     if (restmenge > gesamtmenge) {
       alert("Restmenge darf nicht größer als Gesamtmenge sein.");
@@ -290,6 +362,7 @@ window.addEventListener("DOMContentLoaded", () => {
           restmenge,
           verpackt: document.getElementById('verpackt').checked,
           in_printer: document.getElementById('in_printer').checked,
+          printer_serial: in_printer ? printerSerialValue : null,
           name: currentEditSpule.typ.name,
           material: currentEditSpule.typ.material,
           farbe: currentEditSpule.typ.farbe,
@@ -339,6 +412,11 @@ document.getElementById("suchfeld").addEventListener("input", () => {
         <div class="flex items-center gap-4">
           <input type="checkbox" id="in_printer" name="in_printer" class="w-4 h-4" />
           <label for="in_printer" class="select-none text-white">Im Drucker</label>
+        </div>
+        <div id="printer-select-wrapper" class="flex flex-col gap-2 hidden">
+          <label for="printer_serial" class="block text-white font-semibold mb-1">Drucker auswählen</label>
+          <select id="printer_serial" name="printer_serial" class="w-full border bg-gray-600 text-white border-gray-500 rounded px-3 py-2 disabled:opacity-60" disabled></select>
+          <p class="text-xs text-gray-300">Nur verfügbar, wenn die Spule im Drucker markiert ist.</p>
         </div>
         <div class="flex justify-end gap-4 mt-4">
           <button type="button" id="cancel-btn" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400 transition">Abbrechen</button>

@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.orm import sessionmaker
 from models import Base
 from sqlalchemy.orm import Session
@@ -24,6 +24,14 @@ SessionLocal = sessionmaker(
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    try:
+        with engine.begin() as conn:
+            inspector = inspect(conn)
+            columns = [col["name"] for col in inspector.get_columns("filament_spule")]
+            if "printer_serial" not in columns:
+                conn.execute(text("ALTER TABLE filament_spule ADD COLUMN printer_serial VARCHAR"))
+    except Exception as exc:
+        print(f"[DB] Konnte printer_serial nicht ergänzen: {exc}")
 
 
 def get_db():

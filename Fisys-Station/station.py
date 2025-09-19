@@ -1185,49 +1185,119 @@ def verarbeite_qr_code_in_drucker(barcode):
         zeige_auswahlansicht()
         return
 
-    # PATCH: in_printer=True
-# PATCH inline ausführen: nur erlaubte Felder & korrekte Typen
-    try:
-        aktuelle_rest = int(spule.get("restmenge") or 0)
-        payload = {
-            "restmenge": float(aktuelle_rest),
-            "in_printer": True
-        }
-        headers = {"Content-Type": "application/json", "Accept": "application/json"}
-        r = requests.patch(
-            f"http://{SERVER_IP}:8000/spulen/{spulen_id}",
-            headers=headers,
-            json=payload,
-            timeout=5
-        )
-        if not r.ok:
-            raise RuntimeError(f"PATCH fehlgeschlagen ({r.status_code}): {r.text}")
-    except Exception as e:
-        messagebox.showerror("Fehler", f"❌ Aktualisierung fehlgeschlagen:\n{e}")
+    printer_liste = hole_printer_liste()
+    if not printer_liste:
         zeige_auswahlansicht()
         return
 
-    # Kurze Bestätigung anzeigen, dann zurück zur Auswahl
+    # Auswahloberfläche vorbereiten
     for widget in center_frame.winfo_children():
         widget.destroy()
 
-    bestaetigt_frame = tk.Frame(center_frame, bg="#1e1e1e")
-    bestaetigt_frame.pack(expand=True, fill="both")
+    auswahl_frame = tk.Frame(center_frame, bg="#1e1e1e")
+    auswahl_frame.pack(expand=True, fill="both")
 
-    bestaetigt_label = tk.Label(
-        bestaetigt_frame,
-        text="✅ Erfolgreich in Drucker gesetzt",
-        font=("Helvetica Neue", 34, "bold"),
+    tk.Label(
+        auswahl_frame,
+        text=f"Spule #{spulen_id} in Drucker setzen",
+        font=("Helvetica Neue", 30, "bold"),
         fg="white", bg="#1e1e1e"
-    )
-    bestaetigt_label.pack(expand=True)
+    ).pack(pady=(30, 10))
 
-    def cleanup_and_return():
+    if spule.get("in_printer") and spule.get("printer_serial"):
+        tk.Label(
+            auswahl_frame,
+            text=f"Aktuell zugeordnet: {spule.get('printer_serial')}",
+            font=("Helvetica Neue", 20),
+            fg="white", bg="#1e1e1e"
+        ).pack(pady=(0, 10))
+
+    tk.Label(
+        auswahl_frame,
+        text="Bitte Drucker auswählen:",
+        font=("Helvetica Neue", 22),
+        fg="#d0d0d0", bg="#1e1e1e"
+    ).pack(pady=(0, 20))
+
+    buttons_frame = tk.Frame(auswahl_frame, bg="#1e1e1e")
+    buttons_frame.pack(pady=(0, 30))
+
+    aktuelle_rest = int(spule.get("restmenge") or 0)
+
+    def setze_spule_in_printer(printer_obj):
+        serial = printer_obj.get("serial")
+        if not serial:
+            messagebox.showerror("Fehler", "❌ Dieser Drucker hat keine Seriennummer.")
+            return
+        try:
+            payload = {
+                "restmenge": float(aktuelle_rest),
+                "in_printer": True,
+                "printer_serial": serial
+            }
+            headers = {"Content-Type": "application/json", "Accept": "application/json"}
+            r = requests.patch(
+                f"http://{SERVER_IP}:8000/spulen/{spulen_id}",
+                headers=headers,
+                json=payload,
+                timeout=5
+            )
+            if not r.ok:
+                raise RuntimeError(f"PATCH fehlgeschlagen ({r.status_code}): {r.text}")
+        except Exception as e:
+            messagebox.showerror("Fehler", f"❌ Aktualisierung fehlgeschlagen:\n{e}")
+            zeige_auswahlansicht()
+            return
+
         for widget in center_frame.winfo_children():
             widget.destroy()
-        zeige_auswahlansicht()
 
-    root.after(2000, cleanup_and_return)
+        bestaetigt_frame = tk.Frame(center_frame, bg="#1e1e1e")
+        bestaetigt_frame.pack(expand=True, fill="both")
+
+        drucker_name = printer_obj.get("name") or serial
+        tk.Label(
+            bestaetigt_frame,
+            text=f"✅ Spule im Drucker {drucker_name} gesetzt",
+            font=("Helvetica Neue", 34, "bold"),
+            fg="white", bg="#1e1e1e"
+        ).pack(expand=True)
+
+        def cleanup_and_return():
+            for widget in center_frame.winfo_children():
+                widget.destroy()
+            zeige_auswahlansicht()
+
+        root.after(2000, cleanup_and_return)
+
+    printer_sorted = sorted(
+        printer_liste,
+        key=lambda p: (p.get("name") or p.get("serial") or "").lower()
+    )
+
+    for idx, printer_obj in enumerate(printer_sorted):
+        name = printer_obj.get("name") or "Ohne Namen"
+        serial = printer_obj.get("serial") or "–"
+        btn = tk.Button(
+            buttons_frame,
+            text=f"{name}\n({serial})",
+            font=("Helvetica Neue", 24, "bold"),
+            bg="white", fg="#1e1e1e",
+            relief="flat", padx=40, pady=20,
+            width=22,
+            command=lambda p=printer_obj: setze_spule_in_printer(p)
+        )
+        btn.grid(row=idx // 2, column=idx % 2, padx=20, pady=15, sticky="nsew")
+        buttons_frame.grid_columnconfigure(idx % 2, weight=1)
+
+    tk.Button(
+        auswahl_frame,
+        text="Abbrechen",
+        font=("Helvetica Neue", 22, "bold"),
+        bg="#2d2d2d", fg="white",
+        relief="flat", padx=30, pady=15,
+        command=zeige_auswahlansicht
+    ).pack(pady=(0, 30))
 
 def hole_spule(spulen_id):
     try:
@@ -1256,6 +1326,27 @@ def hole_typ(typ_id):
     except requests.RequestException as e:
         print("❌ Fehler bei API-Aufruf (Typdaten):", e)
         return None
+
+
+def hole_printer_liste():
+    try:
+        url = f"http://{SERVER_IP}:8000/api/printers?only_selected=1"
+        response = requests.get(url, timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data, list):
+                return data
+            logging.warning("⚠️ Unerwartetes Printer-API-Format: %s", data)
+        else:
+            logging.error("❌ Printerliste konnte nicht geladen werden (Status %s)", response.status_code)
+    except requests.RequestException as e:
+        logging.error("❌ Fehler bei API-Aufruf (Printerliste): %s", e)
+
+    messagebox.showerror(
+        "Fehler",
+        "❌ Drucker konnten nicht geladen werden. Bitte Verbindung prüfen."
+    )
+    return []
 
 def starte_scan():
     if not scanner_state["active"]:
