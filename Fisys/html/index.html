@@ -173,7 +173,10 @@
     function connectWS() {
       const proto = (location.protocol === 'https:') ? 'wss' : 'ws';
       ws = new WebSocket(`${proto}://${location.host}/ws/dashboard`);
-      ws.onopen = () => console.log('WebSocket verbunden mit Dashboard');
+      ws.onopen = () => {
+        console.log('WebSocket verbunden mit Dashboard');
+        refreshPrinterData();
+      };
       ws.onclose = () => {
         console.log('Verbindung zum Dashboard-WebSocket getrennt');
         setTimeout(connectWS, 1500); // einfacher Reconnect
@@ -297,20 +300,30 @@
       bar.classList.toggle('shimmer-running', !!isRunning);
     }
 
-    // Initial: ausgewählte Drucker vorab rendern
-    fetch('/api/printers?only_selected=1')
-      .then(r => r.ok ? r.json() : [])
-      .then(list => {
-        selectedPrinterSerials = new Set((list || []).map(p => p.serial));
-        (list || []).forEach(p => ensurePrinterCard(p.serial, p.name));
-      })
-      .catch(() => {});
+    function refreshPrinterData() {
+      fetch('/api/printers?only_selected=1')
+        .then(r => r.ok ? r.json() : [])
+        .then(list => {
+          selectedPrinterSerials = new Set((list || []).map(p => p.serial));
+          syncPrinterCards(list || []);
+        })
+        .catch(() => {});
 
-    // Letzte bekannte Stati einblenden
-    fetch('/api/printer_status_all')
-      .then(r => r.ok ? r.json() : {})
-      .then(map => { Object.values(map || {}).forEach(updatePrinterStatus); })
-      .catch(() => {});
+      fetch('/api/printer_status_all')
+        .then(r => r.ok ? r.json() : {})
+        .then(map => { Object.values(map || {}).forEach(updatePrinterStatus); })
+        .catch(() => {});
+    }
+
+    refreshPrinterData();
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        refreshPrinterData();
+      }
+    });
+
+    window.addEventListener('focus', refreshPrinterData);
 
     function toNumber(value) {
       if (typeof value === 'number' && Number.isFinite(value)) return value;
