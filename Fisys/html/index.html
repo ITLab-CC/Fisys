@@ -319,6 +319,16 @@
       });
     }
 
+    function adjustPanelHeight(panel) {
+      if (!panel) return;
+      requestAnimationFrame(() => {
+        const newHeight = panel.scrollHeight;
+        if (newHeight > 0) {
+          panel.style.maxHeight = newHeight + 'px';
+        }
+      });
+    }
+
     function updateCardSpoolUI(serial) {
       if (!serial) return;
       const card = document.querySelector(`.ps-card[data-serial="${serial}"]`);
@@ -337,6 +347,7 @@
       const panel = card.querySelector('[data-spool-panel]');
       if (panel && !panel.classList.contains('hidden')) {
         renderPrinterSpoolsIntoCard(serial);
+        adjustPanelHeight(panel);
       }
     }
 
@@ -414,6 +425,12 @@
           panel.classList.remove('hidden');
           const scrollHeight = panel.scrollHeight;
           panel.style.maxHeight = scrollHeight + 'px';
+          panel.querySelectorAll('img').forEach(img => {
+            if (!img.complete) {
+              img.addEventListener('load', () => adjustPanelHeight(panel), { once: true });
+            }
+          });
+          adjustPanelHeight(panel);
         } else {
           panel.style.maxHeight = '0px';
           panel.addEventListener('transitionend', () => {
@@ -429,6 +446,7 @@
         const next = !expanded;
         if (next) {
           panel.classList.remove('hidden');
+          panel.style.maxHeight = '0px';
           requestAnimationFrame(() => setPanelState(true));
         } else {
           setPanelState(false);
