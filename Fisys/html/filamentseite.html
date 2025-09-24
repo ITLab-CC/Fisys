@@ -76,6 +76,10 @@
               <label for="gesamtmenge" class="block text-white font-medium mb-1">Gesamtmenge (g) <span class="text-red-500">*</span></label>
               <input type="number" id="gesamtmenge" name="gesamtmenge" min="1" max="99999" step="1" inputmode="numeric" oninput="this.value = this.value.replace(/\D/g,'').slice(0,5)" required class="w-full bg-gray-600 text-white border border-gray-500 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
             </div>
+            <div>
+              <label for="spulen-anzahl" class="block text-white font-medium mb-1">Anzahl Spulen <span class="text-red-500">*</span></label>
+              <input type="number" id="spulen-anzahl" name="spulen-anzahl" value="1" min="1" max="50" step="1" inputmode="numeric" oninput="this.value = this.value.replace(/\\D/g,'').slice(0,2)" required class="w-full bg-gray-600 text-white border border-gray-500 rounded px-3 py-2 focus:outline-none focus:ring focus:border-blue-500" />
+            </div>
             <div class="flex justify-end gap-2 pt-4">
               <button type="button" id="modal-spule-cancel" class="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400">Abbrechen</button>
               <button type="submit" class="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700">Speichern</button>
@@ -259,6 +263,8 @@ window.addEventListener("DOMContentLoaded", () => {
   const dropdownSearch = document.getElementById("dropdown-search");
   const dropdownSelected = document.getElementById("dropdown-selected");
   const hiddenSelect = document.getElementById("spule-typ");
+  const spulenAnzahlInput = document.getElementById("spulen-anzahl");
+  const gesamtmengeInput = document.getElementById("gesamtmenge");
 
   // Toggle dropdown visibility und passe Popup-Höhe dynamisch an
   const popupContent = modalSpule.querySelector("div.bg-white");
@@ -328,6 +334,17 @@ window.addEventListener("DOMContentLoaded", () => {
     spulenContainer.classList.remove("spulen-dimmed");
   }
 
+  function resetSpuleForm() {
+    formSpule.reset();
+    dropdownSelected.textContent = "Bitte wählen";
+    hiddenSelect.value = "";
+    if (dropdownSearch) {
+      dropdownSearch.value = "";
+    }
+    dropdownContainer.classList.add("hidden");
+    spulenAnzahlInput.value = "1";
+  }
+
   addSpuleBtn.addEventListener("click", async () => {
     const res = await fetch("/api/userinfo");
     if (!res.ok) {
@@ -339,6 +356,7 @@ window.addEventListener("DOMContentLoaded", () => {
       zeigeHinweis("Keine Berechtigung, um eine Spule hinzuzufügen.", "bg-red-600");
       return;
     }
+    resetSpuleForm();
     await loadTypenDropdown();
     modalSpule.classList.remove("hidden");
     document.body.style.overflow = "hidden";
@@ -350,6 +368,7 @@ window.addEventListener("DOMContentLoaded", () => {
     modalSpule.classList.add("hidden");
     document.body.style.overflow = "";
     document.body.classList.remove("overflow-hidden");
+    resetSpuleForm();
     undarkenSpulenContainer();
   });
 
@@ -357,14 +376,32 @@ window.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
 
     const typId = hiddenSelect.value;
-    const gesamtmenge = parseInt(document.getElementById("gesamtmenge").value, 10);
+    const gesamtmenge = parseInt(gesamtmengeInput.value, 10);
+    const anzahl = parseInt(spulenAnzahlInput.value, 10);
 
-    if (!typId || !gesamtmenge || gesamtmenge <= 0) {
-      zeigeHinweis("Bitte wählen Sie einen Typ und geben eine gültige Gesamtmenge ein.", "bg-yellow-600");
+    if (!typId) {
+      zeigeHinweis("Bitte wählen Sie einen Typ aus.", "bg-yellow-600");
       return;
     }
 
-    // Suche den Typ im globalen gespeicherten Array
+    if (!Number.isFinite(gesamtmenge) || gesamtmenge <= 0) {
+      zeigeHinweis("Bitte geben Sie eine gültige Gesamtmenge ein.", "bg-yellow-600");
+      gesamtmengeInput.focus();
+      return;
+    }
+
+    if (!Number.isInteger(anzahl) || anzahl <= 0) {
+      zeigeHinweis("Bitte geben Sie eine gültige Anzahl an Spulen ein.", "bg-yellow-600");
+      spulenAnzahlInput.focus();
+      return;
+    }
+
+    if (anzahl > 50) {
+      zeigeHinweis("Maximal 50 Spulen können auf einmal angelegt werden.", "bg-yellow-600");
+      spulenAnzahlInput.focus();
+      return;
+    }
+
     const typ = typenCache.find(t => t.id === parseInt(typId, 10));
 
     if (!typ) {
@@ -372,7 +409,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const data = {
+    const payload = {
       name: typ.name,
       material: typ.material,
       farbe: typ.farbe,
@@ -385,25 +422,48 @@ window.addEventListener("DOMContentLoaded", () => {
       in_printer: false
     };
 
-    const response = await fetch("/spulen/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    });
+    let createdCount = 0;
+    let errorDetail = "";
 
-    if (response.ok) {
+    for (let i = 0; i < anzahl; i++) {
+      const response = await fetch("/spulen/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        try {
+          const err = await response.json();
+          errorDetail = typeof err === "string" ? err : err.detail || err.message || response.statusText;
+        } catch (_) {
+          errorDetail = response.statusText;
+        }
+        break;
+      }
+
+      createdCount += 1;
+    }
+
+    if (createdCount === anzahl) {
+      resetSpuleForm();
       modalSpule.classList.add("hidden");
-      formSpule.reset();
-      dropdownSelected.textContent = "Bitte wählen";
-      hiddenSelect.value = "";
       document.body.style.overflow = "";
       document.body.classList.remove("overflow-hidden");
       undarkenSpulenContainer();
       loadTypen();
+      const successMsg = `${anzahl} Spule${anzahl > 1 ? "n" : ""} erfolgreich hinzugefügt.`;
+      zeigeHinweis(successMsg, "bg-green-600");
+    } else if (createdCount > 0) {
+      loadTypen();
+      const partialMsg = `${createdCount} von ${anzahl} Spulen hinzugefügt. ${errorDetail || "Bitte erneut versuchen."}`;
+      zeigeHinweis(partialMsg.trim(), "bg-yellow-600");
     } else {
-      zeigeHinweis("Fehler beim Hinzufügen der Spule", "bg-red-600");
+      const errorMsg = errorDetail ? `Fehler beim Hinzufügen der Spulen: ${errorDetail}` : "Fehler beim Hinzufügen der Spulen";
+      zeigeHinweis(errorMsg, "bg-red-600");
     }
   });
+
   // Optional: Entferne Abdunklung, falls Modal-Spule durch andere Aktionen geschlossen wird
   // (z. B. Escape-Taste oder Klick außerhalb)
   document.addEventListener("keydown", (e) => {
@@ -411,6 +471,7 @@ window.addEventListener("DOMContentLoaded", () => {
       modalSpule.classList.add("hidden");
       document.body.style.overflow = "";
       document.body.classList.remove("overflow-hidden");
+      resetSpuleForm();
       undarkenSpulenContainer();
     }
   });
@@ -421,6 +482,7 @@ window.addEventListener("DOMContentLoaded", () => {
       modalSpule.classList.add("hidden");
       document.body.style.overflow = "";
       document.body.classList.remove("overflow-hidden");
+      resetSpuleForm();
       undarkenSpulenContainer();
     }
   });
