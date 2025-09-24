@@ -1350,7 +1350,7 @@ def get_low_stock_types(db: Session = Depends(get_db)):
             })
     return result
 
-# Neuer API-Endpunkt: Top 5 meistgenutzte Filamente nach Gesamtverbrauch (aus Verbrauchslog)
+# Neuer API-Endpunkt: Top 10 meistgenutzte Filamente nach Gesamtverbrauch (aus Verbrauchslog)
 @app.get("/api/status/top_filaments")
 def get_top_filaments(db: Session = Depends(get_db)):
     """Gibt die meistgenutzten Filamente nach Gesamtverbrauch zurück (aus Verbrauchslog)."""
@@ -1366,18 +1366,22 @@ def get_top_filaments(db: Session = Depends(get_db)):
         .join(FilamentVerbrauch, FilamentVerbrauch.typ_id == FilamentTyp.id)
         .group_by(FilamentTyp.id, FilamentTyp.name, FilamentTyp.material, FilamentTyp.farbe, FilamentTyp.durchmesser)
         .order_by(func.sum(FilamentVerbrauch.verbrauch_in_g).desc())
-        .limit(5)
+        .limit(10)
         .all()
     )
     return [{"id": r.id, "name": r.name, "material": r.material, "farbe": r.farbe, "durchmesser": r.durchmesser, "verbrauch": int(r.verbrauch or 0)} for r in result]
 
 
-# Neuer API-Endpunkt: Verbrauch der letzten 7 Tage pro Typ (aus Verbrauchslog)
-@app.get("/api/status/weekly_usage")
-def get_weekly_usage(db: Session = Depends(get_db)):
-    """Gibt den Verbrauch pro Typ in den letzten 7 Tagen zurück (aus Verbrauchslog)."""
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
-    result = (
+# Interner Helfer für Verbrauchssummen pro Typ ab bestimmtem Zeitpunkt
+_USAGE_PERIODS = {
+    "day": timedelta(days=1),
+    "week": timedelta(days=7),
+    "month": timedelta(days=30),
+}
+
+
+def _usage_since(db: Session, since: datetime):
+    query = (
         db.query(
             FilamentTyp.id,
             FilamentTyp.name,
@@ -1387,11 +1391,47 @@ def get_weekly_usage(db: Session = Depends(get_db)):
             func.sum(FilamentVerbrauch.verbrauch_in_g).label("verbrauch")
         )
         .join(FilamentVerbrauch, FilamentVerbrauch.typ_id == FilamentTyp.id)
-        .filter(FilamentVerbrauch.datum >= seven_days_ago)
-        .group_by(FilamentTyp.id, FilamentTyp.name, FilamentTyp.material, FilamentTyp.farbe, FilamentTyp.durchmesser)
-        .all()
     )
-    return [{"id": r.id, "name": r.name, "material": r.material, "farbe": r.farbe, "durchmesser": r.durchmesser, "verbrauch": int(r.verbrauch or 0)} for r in result]
+
+    if since is not None:
+        query = query.filter(FilamentVerbrauch.datum >= since)
+
+    result = query.group_by(
+        FilamentTyp.id,
+        FilamentTyp.name,
+        FilamentTyp.material,
+        FilamentTyp.farbe,
+        FilamentTyp.durchmesser
+    ).all()
+
+    return [
+        {
+            "id": row.id,
+            "name": row.name,
+            "material": row.material,
+            "farbe": row.farbe,
+            "durchmesser": row.durchmesser,
+            "verbrauch": int(row.verbrauch or 0),
+        }
+        for row in result
+    ]
+
+
+@app.get("/api/status/usage")
+def get_usage(period: str = "week", db: Session = Depends(get_db)):
+    """Gibt den Verbrauch pro Typ für den gewünschten Zeitraum zurück."""
+    key = (period or "").lower()
+    if key not in _USAGE_PERIODS:
+        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum. Erlaubt: day, week, month")
+
+    since = datetime.utcnow() - _USAGE_PERIODS[key]
+    return _usage_since(db, since)
+
+
+# Bestehender Endpoint für Abwärtskompatibilität
+@app.get("/api/status/weekly_usage")
+def get_weekly_usage(db: Session = Depends(get_db)):
+    return _usage_since(db, datetime.utcnow() - _USAGE_PERIODS["week"])
 
 
 # Serve login.html for /login

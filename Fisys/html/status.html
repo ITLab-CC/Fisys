@@ -56,10 +56,17 @@
         </ul>
       </div>
 
-      <!-- Verbrauch pro Typ in dieser Woche -->
+      <!-- Verbrauch pro Typ -->
       <div class="bg-gray-700 rounded-lg shadow p-6">
-        <h2 class="text-lg text-white font-semibold mb-4 border-b pb-2">Verbrauch pro Typ (diese Woche)</h2>
-        <ul id="weekly-usage-list" class="space-y-3 text-sm text-white">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 border-b pb-2">
+          <h2 class="text-lg text-white font-semibold">Verbrauch pro Typ <span id="usage-period-label" class="text-sm text-gray-300">(diese Woche)</span></h2>
+          <div class="inline-flex items-center gap-1 bg-gray-800 p-1 rounded-md">
+            <button type="button" data-usage-period="day" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Tag</button>
+            <button type="button" data-usage-period="week" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Woche</button>
+            <button type="button" data-usage-period="month" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Monat</button>
+          </div>
+        </div>
+        <ul id="usage-list" class="space-y-3 text-sm text-white">
           <li class="text-white">Lade Daten...</li>
         </ul>
       </div>
@@ -144,13 +151,44 @@ document.addEventListener("DOMContentLoaded", async () => {
       )).join("")
     : "<li class='text-white'>Keine Verbrauchsdaten</li>";
 
-  // Wöchentlicher Verbrauch pro Typ
-  const weeklyUsageRes = await fetch("/api/status/weekly_usage");
-  const weeklyUsage = await weeklyUsageRes.json();
-  const weeklyUsageList = document.getElementById("weekly-usage-list");
-      weeklyUsageList.innerHTML = weeklyUsage.length
-        ? weeklyUsage.map(u => {
-            return `
+  // Verbrauch pro Typ mit auswählbarem Zeitraum
+  const usageList = document.getElementById("usage-list");
+  const usagePeriodLabel = document.getElementById("usage-period-label");
+  const usageButtons = document.querySelectorAll("[data-usage-period]");
+  const usagePeriodLabelMap = {
+    day: "heute",
+    week: "diese Woche",
+    month: "dieser Monat",
+  };
+  const activeButtonClasses = ["bg-blue-600", "text-white"];
+  const inactiveButtonClasses = ["bg-gray-700", "text-gray-200"];
+  let currentUsagePeriod = "week";
+
+  function updateUsageButtons() {
+    usageButtons.forEach(btn => {
+      const isActive = btn.dataset.usagePeriod === currentUsagePeriod;
+      activeButtonClasses.forEach(cls => btn.classList.toggle(cls, isActive));
+      inactiveButtonClasses.forEach(cls => btn.classList.toggle(cls, !isActive));
+    });
+  }
+
+  async function loadUsage(period) {
+    const normalized = (period || "week").toLowerCase();
+    if (!(normalized in usagePeriodLabelMap)) {
+      return loadUsage("week");
+    }
+
+    currentUsagePeriod = normalized;
+    updateUsageButtons();
+    usagePeriodLabel.textContent = `(${usagePeriodLabelMap[currentUsagePeriod]})`;
+    usageList.innerHTML = "<li class='text-white'>Lade Daten...</li>";
+
+    try {
+      const res = await fetch(`/api/status/usage?period=${currentUsagePeriod}`);
+      if (!res.ok) throw new Error(`Antwortstatus ${res.status}`);
+      const daten = await res.json();
+      usageList.innerHTML = daten.length
+        ? daten.map(u => `
               <li class="p-3 rounded border border-blue-500 bg-gray-600">
                 <div class="flex justify-between">
                   <div>
@@ -164,10 +202,23 @@ document.addEventListener("DOMContentLoaded", async () => {
                   </div>
                   <div class="text-sm text-gray-200">${u.verbrauch}g</div>
                 </div>
-              </li>
-            `;
-          }).join("")
-        : "<li class='text-white'>Keine Daten für diese Woche</li>";
+              </li>`).join("")
+        : "<li class='text-white'>Keine Daten für diesen Zeitraum</li>";
+    } catch (err) {
+      console.error("Fehler beim Laden der Verbrauchsdaten:", err);
+      usageList.innerHTML = "<li class='text-white'>Fehler beim Laden</li>";
+    }
+  }
+
+  usageButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.usagePeriod && btn.dataset.usagePeriod !== currentUsagePeriod) {
+        loadUsage(btn.dataset.usagePeriod);
+      }
+    });
+  });
+
+  await loadUsage(currentUsagePeriod);
 });
     </script>
   </main>
