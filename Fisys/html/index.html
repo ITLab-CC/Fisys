@@ -73,6 +73,26 @@
         background-image: none !important;
         animation: finish-pulse 1.8s ease-in-out infinite;
       }
+      .note-preview {
+        position: relative;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        line-clamp: 3;
+        overflow: hidden;
+        min-height: 4.8rem;
+        max-height: 4.8rem;
+        padding-right: 1rem;
+        flex-grow: 1;
+      }
+      .note-preview.clamped::after {
+        content: '…';
+        position: absolute;
+        bottom: 0.25rem;
+        right: 0.35rem;
+        color: rgba(203, 213, 225, 0.7);
+        pointer-events: none;
+      }
     </style>
   </head>
 <body class="bg-gray-800 min-h-screen">
@@ -741,8 +761,13 @@
     function createNoteCard(note) {
       const safeNote = note || {};
       const title = escapeHtml(safeNote.title || 'Hinweis');
-      const messageRaw = safeNote.message ? escapeHtml(safeNote.message) : '';
+      const plainMessage = typeof safeNote.message === 'string' ? safeNote.message : '';
+      const linesMsg = plainMessage ? plainMessage.split(/\r?\n/) : [];
+      const visibleLines = linesMsg.length || (plainMessage ? 1 : 0);
+      const isLongMessage = visibleLines > 3 || plainMessage.length > 240;
+      const messageRaw = plainMessage ? escapeHtml(plainMessage) : '';
       const message = messageRaw ? messageRaw.split('\n').join('<br>') : '<span class="text-gray-400">(Keine Nachricht)</span>';
+      const previewClasses = `text-sm text-gray-100 whitespace-pre-wrap leading-relaxed note-preview${isLongMessage ? ' clamped' : ''}`;
       const timestamp = formatDateTime(safeNote.created_at);
       const actions = buildNoteActions(safeNote);
       return `
@@ -750,8 +775,8 @@
           <div class="flex items-start justify-between gap-3">
             <h3 class="text-base font-semibold text-white leading-snug" title="${title}">${title}</h3>
           </div>
-          <div class="text-sm text-gray-100 whitespace-pre-wrap leading-relaxed">${message}</div>
-          <div class="border-t border-gray-500 pt-2 space-y-2">
+          <div class="${previewClasses}">${message}</div>
+          <div class="mt-auto border-t border-gray-500 pt-2 space-y-2">
             ${actions}
             ${buildNoteFooter(safeNote.author, safeNote.author_role, timestamp)}
           </div>
@@ -766,12 +791,12 @@
       const timestamp = formatDateTime(safeNote.created_at);
       const actions = buildNoteActions(safeNote);
       return `
-        <article class="bg-gray-700 border border-gray-600 rounded-lg p-4 space-y-3">
+        <article class="history-entry bg-gray-700 border border-gray-600 rounded-lg p-4 space-y-3">
           <div class="flex items-start justify-between gap-3">
             <h3 class="text-base font-semibold text-white leading-snug" title="${title}">${title}</h3>
           </div>
           <div class="text-sm text-gray-100 whitespace-pre-wrap leading-relaxed">${message}</div>
-          <div class="border-t border-gray-500 pt-2 space-y-2">
+          <div class="mt-auto border-t border-gray-500 pt-2 space-y-2">
             ${actions}
             ${buildNoteFooter(safeNote.author, safeNote.author_role, timestamp)}
           </div>
@@ -899,6 +924,7 @@
         noteGrid.innerHTML = dashboardNotesSummary.map(createNoteCard).join('');
       }
       bindNoteActionHandlers(noteGrid, dashboardNotesSummary);
+      scheduleHistoryEqualize();
       if (noteShowAllBtn) {
         const hasNotes = dashboardNotesTotal > 0;
         noteShowAllBtn.classList.toggle('hidden', !hasNotes);
