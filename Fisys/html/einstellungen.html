@@ -185,6 +185,8 @@
                     <tr>
                       <th class="px-4 py-2">Benutzername</th>
                       <th class="px-4 py-2">Rolle</th>
+                      <th class="px-4 py-2">Erstellt am</th>
+                      <th class="px-4 py-2">Zuletzt aktiv</th>
                       <th class="px-4 py-2">Aktionen</th>
                     </tr>
                   </thead>
@@ -960,6 +962,13 @@
     cancelBtn.onclick = () => { overlay.classList.add("hidden"); document.body.classList.remove("overflow-hidden"); };
   }
 
+  function formatDateTime(value) {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString("de-DE", { dateStyle: "short", timeStyle: "short" });
+  }
+
       async function ladeBenutzerTabelle() {
         try {
           const res = await fetch("/admin/users");
@@ -978,6 +987,12 @@
             const rolleTd = document.createElement("td");
             rolleTd.className = "px-4 py-2";
             rolleTd.textContent = user.rolle;
+            const erstelltTd = document.createElement("td");
+            erstelltTd.className = "px-4 py-2";
+            erstelltTd.textContent = formatDateTime(user.created_at);
+            const lastSeenTd = document.createElement("td");
+            lastSeenTd.className = "px-4 py-2";
+            lastSeenTd.textContent = formatDateTime(user.last_seen);
             // Aktionen
             const aktionTd = document.createElement("td");
             aktionTd.className = "px-4 py-2 space-x-2";
@@ -1035,13 +1050,15 @@
 
             tr.appendChild(nameTd);
             tr.appendChild(rolleTd);
+            tr.appendChild(erstelltTd);
+            tr.appendChild(lastSeenTd);
             tr.appendChild(aktionTd);
             tbody.appendChild(tr);
           });
         } catch (err) {
           const tbody = document.getElementById("userTabelleBody");
           if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="3" class="px-4 py-2 text-gray-200">Fehler beim Laden der Benutzerliste.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-2 text-gray-200">Fehler beim Laden der Benutzerliste.</td></tr>`;
           }
         }
       }

@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from fastapi import Depends
 from dotenv import load_dotenv
 from itsdangerous import URLSafeSerializer
+from datetime import datetime, timezone
 
 load_dotenv()
 
@@ -41,6 +42,9 @@ async def login(
 
     if not bcrypt.verify(passwort, user.password_hash):
         return RedirectResponse("/login?error=wrong_password", status_code=303)
+
+    user.last_seen = datetime.now(timezone.utc)
+    db.commit()
 
     response = RedirectResponse(url="/", status_code=303)
     cookie_wert = serializer.dumps({"username": benutzername})
@@ -108,6 +112,9 @@ async def get_userinfo(request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == benutzer).first()
     if not user:
         return JSONResponse(status_code=404, content={"detail": "Benutzer nicht gefunden"})
+
+    user.last_seen = datetime.now(timezone.utc)
+    db.commit()
 
     return {"username": user.username, "rolle": user.rolle}
 
@@ -238,4 +245,12 @@ async def list_users(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="Keine Berechtigung")
 
     users = db.query(User).all()
-    return [{"username": u.username, "rolle": u.rolle} for u in users]
+    return [
+        {
+            "username": u.username,
+            "rolle": u.rolle,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "last_seen": u.last_seen.isoformat() if u.last_seen else None,
+        }
+        for u in users
+    ]
