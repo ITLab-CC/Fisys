@@ -1,13 +1,14 @@
 from contextlib import asynccontextmanager
 import os
 import string
+from datetime import datetime, timezone
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from db import SessionLocal, init_db
-from models import FilamentTyp, FilamentSpule, FilamentVerbrauch, User
+from models import FilamentTyp, FilamentSpule, FilamentVerbrauch, FilamentSpuleHistorie, PrinterJobHistory, User
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response, BackgroundTasks, Request
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
@@ -97,6 +98,127 @@ import asyncio
 
 dashboard_connections: list[WebSocket] = []
 LATEST_PRINTER_STATUSES: dict[str, dict] = {}
+CURRENT_PRINTER_JOBS: dict[str, dict] = {}
+PRINTER_NAME_CACHE: dict[str, Optional[str]] = {}
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _resolve_printer_name(serial: str, session: Optional[Session] = None) -> Optional[str]:
+    if not serial:
+        return None
+    cached = PRINTER_NAME_CACHE.get(serial)
+    if cached is not None:
+        return cached
+    own_session = False
+    if session is None:
+        own_session = True
+        session = SessionLocal()
+    try:
+        printer = session.query(Printer).filter(Printer.serial == serial).first()
+        if printer:
+            PRINTER_NAME_CACHE[serial] = printer.name
+            return printer.name
+    except Exception:
+        pass
+    finally:
+        if own_session and session is not None:
+            session.close()
+    return None
+
+
+def _finalize_printer_job(serial: str, entry: dict, status: str, finished_at: datetime) -> None:
+    if not entry:
+        return
+    start_time = entry.get('start_time') or finished_at
+    duration = finished_at - start_time
+    duration_seconds = int(duration.total_seconds()) if duration else None
+    if duration_seconds is not None and duration_seconds < 0:
+        duration_seconds = 0
+    session = SessionLocal()
+    try:
+        printer_name = _resolve_printer_name(serial, session=session)
+        job = PrinterJobHistory(
+            printer_serial=serial,
+            printer_name=printer_name,
+            job_name=entry.get('job_name'),
+            status=status,
+            started_at=start_time,
+            finished_at=finished_at,
+            duration_seconds=duration_seconds
+        )
+        session.add(job)
+        session.commit()
+    except Exception as exc:
+        session.rollback()
+        print(f"[PrinterJob] Persistenzfehler: {exc}")
+    finally:
+        session.close()
+
+
+def _track_printer_job(payload: dict) -> None:
+    serial = payload.get('serial') or payload.get('printer_serial')
+    if not serial:
+        return
+    try:
+        state_raw = payload.get('state') or ''
+        state = str(state_raw).lower()
+        job_name = (payload.get('job_name') or '').strip() or None
+        percent_raw = payload.get('percent')
+        try:
+            percent_value = float(percent_raw) if percent_raw is not None else None
+        except (TypeError, ValueError):
+            percent_value = None
+        now = _utcnow()
+        entry = CURRENT_PRINTER_JOBS.get(serial)
+        printing_tokens = ('print', 'run', 'busy', 'working')
+        success_tokens = ('finish', 'done', 'complete', 'success')
+        failure_tokens = ('fail', 'error', 'cancel', 'abort', 'stopp', 'stopped')
+        is_printing = any(token in state for token in printing_tokens) or (percent_value is not None and 0 < percent_value < 100)
+
+        if is_printing:
+            if entry:
+                if job_name and entry.get('job_name') != job_name:
+                    _finalize_printer_job(serial, entry, 'abgebrochen', now)
+                    CURRENT_PRINTER_JOBS.pop(serial, None)
+                    entry = None
+            if not entry:
+                CURRENT_PRINTER_JOBS[serial] = {
+                    'job_name': job_name or 'Unbekannter Job',
+                    'start_time': now,
+                    'last_state': state,
+                    'last_update': now
+                }
+            else:
+                entry['last_state'] = state
+                entry['last_update'] = now
+                if job_name and not entry.get('job_name'):
+                    entry['job_name'] = job_name
+            return
+
+        entry = CURRENT_PRINTER_JOBS.get(serial)
+        if not entry:
+            return
+
+        status = None
+        if any(token in state for token in success_tokens) or (percent_value is not None and percent_value >= 100):
+            status = 'erfolgreich'
+        elif any(token in state for token in failure_tokens):
+            status = 'fehlgeschlagen'
+        elif state in ('idle', 'ready', 'standby') and entry.get('last_state') and any(token in entry['last_state'] for token in printing_tokens):
+            status = 'erfolgreich'
+
+        entry['last_state'] = state
+        entry['last_update'] = now
+
+        if status:
+            _finalize_printer_job(serial, entry, status, now)
+            CURRENT_PRINTER_JOBS.pop(serial, None)
+    except Exception as exc:
+        print(f"[PrinterJob] Tracking-Fehler: {exc}")
+
 
 def push_to_dashboard(payload: dict):
     """Thread-sicher: aus Worker-Threads ins FastAPI-Event-Loop pushen."""
@@ -106,7 +228,10 @@ def push_to_dashboard(payload: dict):
         global LATEST_PRINTER_STATUSES
         serial = payload.get("serial") or payload.get("printer_serial")
         if serial:
+            _track_printer_job(payload)
             LATEST_PRINTER_STATUSES[serial] = payload
+        else:
+            _track_printer_job(payload)
         # Wenn wir im Event-Loop-Thread sind, direkt Task erstellen
         import asyncio as _asyncio
         try:
@@ -241,6 +366,28 @@ def serve_spulen_page():
     return os.path.join(static_dir, "spulen.html")
 
 # Helper functions
+
+
+def log_spool_history(db: Session, spule: FilamentSpule, aktion: str, alt: Optional[float] = None, neu: Optional[float] = None) -> None:
+    """Persist a history entry for dashboard timeline tracking."""
+    try:
+        typ = spule.typ
+    except Exception:
+        typ = None
+    entry = FilamentSpuleHistorie(
+        spulen_id=spule.spulen_id,
+        typ_name=getattr(typ, "name", None),
+        material=getattr(typ, "material", None),
+        farbe=getattr(typ, "farbe", None),
+        durchmesser=getattr(typ, "durchmesser", None),
+        aktion=aktion,
+        alt_gewicht=alt,
+        neu_gewicht=neu if neu is not None else spule.restmenge,
+        verpackt=spule.verpackt,
+        in_printer=spule.in_printer,
+    )
+    db.add(entry)
+
 def get_or_create_filament_typ(session, name, material, farbe, durchmesser, hersteller=None, leergewicht: int = 0):
     typ = session.query(FilamentTyp).filter_by(
         name=name,
@@ -319,6 +466,7 @@ class FilamentSpuleRead(BaseModel):
     verpackt: bool
     alt_gewicht: float  # neu hinzugefügt
     printer_serial: Optional[str] = None
+    letzte_aktion: Optional[str] = None
     typ: Optional[FilamentTypRead] = None
     model_config = ConfigDict(from_attributes=True)
 
@@ -454,6 +602,7 @@ def delete_typ(typ_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"detail": f"Typ {typ_id} wurde gelöscht"}
 
+
 @app.post("/spulen/", response_model=FilamentSpuleRead)
 async def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)):
     typ = get_or_create_filament_typ(
@@ -488,14 +637,24 @@ async def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)
             FilamentTyp.durchmesser == spule.durchmesser
         ).first()
         if match:
+            previous_rest = match.restmenge
             match.verpackt = False
             match.gesamtmenge = spule.gesamtmenge
             match.restmenge = spule.restmenge
+            match.alt_gewicht = previous_rest
             match.in_printer = spule.in_printer if spule.in_printer is not None else False
             match.printer_serial = assigned_serial if match.in_printer else None
+            match.letzte_aktion = "spule_entpackt"
+            log_spool_history(db, match, "spule_entpackt", alt=previous_rest, neu=match.restmenge)
             db.commit()
             db.refresh(match)
             generate_qrcode_for_spule(match)
+            await notify_dashboard({
+                "event": "spule_updated",
+                "spule_id": match.spulen_id,
+                "restmenge": match.restmenge,
+                "gesamtmenge": match.gesamtmenge
+            })
             return FilamentSpuleRead.model_validate(match)
 
     # Prüfung: Maximal 4 Spulen im Drucker
@@ -504,15 +663,19 @@ async def create_spule(spule: FilamentSpuleCreate, db: Session = Depends(get_db)
         if in_printer_count >= 4:
             raise HTTPException(status_code=400, detail="Maximale Anzahl an Spulen im Drucker erreicht. Entferne zuerst eine.")
 
+    letzte_aktion = "verpackte_spule_hinzugefügt" if spule.verpackt else "spule_hinzugefügt"
     new_spule = FilamentSpule(
         typ=typ,
         gesamtmenge=spule.gesamtmenge,
         restmenge=spule.restmenge,
         in_printer=spule.in_printer if spule.in_printer is not None else False,
         verpackt=spule.verpackt or False,
-        printer_serial=assigned_serial if spule.in_printer else None
+        printer_serial=assigned_serial if spule.in_printer else None,
+        letzte_aktion=letzte_aktion
     )
     db.add(new_spule)
+    db.flush()
+    log_spool_history(db, new_spule, letzte_aktion, alt=None, neu=new_spule.restmenge)
     db.commit()
     db.refresh(new_spule)
     generate_qrcode_for_spule(new_spule)
@@ -549,28 +712,42 @@ def read_spule(spulen_id: int, db: Session = Depends(get_db)):
     }
 
 
+
 @app.put("/spulen/{spulen_id}", response_model=FilamentSpuleRead)
 async def update_spule(spulen_id: int, spule_update: FilamentSpuleCreate, db: Session = Depends(get_db)):
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule not found")
+
+    old_in_printer = spule.in_printer
+    old_verpackt = spule.verpackt
+    history_events: List[Tuple[str, Optional[float], Optional[float]]] = []
+
     if spule_update.gesamtmenge is not None:
+        previous_total = spule.gesamtmenge
         spule.gesamtmenge = spule_update.gesamtmenge
+        if spule_update.gesamtmenge != previous_total:
+            history_events.append(("gesamtmenge_geaendert", previous_total, spule.gesamtmenge))
+
     if spule_update.restmenge is not None and spule_update.restmenge != spule.restmenge:
-        print(f"Update Spule ID {spule.spulen_id}: alt_gewicht={spule.alt_gewicht}, restmenge={spule.restmenge}, neuer Wert={spule_update.restmenge}")
-        verbrauch = spule.restmenge - spule_update.restmenge
+        previous_rest = spule.restmenge
+        new_rest = spule_update.restmenge
+        print(f"Update Spule ID {spule.spulen_id}: alt_gewicht={spule.alt_gewicht}, restmenge={spule.restmenge}, neuer Wert={new_rest}")
+        verbrauch = spule.restmenge - new_rest
         spule.alt_gewicht = spule.restmenge
-        spule.restmenge = spule_update.restmenge
+        spule.restmenge = new_rest
+        history_events.append(("gewicht_geaendert", previous_rest, new_rest))
         if verbrauch > 0:
             eintrag = FilamentVerbrauch(
                 typ_id=spule.typ_id,
                 verbrauch_in_g=verbrauch
             )
             db.add(eintrag)
+
     target_in_printer = spule.in_printer if spule_update.in_printer is None else spule_update.in_printer
     if spule_update.in_printer is not None:
         # Prüfung: Maximal 4 Spulen im Drucker
-        if spule_update.in_printer and not spule.in_printer:
+        if spule_update.in_printer and not old_in_printer:
             in_printer_count = db.query(FilamentSpule).filter_by(in_printer=True).count()
             if in_printer_count >= 4:
                 raise HTTPException(status_code=400, detail="Maximale Anzahl an Spulen im Drucker erreicht. Entferne zuerst eine.")
@@ -584,8 +761,22 @@ async def update_spule(spulen_id: int, spule_update: FilamentSpuleCreate, db: Se
 
     spule.in_printer = target_in_printer
     spule.printer_serial = new_serial if target_in_printer else None
+
+    if spule_update.in_printer is not None and spule_update.in_printer != old_in_printer:
+        history_events.append(("in_drucker_gesetzt" if target_in_printer else "aus_drucker_entfernt", None, None))
+
     if spule_update.verpackt is not None:
-        spule.verpackt = spule_update.verpackt
+        if spule_update.verpackt != old_verpackt:
+            spule.verpackt = spule_update.verpackt
+            history_events.append(("spule_verpackt" if spule.verpackt else "spule_entpackt", None, None))
+        else:
+            spule.verpackt = spule_update.verpackt
+
+    if history_events:
+        spule.letzte_aktion = history_events[-1][0]
+        for action, alt, neu in history_events:
+            log_spool_history(db, spule, action, alt=alt, neu=neu)
+
     db.commit()
     db.refresh(spule)
     # WebSocket-Dashboard-Benachrichtigung
@@ -597,18 +788,26 @@ async def update_spule(spulen_id: int, spule_update: FilamentSpuleCreate, db: Se
     })
     return spule
 
-# PATCH-Endpoint für Spule
+
 @app.patch("/spulen/{spulen_id}", response_model=FilamentSpuleRead)
 async def patch_spule(spulen_id: int, update: SpuleUpdate, db: Session = Depends(get_db)):
     spule = db.get(FilamentSpule, spulen_id)
     if not spule:
         raise HTTPException(status_code=404, detail="Spule nicht gefunden")
 
-    # Verbrauch nur berechnen, wenn restmenge übergeben wurde
+    old_in_printer = spule.in_printer
+    history_events: List[Tuple[str, Optional[float], Optional[float]]] = []
+
     if update.restmenge is not None:
-        verbrauch = spule.restmenge - update.restmenge
-        spule.alt_gewicht = spule.restmenge
-        spule.restmenge = update.restmenge
+        previous_rest = spule.restmenge
+        new_rest = update.restmenge
+        verbrauch = spule.restmenge - new_rest
+        if new_rest != spule.restmenge:
+            spule.alt_gewicht = spule.restmenge
+            spule.restmenge = new_rest
+            history_events.append(("gewicht_geaendert", previous_rest, new_rest))
+        else:
+            spule.restmenge = new_rest
 
         if verbrauch > 0:
             eintrag = FilamentVerbrauch(typ_id=spule.typ_id, verbrauch_in_g=verbrauch)
@@ -631,9 +830,20 @@ async def patch_spule(spulen_id: int, update: SpuleUpdate, db: Session = Depends
     spule.in_printer = target_in_printer
     spule.printer_serial = new_serial if target_in_printer else None
 
+    if update.in_printer is not None and update.in_printer != old_in_printer:
+        history_events.append(("in_drucker_gesetzt" if target_in_printer else "aus_drucker_entfernt", None, None))
+
     # gesamtmenge optional setzen
     if update.gesamtmenge is not None:
+        previous_total = spule.gesamtmenge
         spule.gesamtmenge = update.gesamtmenge
+        if update.gesamtmenge != previous_total:
+            history_events.append(("gesamtmenge_geaendert", previous_total, spule.gesamtmenge))
+
+    if history_events:
+        spule.letzte_aktion = history_events[-1][0]
+        for action, alt, neu in history_events:
+            log_spool_history(db, spule, action, alt=alt, neu=neu)
 
     db.commit()
     db.refresh(spule)
@@ -1171,24 +1381,44 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         .scalar()
     ) or 0
 
-    # Zuletzt bearbeitete Spulen (nach Update-Zeit)
-    letzte_spulen = (
-        db.query(FilamentSpule)
-        .order_by(FilamentSpule.updated_at.desc())
-        .limit(3)
+    # Zuletzt bearbeitete Spulen (nach Historie-Einträgen)
+    letzte_events = (
+        db.query(FilamentSpuleHistorie)
+        .order_by(FilamentSpuleHistorie.created_at.desc())
+        .limit(5)
         .all()
     )
     spulen_liste = [{
         "spulen_id": s.spulen_id,
-        "typ_name": s.typ.name,
-        "farbe": s.typ.farbe,
-        "material": s.typ.material,
-        "durchmesser": s.typ.durchmesser,
+        "typ_name": s.typ_name,
+        "farbe": s.farbe,
+        "material": s.material,
+        "durchmesser": s.durchmesser,
         "alt_gewicht": s.alt_gewicht,
-        "neu_gewicht": s.restmenge,
+        "neu_gewicht": s.neu_gewicht,
         "created_at": s.created_at,
-        "updated_at": s.updated_at,
-    } for s in letzte_spulen]
+        "updated_at": s.created_at,
+        "letzte_aktion": s.aktion,
+        "verpackt": s.verpackt,
+        "in_printer": s.in_printer,
+    } for s in letzte_events]
+
+    job_events = (
+        db.query(PrinterJobHistory)
+        .order_by(PrinterJobHistory.finished_at.desc(), PrinterJobHistory.created_at.desc())
+        .limit(3)
+        .all()
+    )
+    job_historie = [{
+        "job_name": j.job_name,
+        "status": j.status,
+        "printer_serial": j.printer_serial,
+        "printer_name": j.printer_name,
+        "duration_seconds": j.duration_seconds,
+        "started_at": j.started_at,
+        "finished_at": j.finished_at,
+        "created_at": j.created_at,
+    } for j in job_events]
 
     # Neu hinzugefügte Spulen (nach Erstellzeit)
     neue_spulen = (
@@ -1207,6 +1437,9 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "neu_gewicht": s.restmenge,
         "created_at": s.created_at,
         "updated_at": s.updated_at,
+        "letzte_aktion": s.letzte_aktion,
+        "verpackt": s.verpackt,
+        "in_printer": s.in_printer,
     } for s in neue_spulen]
 
     # Ergänzung: Spulen, die aktuell im Drucker sind
@@ -1271,7 +1504,8 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "im_drucker": im_drucker,
         "im_drucker_spulen": im_drucker_liste,
         "letzte_spulen": spulen_liste,
-        "neue_spulen": neue_spulen_liste
+        "neue_spulen": neue_spulen_liste,
+        "job_historie": job_historie
     }
 
 

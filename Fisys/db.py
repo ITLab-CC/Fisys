@@ -30,6 +30,8 @@ def init_db():
             columns = [col["name"] for col in inspector.get_columns("filament_spule")]
             if "printer_serial" not in columns:
                 conn.execute(text("ALTER TABLE filament_spule ADD COLUMN printer_serial VARCHAR"))
+            if "letzte_aktion" not in columns:
+                conn.execute(text("ALTER TABLE filament_spule ADD COLUMN letzte_aktion VARCHAR"))
             user_columns = [col["name"] for col in inspector.get_columns("users")]
             timestamp_type = "TIMESTAMP" if is_sqlite else "TIMESTAMP WITH TIME ZONE"
             default_clause = "DEFAULT CURRENT_TIMESTAMP"

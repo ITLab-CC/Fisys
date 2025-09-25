@@ -36,6 +36,7 @@ class FilamentSpule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     alt_gewicht: Mapped[float] = mapped_column(Float, default=0)
+    letzte_aktion: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     typ: Mapped["FilamentTyp"] = relationship("FilamentTyp", back_populates="spulen")
 
     def get_prozent_voll(self):
@@ -43,6 +44,38 @@ class FilamentSpule(Base):
 
 
 # Tabelle für Filament-Verbrauchs-Logs
+
+class FilamentSpuleHistorie(Base):
+    __tablename__ = 'filament_spule_historie'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    spulen_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    typ_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    material: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    farbe: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    durchmesser: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    aktion: Mapped[str] = mapped_column(String, nullable=False)
+    alt_gewicht: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    neu_gewicht: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    verpackt: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    in_printer: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PrinterJobHistory(Base):
+    __tablename__ = 'printer_job_history'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    printer_serial: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    printer_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    job_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class FilamentVerbrauch(Base):
     __tablename__ = 'filament_verbrauch'
 
@@ -63,6 +96,23 @@ class FilamentSpuleRead(BaseModel):
     in_printer: bool
     verpackt: bool
     printer_serial: Optional[str] = None
+    letzte_aktion: Optional[str] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FilamentSpuleHistorieRead(BaseModel):
+    id: int
+    spulen_id: int
+    typ_name: Optional[str]
+    material: Optional[str]
+    farbe: Optional[str]
+    durchmesser: Optional[float]
+    aktion: str
+    alt_gewicht: Optional[float]
+    neu_gewicht: Optional[float]
+    verpackt: Optional[bool]
+    in_printer: Optional[bool]
+    created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 class FilamentSpuleCreate(BaseModel):

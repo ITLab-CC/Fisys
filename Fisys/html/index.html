@@ -132,18 +132,24 @@
 
     <!-- Letzte Änderungen -->
     <div>
-      <h2 class="text-xl font-semibold mb-4">Letzte Änderungen</h2>
-      <div class="flex flex-col md:flex-row gap-4 items-stretch">
-        <div class="bg-gray-700 p-4 rounded-xl shadow-sm flex-1">
+      <h2 class="text-xl font-semibold mb-4">Historie</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+        <div class="bg-gray-700 p-4 rounded-xl shadow-sm flex flex-col" data-history-card="last">
           <h3 class="text-sm font-medium text-white mb-2">Zuletzt bearbeitete Spulen</h3>
           <div id="last-edited-spools" class="space-y-3 text-sm text-gray-600">
             <div class="text-white italic">Lade letzte Änderungen …</div>
           </div>
         </div>
-        <div class="bg-gray-700 p-4 rounded-xl shadow-sm flex-1">
+        <div class="bg-gray-700 p-4 rounded-xl shadow-sm flex flex-col" data-history-card="new">
           <h3 class="text-sm font-medium text-white mb-2">Neu hinzugefügte Spulen</h3>
           <div id="new-spools" class="space-y-3 text-sm text-gray-600">
             <div class="text-gray-400 italic">Lade neue Spulen …</div>
+          </div>
+        </div>
+        <div class="bg-gray-700 p-4 rounded-xl shadow-sm flex flex-col" data-history-card="jobs">
+          <h3 class="text-sm font-medium text-white mb-2">Letzte Druckjobs</h3>
+          <div id="recent-print-jobs" class="space-y-3 text-sm text-gray-600">
+            <div class="text-gray-400 italic">Noch keine Druckjobs.</div>
           </div>
         </div>
       </div>
@@ -483,27 +489,60 @@
     window.addEventListener('focus', refreshPrinterData);
 
     function toNumber(value) {
-      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (value === null || value === undefined || value === '') return null;
+      if (typeof value === 'number') return Number.isFinite(value) ? value : null;
       const parsed = Number(value);
       return Number.isFinite(parsed) ? parsed : null;
     }
 
     function pickEditedSpools(spools) {
-      const list = Array.isArray(spools) ? spools.slice() : [];
-      const changed = list.filter(s => {
-        const alt = toNumber(s && s.alt_gewicht);
-        const neu = toNumber(s && s.neu_gewicht);
-        if (alt !== null && neu !== null && alt !== neu) {
-          return true;
-        }
-        if (!s || !s.updated_at || !s.created_at) {
-          return false;
-        }
-        return new Date(s.updated_at).getTime() > new Date(s.created_at).getTime();
-      });
-      const relevant = changed.length ? changed : list;
-      return relevant.slice(0, 3);
+      if (!Array.isArray(spools)) return [];
+      return spools.slice(0, 3);
     }
+
+    function equalizeHistoryColumns() {
+      const cards = Array.from(document.querySelectorAll('[data-history-card]'));
+      if (!cards.length) return;
+      cards.forEach(card => {
+        card.style.minHeight = '';
+      });
+      const anchor = document.querySelector('[data-history-card=\"last\"]');
+      if (!anchor) return;
+      const targetHeight = anchor.scrollHeight;
+      if (!targetHeight) return;
+      cards.forEach(card => {
+        if (card === anchor) return;
+        card.style.minHeight = `${targetHeight}px`;
+      });
+    }
+
+    function equalizeHistoryEntries() {
+      const entryCards = Array.from(document.querySelectorAll('[data-history-card] .history-entry'));
+      if (!entryCards.length) return;
+      entryCards.forEach(card => {
+        card.style.minHeight = '';
+      });
+      const reference = Array.from(document.querySelectorAll('[data-history-card=\"last\"] .history-entry'));
+      const source = reference.length ? reference : entryCards;
+      const targetHeight = Math.max(...source.map(card => card.scrollHeight), 0);
+      if (!targetHeight) return;
+      entryCards.forEach(card => {
+        card.style.minHeight = `${targetHeight}px`;
+      });
+    }
+
+    let historyResizeRaf = null;
+    function scheduleHistoryEqualize() {
+      if (historyResizeRaf) cancelAnimationFrame(historyResizeRaf);
+      historyResizeRaf = requestAnimationFrame(() => {
+        historyResizeRaf = null;
+        equalizeHistoryColumns();
+        equalizeHistoryEntries();
+      });
+    }
+
+    window.addEventListener('resize', scheduleHistoryEqualize);
+
 
     function renderEditedSpools(spools, container) {
       if (!container) return;
@@ -514,19 +553,54 @@
         return;
       }
       const toTime = (value) => value ? new Date(value).getTime() : 0;
+      const actionMessages = {
+        gewicht_geaendert: 'Gewicht aktualisiert',
+        in_drucker_gesetzt: 'In Drucker gesetzt',
+        aus_drucker_entfernt: 'Aus Drucker entfernt',
+        verpackte_spule_hinzugefügt: 'Verpackte Spule hinzugefügt',
+        spule_hinzugefügt: 'Spule hinzugefügt',
+        spule_entpackt: 'Spule entpackt',
+        spule_verpackt: 'Spule verpackt',
+        gesamtmenge_geaendert: 'Gesamtmenge angepasst'
+      };
       entries
         .sort((a, b) => toTime(b.updated_at ?? b.created_at) - toTime(a.updated_at ?? a.created_at))
         .forEach(s => {
-          const alt = toNumber(s.alt_gewicht) ?? 0;
-          const neu = toNumber(s.neu_gewicht) ?? 0;
+          const altRaw = toNumber(s.alt_gewicht);
+          const neuRaw = toNumber(s.neu_gewicht);
+          const alt = altRaw ?? 0;
+          const neu = neuRaw ?? 0;
           const diff = alt - neu;
           const diffDisplay = Math.abs(diff);
           const diffPrefix = diff >= 0 ? '–' : '+';
-          const color = diff >= 100 ? 'text-red-500' : diff >= 50 ? 'text-yellow-500' : 'text-green-600';
+          const color = diffDisplay >= 100 ? 'text-red-500' : diffDisplay >= 50 ? 'text-yellow-500' : 'text-green-600';
+          const hasWeights = altRaw !== null && neuRaw !== null;
           const datumQuelle = s.updated_at ?? s.created_at;
-          const datum = datumQuelle ? new Date(datumQuelle).toLocaleDateString('de-DE') : '';
+          const datum = datumQuelle ? new Date(datumQuelle).toLocaleString('de-DE', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }) : '';
+          const actionKey = (s.letzte_aktion || '').trim();
+          const messageText = actionMessages[actionKey] || '';
+          const showDiff = hasWeights && diffDisplay > 0;
+          const messageRowHtml = messageText
+            ? `<div class="text-xs text-gray-100 text-center font-semibold">${messageText}</div>`
+            : '';
+          const diffRowHtml = showDiff
+            ? `<div class="flex justify-between items-center text-xs text-gray-100 space-x-2">
+                <div class="flex-1 text-left">Alt: ${alt} g</div>
+                <div class="flex-1 text-center ${color} font-semibold">${diffPrefix}${diffDisplay} g</div>
+                <div class="flex-1 text-right">Neu: ${neu} g</div>
+              </div>`
+            : '';
+          const fallbackRowHtml = !showDiff && !messageText && hasWeights
+            ? '<div class="text-xs text-gray-100 text-center">Keine Gewichtsänderung</div>'
+            : '';
           container.innerHTML += `
-            <div class="relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+            <div class="history-entry relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
               <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-200 select-none pointer-events-none">
                 ID: ${s.spulen_id}
               </div>
@@ -534,14 +608,63 @@
                 <div class="text-sm font-semibold text-white">${s.typ_name} (${s.material}, ${s.farbe})</div>
                 <div class="text-xs text-gray-200 ml-2">${datum}</div>
               </div>
-              <div class="flex justify-between items-center text-xs text-gray-100 space-x-2">
-                <div class="flex-1 text-left">Alt: ${alt} g</div>
-                <div class="flex-1 text-center ${color} font-semibold">${diffPrefix}${diffDisplay} g</div>
-                <div class="flex-1 text-right">Neu: ${neu} g</div>
-              </div>
+              ${messageRowHtml || ''}
+              ${diffRowHtml || fallbackRowHtml}
             </div>
           `;
         });
+    }
+
+
+    function formatDuration(seconds) {
+      if (!Number.isFinite(seconds) || seconds <= 0) return '—';
+      const mins = Math.round(seconds / 60);
+      if (mins < 60) return `${Math.max(mins, 1)} min`;
+      const hours = Math.floor(mins / 60);
+      const rest = mins % 60;
+      if (rest === 0) return `${hours} h`;
+      return `${hours} h ${rest} min`;
+    }
+
+    function renderPrintJobs(jobs, container) {
+      if (!container) return;
+      const list = Array.isArray(jobs) ? jobs.slice(0, 3) : [];
+      container.innerHTML = '';
+      if (!list.length) {
+        container.innerHTML = '<div class="text-gray-400 italic">Noch keine Druckjobs.</div>';
+        return;
+      }
+      const statusConfig = {
+        'erfolgreich': { label: 'Abgeschlossen', color: 'text-green-400' },
+        'fehlgeschlagen': { label: 'Fehlgeschlagen', color: 'text-red-400' },
+        'abgebrochen': { label: 'Abgebrochen', color: 'text-yellow-400' }
+      };
+      list.forEach(job => {
+        const cfg = statusConfig[job.status] || { label: job.status || 'Unbekannt', color: 'text-gray-300' };
+        const finished = job.finished_at || job.started_at || job.created_at;
+        const datum = finished ? new Date(finished).toLocaleString('de-DE', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }) : '';
+        const printer = job.printer_name || job.printer_serial || '—';
+        const duration = formatDuration(Number(job.duration_seconds));
+        container.innerHTML += `
+          <div class="history-entry relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+            <div class="flex justify-between items-center">
+              <div class="text-sm font-semibold text-white truncate">${job.job_name || 'Unbekannter Job'}</div>
+              <div class="text-xs ${cfg.color} font-semibold">${cfg.label}</div>
+            </div>
+            <div class="flex justify-between text-xs text-gray-100">
+              <span>Drucker: ${printer}</span>
+              <span>Dauer: ${duration}</span>
+            </div>
+            <div class="text-xs text-gray-300 text-right">${datum}</div>
+          </div>
+        `;
+      });
     }
 
     async function loadDashboardDetails() {
@@ -556,8 +679,10 @@
 
       const edited = document.querySelector("#last-edited-spools");
       const added = document.querySelector("#new-spools");
+      const jobs = document.querySelector("#recent-print-jobs");
 
       renderEditedSpools(data.letzte_spulen, edited);
+      renderPrintJobs(data.job_historie, jobs);
 
       added.innerHTML = "";
       (data.neue_spulen || [])
@@ -566,7 +691,7 @@
         .forEach(s => {
           const datum = new Date(s.created_at).toLocaleDateString("de-DE");
           added.innerHTML += `
-            <div class="relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
+            <div class="history-entry relative flex flex-col bg-gray-800 rounded-lg px-4 py-2 border border-gray-200 space-y-1">
               <div class="absolute top-3.5 left-1/2 transform -translate-x-1/2 text-xs text-gray-200 select-none pointer-events-none">
                 ID: ${s.spulen_id}
               </div>
@@ -606,6 +731,7 @@
         });
       });
       setPrinterSpoolData(groupedSpools);
+      scheduleHistoryEqualize();
     }
 
     function animateRollingNumber(element, target, suffix = "") {
