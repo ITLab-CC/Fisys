@@ -4,8 +4,8 @@ import string
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from db import SessionLocal, init_db
-from models import FilamentTyp, FilamentSpule, FilamentVerbrauch
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response, BackgroundTasks
+from models import FilamentTyp, FilamentSpule, FilamentVerbrauch, User
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response, BackgroundTasks, Request
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from qrcode_utils import generate_qrcode_for_spule, delete_qrcode_for_spule
 import shutil
-from auth import router as auth_router
+from auth import router as auth_router, serializer, COOKIE_MAX_AGE
 from printer_service import start_printer_service, stop_printer_service
 from models import Printer, PrinterCreate, PrinterUpdate, PrinterRead
 
@@ -348,6 +348,10 @@ class SpuleUpdate(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class VerbrauchUpdate(BaseModel):
+    verbrauch_in_g: float
+
 # DB Dependency
 def get_db():
     db = SessionLocal()
@@ -355,6 +359,26 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+
+def require_roles(request: Request, db: Session, allowed_roles: set[str]) -> User:
+    """Stellt sicher, dass der aktuelle Nutzer eine erlaubte Rolle besitzt."""
+    raw_cookie = request.cookies.get("benutzer")
+    username = None
+    if raw_cookie:
+        try:
+            data = serializer.loads(raw_cookie, max_age=COOKIE_MAX_AGE)
+            username = data.get("username")
+        except Exception:
+            username = None
+    if not username:
+        raise HTTPException(status_code=401, detail="Nicht eingeloggt")
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user or user.rolle not in allowed_roles:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    return user
 
 def _normalize_printer_serial(db: Session, serial: Optional[str]) -> Optional[str]:
     """Return a valid printer serial (or None) ensuring it exists in the DB."""
@@ -660,8 +684,80 @@ def delete_spule_api(
     return {"detail": f"Spule {spulen_id} wurde gelöscht und Verbrauch von {spule.restmenge}g geloggt"}
 
 
+# --- Admin: Verbrauchsverwaltung ---
+
+def _serialize_verbrauch_entry(entry: FilamentVerbrauch, typ: Optional[FilamentTyp] | None = None) -> dict:
+    typ = typ or entry.typ
+    return {
+        "id": entry.id,
+        "typ_id": entry.typ_id,
+        "typ_name": getattr(typ, "name", None),
+        "material": getattr(typ, "material", None),
+        "farbe": getattr(typ, "farbe", None),
+        "durchmesser": getattr(typ, "durchmesser", None),
+        "verbrauch_in_g": entry.verbrauch_in_g,
+        "datum": entry.datum.isoformat() if entry.datum else None,
+    }
+
+
+@app.get("/admin/verbrauch")
+def list_filament_consumption(request: Request, limit: int = 200, db: Session = Depends(get_db)):
+    require_roles(request, db, {"mod", "admin"})
+    limit = max(1, min(limit, 500))
+    rows = (
+        db.query(FilamentVerbrauch, FilamentTyp)
+        .join(FilamentTyp, FilamentTyp.id == FilamentVerbrauch.typ_id)
+        .order_by(FilamentVerbrauch.datum.desc())
+        .limit(limit)
+        .all()
+    )
+    entries = [_serialize_verbrauch_entry(entry, typ) for entry, typ in rows]
+    total_sum = db.query(func.sum(FilamentVerbrauch.verbrauch_in_g)).scalar() or 0
+    total_count = db.query(func.count(FilamentVerbrauch.id)).scalar() or 0
+    return {
+        "entries": entries,
+        "total_sum": total_sum,
+        "total_count": total_count,
+        "limit": limit,
+        "has_more": total_count > len(entries),
+    }
+
+
+@app.patch("/admin/verbrauch/{entry_id}")
+def update_filament_consumption(entry_id: int, payload: VerbrauchUpdate, request: Request, db: Session = Depends(get_db)):
+    require_roles(request, db, {"mod", "admin"})
+    if payload.verbrauch_in_g < 0:
+        raise HTTPException(status_code=400, detail="Verbrauch darf nicht negativ sein")
+
+    eintrag = db.get(FilamentVerbrauch, entry_id)
+    if not eintrag:
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+
+    eintrag.verbrauch_in_g = payload.verbrauch_in_g
+    db.commit()
+    db.refresh(eintrag)
+    typ = db.query(FilamentTyp).filter(FilamentTyp.id == eintrag.typ_id).first()
+    return {
+        "detail": "Verbrauch aktualisiert",
+        "entry": _serialize_verbrauch_entry(eintrag, typ),
+    }
+
+
+@app.delete("/admin/verbrauch/{entry_id}")
+def delete_filament_consumption(entry_id: int, request: Request, db: Session = Depends(get_db)):
+    require_roles(request, db, {"mod", "admin"})
+    eintrag = db.get(FilamentVerbrauch, entry_id)
+    if not eintrag:
+        raise HTTPException(status_code=404, detail="Eintrag nicht gefunden")
+    db.delete(eintrag)
+    db.commit()
+    return {
+        "detail": "Verbrauchseintrag gelöscht"
+    }
+
+
 # Bild-Upload Endpoint
-from fastapi import Form, Request
+from fastapi import Form
 
 @app.post("/upload-image/")
 def upload_image(file: UploadFile = File(...), name: str = Form("")):

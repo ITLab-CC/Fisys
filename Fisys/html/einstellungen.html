@@ -80,6 +80,10 @@
                 <p class="text-sm font-semibold text-white mb-1">User</p>
                 <button data-ziel="userVerwaltungBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">User verwalten</button>
               </div>
+              <div id="verbrauchNavBlock" class="hidden">
+                <p class="text-sm font-semibold text-white mb-1">Filamentverbrauch</p>
+                <button data-ziel="verbrauchVerwaltungBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Verbrauch verwalten</button>
+              </div>
             </nav>
           </aside>
 
@@ -188,6 +192,48 @@
                 </table>
               </div>
             </div>
+
+            <!-- Verbrauch verwalten -->
+            <div id="verbrauchVerwaltungBlock" class="hidden bg-gray-700 p-6 rounded shadow">
+              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                <div>
+                  <h2 class="text-xl text-white font-semibold">Filamentverbrauch verwalten</h2>
+                  <p class="text-sm text-gray-300">Entferne Testeinträge und passe fehlerhafte Werte an.</p>
+                </div>
+                <button id="verbrauchNeuLaden" class="self-start md:self-center bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-500 text-sm">Aktualisieren</button>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-6">
+                <div class="bg-gray-800 p-4 rounded border border-gray-600">
+                  <p class="text-xs uppercase text-gray-400 tracking-wide">Gesamtverbrauch</p>
+                  <p id="verbrauchSum" class="text-lg font-semibold text-white mt-1">–</p>
+                </div>
+                <div class="bg-gray-800 p-4 rounded border border-gray-600">
+                  <p class="text-xs uppercase text-gray-400 tracking-wide">Einträge im Log</p>
+                  <p id="verbrauchCount" class="text-lg font-semibold text-white mt-1">–</p>
+                </div>
+                <div class="bg-gray-800 p-4 rounded border border-gray-600">
+                  <p class="text-xs uppercase text-gray-400 tracking-wide">Hinweis</p>
+                  <p class="text-sm text-gray-300 mt-1">Änderungen wirken sich direkt auf alle Statistiken aus.</p>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-sm text-gray-100 text-left border">
+                  <thead class="bg-gray-600 border-b">
+                    <tr>
+                      <th class="px-4 py-2">Datum</th>
+                      <th class="px-4 py-2">Eintrag</th>
+                      <th class="px-4 py-2">Verbrauch</th>
+                      <th class="px-4 py-2">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="verbrauchTabelleBody">
+                    <tr>
+                      <td colspan="4" class="px-4 py-6 text-center text-gray-400">Noch keine Daten geladen</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -217,7 +263,7 @@
         highlightBar.classList.remove("hidden");
 
         // Bereiche verstecken und Ziel anzeigen
-        const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "printerVerwaltungBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock"];
+        const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "printerVerwaltungBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock", "verbrauchVerwaltungBlock"];
         bereiche.forEach(id => {
           const el = document.getElementById(id);
           if (el) el.classList.add("hidden");
@@ -227,7 +273,7 @@
         if (zielElement) zielElement.classList.remove("hidden");
       });
       // Anfangs alle Bereiche verstecken
-      const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "printerVerwaltungBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock"];
+      const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "printerVerwaltungBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock", "verbrauchVerwaltungBlock"];
       bereiche.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add("hidden");
@@ -666,6 +712,171 @@
               zeigeBenachrichtigung("Fehler beim Erstellen des Tokens.", "red");
             }
           });
+
+          const verbrauchNavBlock = document.getElementById("verbrauchNavBlock");
+          const verbrauchTabelleBody = document.getElementById("verbrauchTabelleBody");
+          const verbrauchSum = document.getElementById("verbrauchSum");
+          const verbrauchCount = document.getElementById("verbrauchCount");
+          const verbrauchNeuLaden = document.getElementById("verbrauchNeuLaden");
+          const einstellungsMenue = document.getElementById("einstellungsMenue");
+          const verbrauchDateFormatter = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" });
+          const verbrauchNumberFormat = new Intl.NumberFormat("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+          const verbrauchCountFormat = new Intl.NumberFormat("de-DE");
+          let verbrauchGeladen = false;
+
+          const formatVerbrauch = (value) => `${verbrauchNumberFormat.format(value ?? 0)} g`;
+          const formatDatum = (value) => {
+            if (!value) return "–";
+            const date = new Date(value);
+            return Number.isNaN(date.getTime()) ? "–" : verbrauchDateFormatter.format(date);
+          };
+
+          const baueVerbrauchszeile = (entry) => {
+            const tr = document.createElement("tr");
+            tr.className = "border-b align-top";
+
+            const datumTd = document.createElement("td");
+            datumTd.className = "px-4 py-2 whitespace-nowrap";
+            datumTd.textContent = formatDatum(entry.datum);
+
+            const infoTd = document.createElement("td");
+            infoTd.className = "px-4 py-2";
+            const nameDiv = document.createElement("div");
+            nameDiv.className = "font-semibold text-white";
+            const typLabel = entry.typ_name || (entry.typ_id != null ? `Typ #${entry.typ_id}` : "Unbekannter Typ");
+            nameDiv.textContent = typLabel;
+            const metaDiv = document.createElement("div");
+            metaDiv.className = "text-xs text-gray-400 mt-1";
+            const details = [];
+            if (entry.material) details.push(entry.material);
+            if (entry.farbe) details.push(entry.farbe);
+            if (entry.durchmesser !== null && entry.durchmesser !== undefined) {
+              details.push(`${entry.durchmesser} mm`);
+            }
+            const metaParts = [`Typ-ID: ${entry.typ_id ?? "–"}`];
+            if (details.length) metaParts.push(details.join(" · "));
+            metaDiv.textContent = metaParts.join(" · ");
+            const logDiv = document.createElement("div");
+            logDiv.className = "text-xs text-gray-500 mt-1";
+            logDiv.textContent = `Log-ID: ${entry.id}`;
+            infoTd.append(nameDiv, metaDiv, logDiv);
+
+            const wertTd = document.createElement("td");
+            wertTd.className = "px-4 py-2 font-semibold text-white whitespace-nowrap";
+            wertTd.textContent = formatVerbrauch(entry.verbrauch_in_g);
+
+            const actionTd = document.createElement("td");
+            actionTd.className = "px-4 py-2 space-x-2 whitespace-nowrap";
+
+            const editBtn = document.createElement("button");
+            editBtn.textContent = "Anpassen";
+            editBtn.className = "px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-500";
+            editBtn.addEventListener("click", async () => {
+              const eingabe = prompt("Neuer Verbrauch in Gramm:", String(entry.verbrauch_in_g));
+              if (eingabe === null) return;
+              const sanisiert = eingabe.replace(",", ".").trim();
+              if (!sanisiert) {
+                zeigeBenachrichtigung("Bitte einen Wert eingeben.", "red");
+                return;
+              }
+              const wert = Number(sanisiert);
+              if (!Number.isFinite(wert) || wert < 0) {
+                zeigeBenachrichtigung("Ungültiger Verbrauchswert.", "red");
+                return;
+              }
+              if (Math.abs(wert - entry.verbrauch_in_g) < 1e-6) {
+                return;
+              }
+              try {
+                const res = await fetch(`/admin/verbrauch/${entry.id}`, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ verbrauch_in_g: wert })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                zeigeBenachrichtigung("Verbrauch wurde aktualisiert.", "blue");
+                verbrauchGeladen = false;
+                ladeVerbrauchsdaten();
+              } catch (err) {
+                console.error("Fehler beim Aktualisieren des Verbrauchs:", err);
+                zeigeBenachrichtigung("Fehler beim Aktualisieren.", "red");
+              }
+            });
+
+            const deleteBtn = document.createElement("button");
+            deleteBtn.textContent = "Löschen";
+            deleteBtn.className = "px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700";
+            deleteBtn.addEventListener("click", () => {
+              zeigePopup("Diesen Verbrauchseintrag wirklich löschen?", async () => {
+                try {
+                  const res = await fetch(`/admin/verbrauch/${entry.id}`, { method: "DELETE" });
+                  if (!res.ok) throw new Error(await res.text());
+                  zeigeBenachrichtigung("Verbrauchseintrag gelöscht.", "blue");
+                  verbrauchGeladen = false;
+                  ladeVerbrauchsdaten();
+                } catch (err) {
+                  console.error("Fehler beim Löschen des Verbrauchseintrags:", err);
+                  zeigeBenachrichtigung("Fehler beim Löschen.", "red");
+                }
+              });
+            });
+
+            actionTd.append(editBtn, deleteBtn);
+            tr.append(datumTd, infoTd, wertTd, actionTd);
+            return tr;
+          };
+
+          const ladeVerbrauchsdaten = async () => {
+            if (!verbrauchTabelleBody) return;
+            verbrauchTabelleBody.innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">Lade Daten…</td></tr>`;
+            try {
+              const res = await fetch("/admin/verbrauch");
+              if (!res.ok) throw new Error(await res.text());
+              const daten = await res.json();
+              if (verbrauchSum) verbrauchSum.textContent = formatVerbrauch(daten.total_sum ?? 0);
+              if (verbrauchCount) verbrauchCount.textContent = verbrauchCountFormat.format(daten.total_count ?? 0);
+              verbrauchTabelleBody.innerHTML = "";
+              if (!Array.isArray(daten.entries) || daten.entries.length === 0) {
+                const row = document.createElement("tr");
+                row.innerHTML = `<td colspan="4" class="px-4 py-6 text-center text-gray-400">Keine Verbrauchseinträge vorhanden</td>`;
+                verbrauchTabelleBody.appendChild(row);
+              } else {
+                daten.entries.forEach((entry) => {
+                  verbrauchTabelleBody.appendChild(baueVerbrauchszeile(entry));
+                });
+              }
+              verbrauchGeladen = true;
+            } catch (err) {
+              console.error("Fehler beim Laden der Verbrauchsdaten:", err);
+              zeigeBenachrichtigung("Fehler beim Laden der Verbrauchsdaten.", "red");
+              verbrauchTabelleBody.innerHTML = `<tr><td colspan="4" class="px-4 py-6 text-center text-gray-400">Fehler beim Laden</td></tr>`;
+            }
+          };
+
+          const ensureVerbrauchsdaten = () => {
+            if (!verbrauchGeladen) {
+              ladeVerbrauchsdaten();
+            }
+          };
+
+          if (verbrauchNavBlock) {
+            verbrauchNavBlock.classList.remove("hidden");
+          }
+          if (verbrauchNeuLaden) {
+            verbrauchNeuLaden.addEventListener("click", (event) => {
+              event.preventDefault();
+              ladeVerbrauchsdaten();
+            });
+          }
+          if (einstellungsMenue) {
+            einstellungsMenue.addEventListener("click", (event) => {
+              if (event.target.dataset.ziel === "verbrauchVerwaltungBlock") {
+                ensureVerbrauchsdaten();
+              }
+            });
+          }
+          ensureVerbrauchsdaten();
+
         }
       } else {
         document.getElementById("bilderVerwaltung").remove();
