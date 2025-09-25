@@ -5,9 +5,9 @@ from datetime import datetime, timezone
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from db import SessionLocal, init_db
-from models import FilamentTyp, FilamentSpule, FilamentVerbrauch, FilamentSpuleHistorie, PrinterJobHistory, User
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response, BackgroundTasks, Request
-from pydantic import BaseModel, ConfigDict
+from models import FilamentTyp, FilamentSpule, FilamentVerbrauch, FilamentSpuleHistorie, PrinterJobHistory, User, DashboardNote
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response, BackgroundTasks, Request, Query
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from fastapi.staticfiles import StaticFiles
@@ -368,6 +368,27 @@ def serve_spulen_page():
 # Helper functions
 
 
+# Authentication helpers
+
+def get_current_user(request: Request, db: Session) -> User:
+    raw_cookie = request.cookies.get("benutzer")
+    if not raw_cookie:
+        raise HTTPException(status_code=401, detail="Nicht eingeloggt")
+    try:
+        data = serializer.loads(raw_cookie, max_age=COOKIE_MAX_AGE)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Session ungültig oder abgelaufen")
+    username = data.get('username') if isinstance(data, dict) else None
+    if not username:
+        raise HTTPException(status_code=401, detail="Session ungültig")
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Benutzer nicht gefunden")
+    user.last_seen = datetime.now(timezone.utc)
+    db.commit()
+    return user
+
+
 def log_spool_history(db: Session, spule: FilamentSpule, aktion: str, alt: Optional[float] = None, neu: Optional[float] = None) -> None:
     """Persist a history entry for dashboard timeline tracking."""
     try:
@@ -495,6 +516,11 @@ class SpuleUpdate(BaseModel):
     printer_serial: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DashboardNoteCreate(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=120)
+    message: str = Field(..., min_length=1, max_length=2000)
 
 
 class VerbrauchUpdate(BaseModel):
@@ -1420,6 +1446,19 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "created_at": j.created_at,
     } for j in job_events]
 
+    dashboard_notes = [
+        {
+            "id": note.id,
+            "title": note.title,
+            "message": note.message,
+            "created_at": note.created_at,
+            "author": note.author.username if note.author else None,
+            "author_role": note.author.rolle if note.author else None,
+        }
+        for note in db.query(DashboardNote).order_by(DashboardNote.created_at.desc()).limit(3).all()
+    ]
+    dashboard_note_total = db.query(func.count(DashboardNote.id)).scalar() or 0
+
     # Neu hinzugefügte Spulen (nach Erstellzeit)
     neue_spulen = (
         db.query(FilamentSpule)
@@ -1505,8 +1544,98 @@ def get_dashboard_details(db: Session = Depends(get_db)):
         "im_drucker_spulen": im_drucker_liste,
         "letzte_spulen": spulen_liste,
         "neue_spulen": neue_spulen_liste,
-        "job_historie": job_historie
+        "job_historie": job_historie,
+        "dashboard_notes": dashboard_notes,
+        "dashboard_notes_total": dashboard_note_total
     }
+
+
+@app.get("/api/dashboard-notes")
+def list_dashboard_notes(limit: int = Query(0, ge=0), db: Session = Depends(get_db)):
+    base_query = db.query(DashboardNote).order_by(DashboardNote.created_at.desc())
+    total = db.query(func.count(DashboardNote.id)).scalar() or 0
+    notes_query = base_query.limit(limit) if limit else base_query
+    notes = notes_query.all()
+    def _serialize(note: DashboardNote) -> dict:
+        author = note.author.username if note.author else None
+        role = note.author.rolle if getattr(note, 'author', None) else None
+        return {
+            "id": note.id,
+            "title": note.title,
+            "message": note.message,
+            "created_at": note.created_at,
+            "author": author,
+            "author_role": role,
+        }
+    return {"total": total, "items": [_serialize(note) for note in notes]}
+
+
+@app.post("/api/dashboard-notes", status_code=201)
+def create_dashboard_note(payload: DashboardNoteCreate, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if user.rolle not in {"admin", "mod"}:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    message = (payload.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
+    title = (payload.title or None)
+    if title:
+        title = title.strip() or None
+    note = DashboardNote(title=title, message=message, author=user)
+    db.add(note)
+    db.commit()
+    db.refresh(note)
+    return {
+        "id": note.id,
+        "title": note.title,
+        "message": note.message,
+        "created_at": note.created_at,
+        "author": user.username,
+        "author_role": user.rolle,
+    }
+
+
+@app.patch("/api/dashboard-notes/{note_id}")
+def update_dashboard_note(note_id: int, payload: DashboardNoteCreate, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if user.rolle not in {"admin", "mod"}:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    note = db.query(DashboardNote).filter(DashboardNote.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Hinweis nicht gefunden")
+    message = (payload.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Nachricht darf nicht leer sein")
+    title = (payload.title or None)
+    if title:
+        title = title.strip() or None
+    note.message = message
+    note.title = title
+    db.commit()
+    db.refresh(note)
+    return {
+        "id": note.id,
+        "title": note.title,
+        "message": note.message,
+        "created_at": note.created_at,
+        "author": note.author.username if note.author else None,
+        "author_role": note.author.rolle if note.author else None,
+    }
+
+
+@app.delete("/api/dashboard-notes/{note_id}", status_code=204)
+def delete_dashboard_note(note_id: int, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if user.rolle not in {"admin", "mod"}:
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    note = db.query(DashboardNote).filter(DashboardNote.id == note_id).first()
+    if not note:
+        raise HTTPException(status_code=404, detail="Hinweis nicht gefunden")
+    db.delete(note)
+    db.commit()
+    return Response(status_code=204)
+
+
 
 
 @app.get("/api/printer_spools")

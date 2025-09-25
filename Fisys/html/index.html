@@ -155,24 +155,105 @@
       </div>
     </div>
 
-    <!-- Platz für geplante Funktionen oder Hinweise -->
-    <div>
-      <h2 class="text-xl font-semibold mb-4">Hinweise &amp; Geplante Funktionen</h2>
-      <div class="bg-gray-700 p-4 rounded-xl shadow-sm text-white text-sm">
-        <ul class="list-disc pl-5 space-y-1">
-          <li>Erweiterte Statistiken und Filtermöglichkeiten</li>
-          <li>Benachrichtigungen bei fast leerem Filament</li>
-          <li>Diverse Bugfixes und Verbesserungen</li>
-        </ul>
+    <!-- Hinweise & Updates -->
+    <section id="dashboard-notes-section" class="space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-xl font-semibold">Ankündigungen</h2>
+        <div class="flex items-center gap-2">
+          <button type="button" id="dashboard-note-show-all" class="hidden px-3 py-2 text-sm font-medium text-white bg-gray-700 hover:bg-gray-600 rounded transition">Alle anzeigen</button>
+          <button type="button" id="dashboard-note-new" class="hidden px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-500 rounded transition">Neue Nachricht</button>
+        </div>
+      </div>
+      <form id="dashboard-note-form" class="hidden bg-gray-700 rounded-xl shadow-sm border border-gray-600 p-4 space-y-3">
+        <div>
+          <label for="dashboard-note-title" class="block text-xs uppercase tracking-wide text-gray-300 mb-1">Titel (optional)</label>
+          <input id="dashboard-note-title" type="text" maxlength="120" class="w-full px-3 py-2 rounded border border-gray-500 bg-gray-800 text-white focus:outline-none focus:ring focus:border-blue-500" placeholder="Kurzer Titel">
+        </div>
+        <div>
+          <label for="dashboard-note-message" class="block text-xs uppercase tracking-wide text-gray-300 mb-1">Nachricht</label>
+          <textarea id="dashboard-note-message" rows="4" maxlength="2000" required class="w-full px-3 py-2 rounded border border-gray-500 bg-gray-800 text-white focus:outline-none focus:ring focus:border-blue-500 resize-y" placeholder="Was sollen alle wissen?"></textarea>
+        </div>
+        <p id="dashboard-note-error" class="text-xs text-red-400 hidden"></p>
+        <div class="flex items-center justify-end gap-2">
+          <button type="button" id="dashboard-note-cancel" class="px-3 py-2 text-sm text-gray-200 border border-gray-500 rounded hover:bg-gray-600 transition">Abbrechen</button>
+          <button type="submit" id="dashboard-note-submit" class="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded hover:bg-blue-500 transition">Speichern</button>
+        </div>
+      </form>
+      <div id="dashboard-note-empty" class="text-sm text-gray-400 italic hidden">Noch keine Hinweise vorhanden.</div>
+      <div id="dashboard-note-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
+    </section>
+  </main>
+  <div id="dashboard-note-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-4 hidden z-50">
+    <div class="bg-gray-800 border border-gray-600 rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-hidden">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-700">
+        <h3 class="text-lg font-semibold text-white">Alle Hinweise</h3>
+        <button type="button" class="text-gray-300 hover:text-white transition text-xl leading-none" data-note-modal-close>&times;</button>
+      </div>
+      <div id="dashboard-note-modal-body" class="px-5 py-4 space-y-3 overflow-y-auto max-h-[70vh]">
+        <div class="text-sm text-gray-300">Lade Hinweise …</div>
       </div>
     </div>
-  </main>
+  </div>
 </body>
   <script>
     let ws;
     let selectedPrinterSerials = new Set();
     let printerSpoolData = {};
     const printerNameBySerial = new Map();
+    let currentUserInfo = { username: null, role: null };
+    let dashboardNotesSummary = [];
+    let dashboardNotesTotal = 0;
+    const noteGrid = document.getElementById('dashboard-note-grid');
+    const noteEmpty = document.getElementById('dashboard-note-empty');
+    const noteShowAllBtn = document.getElementById('dashboard-note-show-all');
+    const noteNewBtn = document.getElementById('dashboard-note-new');
+    const noteForm = document.getElementById('dashboard-note-form');
+    const noteTitleInput = document.getElementById('dashboard-note-title');
+    const noteMessageInput = document.getElementById('dashboard-note-message');
+    const noteError = document.getElementById('dashboard-note-error');
+    const noteSubmitBtn = document.getElementById('dashboard-note-submit');
+    const noteCancelBtn = document.getElementById('dashboard-note-cancel');
+    const noteModal = document.getElementById('dashboard-note-modal');
+    const noteModalBody = document.getElementById('dashboard-note-modal-body');
+    const noteModalCloseButtons = document.querySelectorAll('[data-note-modal-close]');
+    let editingNoteId = null;
+    let lastCanManageNotes = false;
+    if (noteShowAllBtn) {
+      noteShowAllBtn.addEventListener('click', () => {
+        if (noteShowAllBtn.disabled) return;
+        openDashboardNoteModal();
+      });
+    }
+    if (noteNewBtn) {
+      noteNewBtn.addEventListener('click', () => {
+        editingNoteId = null;
+        if (noteSubmitBtn) {
+          noteSubmitBtn.textContent = 'Speichern';
+        }
+        showNoteForm();
+      });
+    }
+    if (noteCancelBtn) {
+      noteCancelBtn.addEventListener('click', () => {
+        hideNoteForm();
+      });
+    }
+    if (noteForm) {
+      noteForm.addEventListener('submit', handleNoteFormSubmit);
+    }
+    noteModalCloseButtons.forEach(btn => btn.addEventListener('click', () => closeDashboardNoteModal()));
+    if (noteModal) {
+      noteModal.addEventListener('click', (event) => {
+        if (event.target === noteModal) {
+          closeDashboardNoteModal();
+        }
+      });
+    }
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && noteModal && !noteModal.classList.contains('hidden')) {
+        closeDashboardNoteModal();
+      }
+    });
     function connectWS() {
       const proto = (location.protocol === 'https:') ? 'wss' : 'ws';
       ws = new WebSocket(`${proto}://${location.host}/ws/dashboard`);
@@ -543,6 +624,379 @@
 
     window.addEventListener('resize', scheduleHistoryEqualize);
 
+    function canManageNotes() {
+      const role = (currentUserInfo && typeof currentUserInfo.role === 'string')
+        ? currentUserInfo.role.toLowerCase().trim()
+        : '';
+      return role === 'admin' || role === 'mod';
+    }
+
+    function updateDashboardNotePermissions() {
+      const canManage = canManageNotes();
+      if (noteNewBtn) {
+        const formVisible = noteForm && !noteForm.classList.contains('hidden');
+        noteNewBtn.classList.toggle('hidden', !canManage || formVisible);
+      }
+      if (!canManage) {
+        hideNoteForm();
+      }
+      if (canManage !== lastCanManageNotes) {
+        lastCanManageNotes = canManage;
+        renderDashboardNotes(dashboardNotesSummary, dashboardNotesTotal);
+        scheduleHistoryEqualize();
+        if (noteModal && !noteModal.classList.contains('hidden')) {
+          loadAllDashboardNotesIntoModal().catch(() => {});
+        }
+      }
+    }
+
+    function showNoteForm({ preserveValues = false } = {}) {
+      if (!noteForm) return;
+      if (!canManageNotes()) {
+        if (noteError) {
+          noteError.textContent = 'Keine Berechtigung, um Hinweise zu verfassen.';
+          noteError.classList.remove('hidden');
+        }
+        return;
+      }
+      noteForm.classList.remove('hidden');
+      if (noteNewBtn) {
+        noteNewBtn.classList.add('hidden');
+      }
+      if (noteError) {
+        noteError.classList.add('hidden');
+        noteError.textContent = '';
+      }
+      if (!preserveValues) {
+        if (noteTitleInput) noteTitleInput.value = '';
+        if (noteMessageInput) noteMessageInput.value = '';
+      }
+      if (noteMessageInput) {
+        noteMessageInput.focus();
+      }
+    }
+
+    function hideNoteForm(resetInputs = true) {
+      if (!noteForm) return;
+      noteForm.classList.add('hidden');
+      if (resetInputs && typeof noteForm.reset === 'function') {
+        noteForm.reset();
+      }
+      editingNoteId = null;
+      if (noteSubmitBtn) {
+        noteSubmitBtn.textContent = 'Speichern';
+      }
+      if (noteError) {
+        noteError.classList.add('hidden');
+        noteError.textContent = '';
+      }
+      if (noteNewBtn) {
+        const shouldHide = !canManageNotes();
+        noteNewBtn.classList.toggle('hidden', shouldHide);
+      }
+    }
+
+    function escapeHtml(value) {
+      if (value === null || value === undefined) return '';
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '—';
+      return date.toLocaleString('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+
+    function buildNoteFooter(author, role, timestamp) {
+      const safeAuthor = escapeHtml(author || 'Unbekannt');
+      const roleBadge = role ? `<span class="ml-2 inline-flex items-center rounded-full bg-gray-800/80 px-2 py-0.5 text-[0.65rem] uppercase tracking-wide text-gray-300">${escapeHtml(role)}</span>` : '';
+      const safeTimestamp = escapeHtml(timestamp || '—');
+      return `<div class="history-entry__footer text-xs text-gray-300">
+        <div class="flex items-center">Von ${safeAuthor}${roleBadge}</div>
+        <div>${safeTimestamp}</div>
+      </div>`;
+    }
+
+    function buildNoteActions(note) {
+      if (!canManageNotes() || !note || typeof note.id === 'undefined' || note.id === null) return '';
+      const id = String(note.id);
+      return `<div class="flex justify-end gap-2 text-xs">
+        <button type="button" class="px-2 py-1 rounded border border-blue-400/70 text-blue-200 hover:bg-blue-500/10 transition note-edit-btn" data-note-edit="${id}">Bearbeiten</button>
+        <button type="button" class="px-2 py-1 rounded border border-red-400/70 text-red-200 hover:bg-red-500/10 transition note-delete-btn" data-note-delete="${id}">Löschen</button>
+      </div>`;
+    }
+
+    function createNoteCard(note) {
+      const safeNote = note || {};
+      const title = escapeHtml(safeNote.title || 'Hinweis');
+      const messageRaw = safeNote.message ? escapeHtml(safeNote.message) : '';
+      const message = messageRaw ? messageRaw.split('\n').join('<br>') : '<span class="text-gray-400">(Keine Nachricht)</span>';
+      const timestamp = formatDateTime(safeNote.created_at);
+      const actions = buildNoteActions(safeNote);
+      return `
+        <article class="history-entry bg-gray-700 rounded-xl shadow-sm border border-gray-600 p-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="text-base font-semibold text-white leading-snug" title="${title}">${title}</h3>
+          </div>
+          <div class="text-sm text-gray-100 whitespace-pre-wrap leading-relaxed">${message}</div>
+          <div class="border-t border-gray-500 pt-2 space-y-2">
+            ${actions}
+            ${buildNoteFooter(safeNote.author, safeNote.author_role, timestamp)}
+          </div>
+        </article>`;
+    }
+
+    function createModalNote(note) {
+      const safeNote = note || {};
+      const title = escapeHtml(safeNote.title || 'Hinweis');
+      const messageRaw = safeNote.message ? escapeHtml(safeNote.message) : '';
+      const message = messageRaw ? messageRaw.split('\n').join('<br>') : '<span class="text-gray-400">(Keine Nachricht)</span>';
+      const timestamp = formatDateTime(safeNote.created_at);
+      const actions = buildNoteActions(safeNote);
+      return `
+        <article class="bg-gray-700 border border-gray-600 rounded-lg p-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <h3 class="text-base font-semibold text-white leading-snug" title="${title}">${title}</h3>
+          </div>
+          <div class="text-sm text-gray-100 whitespace-pre-wrap leading-relaxed">${message}</div>
+          <div class="border-t border-gray-500 pt-2 space-y-2">
+            ${actions}
+            ${buildNoteFooter(safeNote.author, safeNote.author_role, timestamp)}
+          </div>
+        </article>`;
+    }
+
+    function bindNoteActionHandlers(container, notes) {
+      if (!container || !canManageNotes()) return;
+      const noteList = Array.isArray(notes) ? notes : [];
+      const noteMap = new Map();
+      noteList.forEach(note => {
+        if (!note || note.id === null || typeof note.id === 'undefined') return;
+        noteMap.set(String(note.id), note);
+      });
+      container.querySelectorAll('[data-note-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const noteId = btn.getAttribute('data-note-edit');
+          const note = noteMap.get(String(noteId));
+          if (!note) return;
+          startNoteEdit(note);
+        });
+      });
+      container.querySelectorAll('[data-note-delete]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const noteId = btn.getAttribute('data-note-delete');
+          await deleteDashboardNote(noteId, btn);
+        });
+      });
+    }
+
+    function startNoteEdit(note) {
+      if (!note || !canManageNotes()) return;
+      editingNoteId = note.id;
+      if (noteError) {
+        noteError.classList.add('hidden');
+        noteError.textContent = '';
+      }
+      showNoteForm({ preserveValues: true });
+      if (noteTitleInput) noteTitleInput.value = note.title || '';
+      if (noteMessageInput) noteMessageInput.value = note.message || '';
+      if (noteSubmitBtn) {
+        noteSubmitBtn.textContent = 'Aktualisieren';
+      }
+      if (noteModal && !noteModal.classList.contains('hidden')) {
+        closeDashboardNoteModal();
+      }
+    }
+
+    async function deleteDashboardNote(noteId, triggerBtn) {
+      if (!canManageNotes()) return;
+      if (noteId === null || typeof noteId === 'undefined') return;
+      const idNum = Number(noteId);
+      if (!Number.isFinite(idNum)) return;
+      if (!window.confirm('Diesen Hinweis wirklich löschen?')) return;
+      let originalText = null;
+      if (triggerBtn) {
+        originalText = triggerBtn.textContent;
+        triggerBtn.disabled = true;
+        triggerBtn.textContent = 'Löschen …';
+      }
+      try {
+        const res = await fetch(`/api/dashboard-notes/${idNum}`, { method: 'DELETE', credentials: 'same-origin' });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const detail = (errData && errData.detail) || `Fehler ${res.status}`;
+          throw new Error(detail);
+        }
+        if (editingNoteId !== null && Number(editingNoteId) === idNum) {
+          hideNoteForm();
+        }
+        await loadDashboardDetails();
+        if (noteModal && !noteModal.classList.contains('hidden')) {
+          await loadAllDashboardNotesIntoModal();
+        }
+      } catch (error) {
+        console.error('Fehler beim Löschen der Hinweis-Nachricht', error);
+        if (noteError) {
+          noteError.textContent = error.message || 'Fehler beim Löschen.';
+          noteError.classList.remove('hidden');
+        }
+      } finally {
+        if (triggerBtn) {
+          triggerBtn.disabled = false;
+          if (originalText !== null) {
+            triggerBtn.textContent = originalText;
+          }
+        }
+      }
+    }
+
+    async function loadAllDashboardNotesIntoModal() {
+      if (!noteModalBody) return [];
+      noteModalBody.innerHTML = '<div class="text-sm text-gray-300">Lade Hinweise …</div>';
+      try {
+        const res = await fetch('/api/dashboard-notes', { credentials: 'same-origin' });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        const payload = await res.json();
+        const itemsSource = (payload && Array.isArray(payload.items)) ? payload.items : (Array.isArray(payload) ? payload : []);
+        const items = Array.isArray(itemsSource) ? itemsSource : [];
+        if (!items.length) {
+          noteModalBody.innerHTML = '<div class="text-sm text-gray-400 italic">Noch keine Hinweise vorhanden.</div>';
+        } else {
+          noteModalBody.innerHTML = items.map(createModalNote).join('');
+          bindNoteActionHandlers(noteModalBody, items);
+        }
+        return items;
+      } catch (error) {
+        console.error('Fehler beim Laden der Hinweise', error);
+        noteModalBody.innerHTML = '<div class="text-sm text-red-400">Fehler beim Laden der Hinweise.</div>';
+        return [];
+      }
+    }
+
+    function renderDashboardNotes(notes, total) {
+      dashboardNotesSummary = Array.isArray(notes) ? notes.slice(0, 3) : [];
+      dashboardNotesTotal = typeof total === 'number' ? total : dashboardNotesSummary.length;
+      if (!noteGrid || !noteEmpty) return;
+      if (!dashboardNotesSummary.length) {
+        noteGrid.innerHTML = '';
+        noteEmpty.classList.remove('hidden');
+      } else {
+        noteEmpty.classList.add('hidden');
+        noteGrid.innerHTML = dashboardNotesSummary.map(createNoteCard).join('');
+      }
+      bindNoteActionHandlers(noteGrid, dashboardNotesSummary);
+      if (noteShowAllBtn) {
+        const hasNotes = dashboardNotesTotal > 0;
+        noteShowAllBtn.classList.toggle('hidden', !hasNotes);
+        noteShowAllBtn.disabled = !hasNotes;
+        noteShowAllBtn.classList.toggle('opacity-50', !hasNotes);
+        noteShowAllBtn.classList.toggle('cursor-not-allowed', !hasNotes);
+      }
+    }
+
+    function closeDashboardNoteModal() {
+      if (!noteModal) return;
+      noteModal.classList.add('hidden');
+      if (noteModalBody) {
+        noteModalBody.innerHTML = '<div class="text-sm text-gray-300">Lade Hinweise …</div>';
+      }
+    }
+
+    async function openDashboardNoteModal() {
+      if (!noteModal || !noteModalBody) return;
+      noteModal.classList.remove('hidden');
+      await loadAllDashboardNotesIntoModal();
+    }
+
+    async function handleNoteFormSubmit(event) {
+      event.preventDefault();
+      if (!noteForm || !noteMessageInput) return;
+      if (!canManageNotes()) {
+        if (noteError) {
+          noteError.textContent = 'Keine Berechtigung, um Hinweise zu verfassen.';
+          noteError.classList.remove('hidden');
+        }
+        return;
+      }
+      const message = noteMessageInput.value.trim();
+      const title = noteTitleInput ? noteTitleInput.value.trim() : '';
+      if (!message) {
+        if (noteError) {
+          noteError.textContent = 'Bitte eine Nachricht eingeben.';
+          noteError.classList.remove('hidden');
+        }
+        noteMessageInput.focus();
+        return;
+      }
+      if (noteError) {
+        noteError.classList.add('hidden');
+        noteError.textContent = '';
+      }
+      const payload = { message };
+      if (title) {
+        payload.title = title;
+      }
+      const isEdit = editingNoteId !== null && editingNoteId !== undefined;
+      const noteIdValue = isEdit ? Number(editingNoteId) : null;
+      if (isEdit && !Number.isFinite(noteIdValue)) {
+        if (noteError) {
+          noteError.textContent = 'Hinweis-ID ungültig. Bitte laden und erneut versuchen.';
+          noteError.classList.remove('hidden');
+        }
+        return;
+      }
+      const url = isEdit ? `/api/dashboard-notes/${noteIdValue}` : '/api/dashboard-notes';
+      const method = isEdit ? 'PATCH' : 'POST';
+      if (noteSubmitBtn) {
+        noteSubmitBtn.disabled = true;
+        noteSubmitBtn.textContent = method === 'POST' ? 'Speichern …' : 'Aktualisieren …';
+      }
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          credentials: 'same-origin',
+        });
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const detail = (errData && errData.detail) || 'Fehler beim Speichern der Nachricht.';
+          throw new Error(detail);
+        }
+        hideNoteForm();
+        await loadDashboardDetails();
+        if (noteModal && !noteModal.classList.contains('hidden')) {
+          await loadAllDashboardNotesIntoModal();
+        }
+      } catch (error) {
+        console.error('Fehler beim Speichern der Hinweis-Nachricht', error);
+        if (noteError) {
+          noteError.textContent = error.message || 'Fehler beim Speichern.';
+          noteError.classList.remove('hidden');
+        }
+      } finally {
+        if (noteSubmitBtn) {
+          noteSubmitBtn.disabled = false;
+          noteSubmitBtn.textContent = editingNoteId !== null ? 'Aktualisieren' : 'Speichern';
+        }
+      }
+    }
+
+    updateDashboardNotePermissions();
 
     function renderEditedSpools(spools, container) {
       if (!container) return;
@@ -683,6 +1137,7 @@
 
       renderEditedSpools(data.letzte_spulen, edited);
       renderPrintJobs(data.job_historie, jobs);
+      renderDashboardNotes(data.dashboard_notes, data.dashboard_notes_total);
 
       added.innerHTML = "";
       (data.neue_spulen || [])
@@ -778,7 +1233,7 @@
 
   async function checkAuthStatus() {
     try {
-      const res = await fetch("/api/userinfo");
+      const res = await fetch("/api/userinfo", { credentials: 'same-origin' });
       if (!res.ok) throw new Error("Nicht angemeldet");
       const daten = await res.json();
 
@@ -790,13 +1245,25 @@
         </form>
       `;
 
+      currentUserInfo = { username: daten.username, role: daten.rolle };
+      if (typeof updateDashboardNotePermissions === 'function') {
+        updateDashboardNotePermissions();
+      }
+
       document.getElementById("logoutForm").addEventListener("submit", async (e) => {
         e.preventDefault();
-        await fetch("/logout", { method: "POST" });
+        await fetch("/logout", { method: "POST", credentials: 'same-origin' });
+        currentUserInfo = { username: null, role: null };
+        if (typeof updateDashboardNotePermissions === 'function') {
+          updateDashboardNotePermissions();
+        }
         location.reload();
       });
     } catch (err) {
-      // Nicht eingeloggt, Standard-Login-Link bleibt
+      currentUserInfo = { username: null, role: null };
+      if (typeof updateDashboardNotePermissions === 'function') {
+        updateDashboardNotePermissions();
+      }
     }
   }
 

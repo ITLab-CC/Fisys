@@ -76,6 +76,18 @@ class PrinterJobHistory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class DashboardNote(Base):
+    __tablename__ = 'dashboard_notes'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    author_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    author: Mapped['User'] = relationship('User', back_populates='notes')
+
+
 class FilamentVerbrauch(Base):
     __tablename__ = 'filament_verbrauch'
 
@@ -115,6 +127,17 @@ class FilamentSpuleHistorieRead(BaseModel):
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+
+class DashboardNoteRead(BaseModel):
+    id: int
+    title: Optional[str]
+    message: str
+    created_at: datetime
+    author_username: Optional[str]
+    author_role: Optional[str]
+    model_config = ConfigDict(from_attributes=True)
+
+
 class FilamentSpuleCreate(BaseModel):
     name: str
     material: str
@@ -138,6 +161,8 @@ class User(Base):
     rolle: Mapped[str] = mapped_column(String, nullable=False, default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    notes: Mapped[list['DashboardNote']] = relationship('DashboardNote', back_populates='author', cascade="all, delete-orphan")
 
 class AuthToken(Base):
     __tablename__ = "auth_tokens"
