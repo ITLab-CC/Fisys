@@ -63,6 +63,10 @@
             <nav id="einstellungsMenue" class="space-y-4 highlight-container">
               <div id="highlightBar" class="highlight-bar hidden"></div>
               <div>
+                <p class="text-sm font-semibold text-white mb-1">Mein Profil</p>
+                <button data-ziel="userSettingsBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Benutzereinstellungen</button>
+              </div>
+              <div>
                 <p class="text-sm font-semibold text-white mb-1">Bildeinstellungen</p>
                 <button data-ziel="bilderVerwaltung" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Bild hochladen</button>
                 <button data-ziel="vorhandeneBilderBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Vorhandene Bilder</button>
@@ -89,6 +93,11 @@
 
           <!-- Inhalt -->
           <div class="flex-1 space-y-10">
+            <div id="userSettingsBlock" class="hidden bg-gray-700 p-6 rounded shadow max-w-3xl mt-10">
+              <h2 class="text-xl text-white font-semibold mb-4">Benutzereinstellungen</h2>
+              <p class="text-sm text-gray-300">Hier kannst du künftig persönliche Einstellungen für dein Konto anpassen.</p>
+              <div class="mt-6 rounded border border-dashed border-gray-500 bg-gray-800 p-4 text-sm text-gray-400">Weitere Optionen folgen demnächst.</div>
+            </div>
             <!-- Drucker verwalten -->
             <div id="printerVerwaltungBlock" class="hidden bg-gray-700 p-6 rounded shadow max-w-3xl mt-10">
               <h2 class="text-xl text-white font-semibold mb-4">Drucker</h2>
@@ -242,44 +251,114 @@
     </div>
 <script>
     document.addEventListener("DOMContentLoaded", async () => {
-      // Highlight-Bar-Referenz
       const highlightBar = document.getElementById("highlightBar");
-      // Wechsel zwischen Einstellungsbereichen mit Highlight-Bar
-      document.getElementById("einstellungsMenue").addEventListener("click", (e) => {
-        const ziel = e.target.dataset.ziel;
-        if (!ziel || !e.target.matches("button")) return;
+      const settingsMenu = document.getElementById("einstellungsMenue");
+      if (settingsMenu) {
+        settingsMenu.style.visibility = "hidden";
+      }
+      const ALL_SECTION_IDS = [
+        "userSettingsBlock",
+        "bilderVerwaltung",
+        "vorhandeneBilderBlock",
+        "printerVerwaltungBlock",
+        "tokenBlockContainer",
+        "tokenUebersichtBlockContainer",
+        "userVerwaltungBlock",
+        "verbrauchVerwaltungBlock"
+      ];
+      let availableSectionIds = [...ALL_SECTION_IDS];
+      let autoActivatedInitialSection = false;
 
-        // Vorheriges Highlight entfernen
-        document.querySelectorAll('#einstellungsMenue button').forEach(btn => {
-          btn.classList.remove('bg-gray-600', 'menu-highlight');
-        });
-        e.target.classList.add('bg-gray-600', 'menu-highlight');
+      const navigationPermissions = {
+        userSettingsBlock: ["user", "helper", "mod", "admin"],
+        bilderVerwaltung: ["helper", "mod", "admin"],
+        vorhandeneBilderBlock: ["helper", "mod", "admin"],
+        printerVerwaltungBlock: ["helper", "mod", "admin"],
+        tokenBlockContainer: ["mod", "admin"],
+        tokenUebersichtBlockContainer: ["mod", "admin"],
+        userVerwaltungBlock: ["mod", "admin"],
+        verbrauchVerwaltungBlock: ["mod", "admin"]
+      };
 
-        // Highlight-Bar-Animation
-        const buttonRect = e.target.getBoundingClientRect();
-        const containerRect = e.currentTarget.getBoundingClientRect();
-        const offsetTop = e.target.offsetTop;
+      const normalizeRole = (role) => (typeof role === "string" ? role.toLowerCase().trim() : "");
 
-        highlightBar.style.top = offsetTop + "px";
-        highlightBar.style.height = e.target.offsetHeight + "px";
-        highlightBar.classList.remove("hidden");
+      const removeAvailableSection = (id) => {
+        const idx = availableSectionIds.indexOf(id);
+        if (idx !== -1) {
+          availableSectionIds.splice(idx, 1);
+        }
+      };
 
-        // Bereiche verstecken und Ziel anzeigen
-        const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "printerVerwaltungBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock", "verbrauchVerwaltungBlock"];
-        bereiche.forEach(id => {
+      const hideAllSections = () => {
+        availableSectionIds.forEach((id) => {
           const el = document.getElementById(id);
           if (el) el.classList.add("hidden");
         });
+      };
 
-        const zielElement = document.getElementById(ziel);
-        if (zielElement) zielElement.classList.remove("hidden");
-      });
-      // Anfangs alle Bereiche verstecken
-      const bereiche = ["bilderVerwaltung", "vorhandeneBilderBlock", "printerVerwaltungBlock", "tokenBlockContainer", "tokenUebersichtBlockContainer", "userVerwaltungBlock", "verbrauchVerwaltungBlock"];
-      bereiche.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add("hidden");
-      });
+      const activateFirstAvailableSection = () => {
+        if (autoActivatedInitialSection) return;
+        const firstButton = settingsMenu?.querySelector("button");
+        if (firstButton) {
+          autoActivatedInitialSection = true;
+          firstButton.click();
+        }
+      };
+
+      const filterSettingsMenuForRole = (role) => {
+        const normalizedRole = normalizeRole(role);
+        Object.entries(navigationPermissions).forEach(([sectionId, allowedRoles]) => {
+          if (!allowedRoles.includes(normalizedRole)) {
+            if (settingsMenu) {
+              const button = settingsMenu.querySelector(`button[data-ziel="${sectionId}"]`);
+              if (button) {
+                const parentSection = button.closest("div");
+                button.remove();
+                if (parentSection && parentSection.querySelectorAll("button").length === 0) {
+                  parentSection.remove();
+                }
+              }
+            }
+            const area = document.getElementById(sectionId);
+            if (area) {
+              area.remove();
+            }
+            removeAvailableSection(sectionId);
+          }
+        });
+        if (settingsMenu) {
+          settingsMenu.style.visibility = "visible";
+          if (highlightBar && settingsMenu.querySelectorAll("button").length === 0) {
+            highlightBar.classList.add("hidden");
+          }
+        }
+      };
+
+      if (settingsMenu) {
+        settingsMenu.addEventListener("click", (e) => {
+          const ziel = e.target?.dataset?.ziel;
+          if (!ziel || !e.target.matches("button")) return;
+
+          settingsMenu.querySelectorAll("button").forEach((btn) => {
+            btn.classList.remove("bg-gray-600", "menu-highlight");
+          });
+          e.target.classList.add("bg-gray-600", "menu-highlight");
+
+          const offsetTop = e.target.offsetTop;
+          if (highlightBar) {
+            highlightBar.style.top = offsetTop + "px";
+            highlightBar.style.height = e.target.offsetHeight + "px";
+            highlightBar.classList.remove("hidden");
+          }
+
+          hideAllSections();
+
+          const zielElement = document.getElementById(ziel);
+          if (zielElement) zielElement.classList.remove("hidden");
+        });
+      }
+
+      hideAllSections();
       let benutzerRolle = null;
       const tokenBlock = document.createElement("div");
       tokenBlock.className = "bg-gray-700 p-6 rounded shadow max-w-xl mt-10";
@@ -330,6 +409,9 @@
         if (!res.ok) throw new Error("Nicht eingeloggt");
         const daten = await res.json();
         benutzerRolle = daten.rolle;
+        filterSettingsMenuForRole(benutzerRolle);
+        hideAllSections();
+        activateFirstAvailableSection();
         // Auth-Bereich dynamisch anpassen (Login/Logout, Benutzername)
         authBereich.innerHTML = `
           <form id="logoutForm" class="flex flex-col items-center">
@@ -881,8 +963,10 @@
 
         }
       } else {
-        document.getElementById("bilderVerwaltung").remove();
-        document.getElementById("vorhandeneBilderBlock").remove();
+        const bilderVerwaltung = document.getElementById("bilderVerwaltung");
+        if (bilderVerwaltung) bilderVerwaltung.remove();
+        const vorhandeneBilderBlock = document.getElementById("vorhandeneBilderBlock");
+        if (vorhandeneBilderBlock) vorhandeneBilderBlock.remove();
       }
   // Funktion zum Laden der Token-Tabelle
   async function ladeTokenTabelle() {
