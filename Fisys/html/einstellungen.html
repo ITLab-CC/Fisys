@@ -81,6 +81,10 @@
                 <button data-ziel="tokenUebersichtBlockContainer" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Token Übersicht</button>
               </div>
               <div>
+                <p class="text-sm font-semibold text-white mb-1">Integrationen</p>
+                <button data-ziel="discordBotConfigBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Discord Bot</button>
+              </div>
+              <div>
                 <p class="text-sm font-semibold text-white mb-1">User</p>
                 <button data-ziel="userVerwaltungBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">User verwalten</button>
               </div>
@@ -95,8 +99,56 @@
           <div class="flex-1 space-y-10">
             <div id="userSettingsBlock" class="hidden bg-gray-700 p-6 rounded shadow max-w-3xl mt-10">
               <h2 class="text-xl text-white font-semibold mb-4">Benutzereinstellungen</h2>
-              <p class="text-sm text-gray-300">Hier kannst du künftig persönliche Einstellungen für dein Konto anpassen.</p>
-              <div class="mt-6 rounded border border-dashed border-gray-500 bg-gray-800 p-4 text-sm text-gray-400">Weitere Optionen folgen demnächst.</div>
+              <form id="userSettingsForm" class="space-y-5 max-w-xl">
+                <div>
+                  <label for="userDiscordId" class="block text-sm font-medium text-gray-200 mb-1">Discord ID</label>
+                  <input id="userDiscordId" name="discord_id" type="text" class="w-full px-3 py-2 rounded border border-gray-500 bg-gray-800 text-white focus:outline-none focus:ring focus:border-blue-500" placeholder="123456789012345678">
+                  <p class="text-xs text-gray-400 mt-1">Gib deine Discord Benutzer-ID ein (nur Ziffern, keine @Mention).</p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-sm text-white rounded transition">Speichern</button>
+                  <button type="button" id="userDiscordClear" class="px-4 py-2 text-sm text-gray-200 border border-gray-500 rounded hover:bg-gray-600 transition">Entfernen</button>
+                </div>
+                <p id="userSettingsFeedback" class="text-xs hidden"></p>
+              </form>
+            </div>
+            <div id="discordBotConfigBlock" class="hidden bg-gray-700 p-6 rounded shadow max-w-3xl mt-10">
+              <h2 class="text-xl text-white font-semibold mb-4">Discord Bot Einstellungen</h2>
+              <form id="discordBotForm" class="space-y-5 max-w-2xl">
+                <div class="flex items-center gap-3">
+                  <input type="checkbox" id="discordBotEnabled" class="h-4 w-4">
+                  <label for="discordBotEnabled" class="text-sm text-gray-200">Benachrichtigungen über Discord aktivieren</label>
+                </div>
+                <div class="flex items-start gap-3">
+                  <input type="checkbox" id="discordBotUseDm" class="mt-1 h-4 w-4">
+                  <label for="discordBotUseDm" class="text-sm text-gray-200 leading-relaxed">Direktnachricht an Nutzer senden (erfordert Bot Token und erlaubte DMs)</label>
+                </div>
+                <div>
+                  <label for="discordWebhookUrl" class="block text-sm font-medium text-gray-200 mb-1">Webhook URL</label>
+                  <input id="discordWebhookUrl" type="url" class="w-full px-3 py-2 rounded border border-gray-500 bg-gray-800 text-white focus:outline-none focus:ring focus:border-blue-500" placeholder="https://discord.com/api/webhooks/...">
+                  <p class="text-xs text-gray-400 mt-1">Optional: Wenn gesetzt, wird der Bot über diesen Webhook benachrichtigen.</p>
+                </div>
+                <div class="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <label for="discordBotToken" class="block text-sm font-medium text-gray-200 mb-1">Bot Token</label>
+                    <input id="discordBotToken" type="text" class="w-full px-3 py-2 rounded border border-gray-500 bg-gray-800 text-white focus:outline-none focus:ring focus:border-blue-500" placeholder="Bot Token">
+                  </div>
+                  <div>
+                    <label for="discordChannelId" class="block text-sm font-medium text-gray-200 mb-1">Channel ID</label>
+                    <input id="discordChannelId" type="text" class="w-full px-3 py-2 rounded border border-gray-500 bg-gray-800 text-white focus:outline-none focus:ring focus:border-blue-500" placeholder="123456789012345678">
+                  </div>
+                </div>
+                <div>
+                  <label for="discordMessageTemplate" class="block text-sm font-medium text-gray-200 mb-1">Nachrichtenvorlage</label>
+                  <textarea id="discordMessageTemplate" rows="4" class="w-full px-3 py-2 rounded border border-gray-500 bg-gray-800 text-white focus:outline-none focus:ring focus:border-blue-500" placeholder="Hey {username}, dein Druckauftrag {job_name} auf {printer_name} ist fertig!"></textarea>
+                  <p class="text-xs text-gray-400 mt-1">Verfügbare Platzhalter: {username}, {printer_name}, {printer_serial}, {job_name}, {status}, {discord_id}, {discord_mention}</p>
+                </div>
+                <div class="flex items-center gap-3">
+                  <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-sm text-white rounded transition">Speichern</button>
+                  <button type="button" id="discordBotReload" class="px-4 py-2 text-sm text-gray-200 border border-gray-500 rounded hover:bg-gray-600 transition">Neu laden</button>
+                </div>
+                <p id="discordBotFeedback" class="text-xs hidden"></p>
+              </form>
             </div>
             <!-- Drucker verwalten -->
             <div id="printerVerwaltungBlock" class="hidden bg-gray-700 p-6 rounded shadow max-w-3xl mt-10">
@@ -263,11 +315,26 @@
         "printerVerwaltungBlock",
         "tokenBlockContainer",
         "tokenUebersichtBlockContainer",
+        "discordBotConfigBlock",
         "userVerwaltungBlock",
         "verbrauchVerwaltungBlock"
       ];
       let availableSectionIds = [...ALL_SECTION_IDS];
       let autoActivatedInitialSection = false;
+
+      const userSettingsForm = document.getElementById("userSettingsForm");
+      const userDiscordInput = document.getElementById("userDiscordId");
+      const userDiscordClearBtn = document.getElementById("userDiscordClear");
+      const userSettingsFeedback = document.getElementById("userSettingsFeedback");
+      const discordBotForm = document.getElementById("discordBotForm");
+      const discordBotEnabledInput = document.getElementById("discordBotEnabled");
+      const discordBotUseDmInput = document.getElementById("discordBotUseDm");
+      const discordWebhookInput = document.getElementById("discordWebhookUrl");
+      const discordBotTokenInput = document.getElementById("discordBotToken");
+      const discordChannelIdInput = document.getElementById("discordChannelId");
+      const discordMessageTemplateInput = document.getElementById("discordMessageTemplate");
+      const discordBotFeedback = document.getElementById("discordBotFeedback");
+      const discordBotReloadBtn = document.getElementById("discordBotReload");
 
       const navigationPermissions = {
         userSettingsBlock: ["user", "helper", "mod", "admin"],
@@ -276,6 +343,7 @@
         printerVerwaltungBlock: ["helper", "mod", "admin"],
         tokenBlockContainer: ["mod", "admin"],
         tokenUebersichtBlockContainer: ["mod", "admin"],
+        discordBotConfigBlock: ["admin"],
         userVerwaltungBlock: ["mod", "admin"],
         verbrauchVerwaltungBlock: ["mod", "admin"]
       };
@@ -412,6 +480,10 @@
         filterSettingsMenuForRole(benutzerRolle);
         hideAllSections();
         activateFirstAvailableSection();
+        if (userDiscordInput) {
+          userDiscordInput.value = daten.discord_id || '';
+        }
+        showUserSettingsMessage('', 'info');
         // Auth-Bereich dynamisch anpassen (Login/Logout, Benutzername)
         authBereich.innerHTML = `
           <form id="logoutForm" class="flex flex-col items-center">
@@ -444,6 +516,200 @@
         box.className = `fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-${farbe}-600 text-white px-4 py-2 rounded shadow z-50 text-sm`;
         box.classList.remove("hidden");
         setTimeout(() => box.classList.add("hidden"), 3000);
+      }
+
+      function showUserSettingsMessage(message, tone = 'info') {
+        if (!userSettingsFeedback) return;
+        if (!message) {
+          userSettingsFeedback.classList.add('hidden');
+          userSettingsFeedback.textContent = '';
+          return;
+        }
+        userSettingsFeedback.textContent = message;
+        userSettingsFeedback.classList.remove('hidden', 'text-green-400', 'text-red-400', 'text-gray-300');
+        let toneClass = 'text-gray-300';
+        if (tone === 'success') toneClass = 'text-green-400';
+        if (tone === 'error') toneClass = 'text-red-400';
+        userSettingsFeedback.classList.add(toneClass);
+      }
+
+      function setUserSettingsLoading(isLoading) {
+        if (!userSettingsForm) return;
+        userSettingsForm.classList.toggle('opacity-60', isLoading);
+        userSettingsForm.querySelectorAll('button, input').forEach(element => {
+          element.disabled = isLoading;
+        });
+      }
+
+      async function persistUserDiscord(value) {
+        if (!userSettingsForm) return false;
+        setUserSettingsLoading(true);
+        try {
+          const trimmed = value && value.trim() ? value.trim() : '';
+          if (trimmed && !/^\d+$/.test(trimmed)) {
+            showUserSettingsMessage('Die Discord-ID darf nur aus Ziffern bestehen.', 'error');
+            return false;
+          }
+          const payload = { discord_id: trimmed || null };
+          const res = await fetch('/api/me/settings', {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.status === 401) {
+            window.location.href = '/login';
+            return false;
+          }
+          if (!res.ok) {
+            showUserSettingsMessage(data?.detail || 'Speichern fehlgeschlagen.', 'error');
+            return false;
+          }
+          const storedId = data?.discord_id || null;
+          if (userDiscordInput) {
+            userDiscordInput.value = storedId || '';
+          }
+          showUserSettingsMessage(storedId ? 'Discord-ID gespeichert.' : 'Discord-ID entfernt.', 'success');
+          return true;
+        } catch (error) {
+          console.error('Discord-ID konnte nicht gespeichert werden:', error);
+          showUserSettingsMessage('Es ist ein Fehler aufgetreten. Bitte versuche es erneut.', 'error');
+          return false;
+        } finally {
+          setUserSettingsLoading(false);
+        }
+      }
+
+      function showDiscordBotFeedback(message, tone = 'info') {
+        if (!discordBotFeedback) return;
+        if (!message) {
+          discordBotFeedback.classList.add('hidden');
+          discordBotFeedback.textContent = '';
+          return;
+        }
+        discordBotFeedback.textContent = message;
+        discordBotFeedback.classList.remove('hidden', 'text-green-400', 'text-red-400', 'text-gray-300');
+        let toneClass = 'text-gray-300';
+        if (tone === 'success') toneClass = 'text-green-400';
+        if (tone === 'error') toneClass = 'text-red-400';
+        discordBotFeedback.classList.add(toneClass);
+      }
+
+      function setDiscordBotFormLoading(isLoading) {
+        if (!discordBotForm) return;
+        discordBotForm.classList.toggle('opacity-60', isLoading);
+        discordBotForm.querySelectorAll('button, input, textarea').forEach(element => {
+          element.disabled = isLoading;
+        });
+      }
+
+      function updateDiscordBotFieldState() {
+        const useDm = discordBotUseDmInput ? !!discordBotUseDmInput.checked : false;
+        if (discordWebhookInput) {
+          discordWebhookInput.disabled = useDm;
+          discordWebhookInput.classList.toggle('opacity-50', useDm);
+        }
+        if (discordChannelIdInput) {
+          discordChannelIdInput.disabled = useDm;
+          discordChannelIdInput.classList.toggle('opacity-50', useDm);
+        }
+      }
+
+      async function loadDiscordBotConfig({ showStatus = false } = {}) {
+        if (!discordBotForm) return;
+        setDiscordBotFormLoading(true);
+        if (showStatus) {
+          showDiscordBotFeedback('Lade Einstellungen …', 'info');
+        } else {
+          showDiscordBotFeedback('', 'info');
+        }
+        try {
+          const res = await fetch('/api/discord/config', { credentials: 'same-origin' });
+          if (res.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          if (res.status === 403) {
+            showDiscordBotFeedback('Keine Berechtigung für Discord-Einstellungen.', 'error');
+            return;
+          }
+          if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
+          }
+          const data = await res.json();
+          if (discordBotEnabledInput) discordBotEnabledInput.checked = !!data.enabled;
+          if (discordBotUseDmInput) discordBotUseDmInput.checked = !!data.use_dm;
+          if (discordWebhookInput) discordWebhookInput.value = data.webhook_url || '';
+          if (discordBotTokenInput) discordBotTokenInput.value = data.bot_token || '';
+          if (discordChannelIdInput) discordChannelIdInput.value = data.channel_id || '';
+          if (discordMessageTemplateInput) discordMessageTemplateInput.value = data.message_template || '';
+          updateDiscordBotFieldState();
+          if (showStatus) {
+            showDiscordBotFeedback('Einstellungen geladen.', 'success');
+          } else {
+            showDiscordBotFeedback('', 'info');
+          }
+        } catch (error) {
+          console.error('Discord-Konfiguration konnte nicht geladen werden:', error);
+          showDiscordBotFeedback('Fehler beim Laden der Discord-Konfiguration.', 'error');
+        } finally {
+          setDiscordBotFormLoading(false);
+          updateDiscordBotFieldState();
+        }
+      }
+
+      async function submitDiscordBotConfig(event) {
+        event.preventDefault();
+        if (!discordBotForm) return;
+        setDiscordBotFormLoading(true);
+        showDiscordBotFeedback('Speichere …', 'info');
+        try {
+          const payload = {
+            enabled: discordBotEnabledInput ? !!discordBotEnabledInput.checked : false,
+            use_dm: discordBotUseDmInput ? !!discordBotUseDmInput.checked : false,
+            webhook_url: discordWebhookInput && discordWebhookInput.value ? discordWebhookInput.value.trim() : null,
+            bot_token: discordBotTokenInput && discordBotTokenInput.value ? discordBotTokenInput.value.trim() : null,
+            channel_id: discordChannelIdInput && discordChannelIdInput.value ? discordChannelIdInput.value.trim() : null,
+            message_template: discordMessageTemplateInput ? discordMessageTemplateInput.value : ''
+          };
+          if (payload.use_dm) {
+            payload.webhook_url = null;
+            payload.channel_id = null;
+          }
+          const res = await fetch('/api/discord/config', {
+            method: 'PATCH',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json().catch(() => ({}));
+          if (res.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          if (res.status === 403) {
+            showDiscordBotFeedback('Keine Berechtigung für Discord-Einstellungen.', 'error');
+            return;
+          }
+          if (!res.ok) {
+            showDiscordBotFeedback(data?.detail || 'Speichern fehlgeschlagen.', 'error');
+            return;
+          }
+          if (discordBotEnabledInput) discordBotEnabledInput.checked = !!data.enabled;
+          if (discordWebhookInput) discordWebhookInput.value = data.webhook_url || '';
+          if (discordBotTokenInput) discordBotTokenInput.value = data.bot_token || '';
+          if (discordChannelIdInput) discordChannelIdInput.value = data.channel_id || '';
+          if (discordMessageTemplateInput) discordMessageTemplateInput.value = data.message_template || '';
+          if (discordBotUseDmInput) discordBotUseDmInput.checked = !!data.use_dm;
+          updateDiscordBotFieldState();
+          showDiscordBotFeedback('Einstellungen gespeichert.', 'success');
+        } catch (error) {
+          console.error('Discord-Konfiguration konnte nicht gespeichert werden:', error);
+          showDiscordBotFeedback('Es ist ein Fehler aufgetreten. Bitte versuche es erneut.', 'error');
+        } finally {
+          setDiscordBotFormLoading(false);
+        }
       }
 
       async function ladeBilder() {
@@ -540,6 +806,21 @@
       }
 
       ladeBilder();
+
+      if (userSettingsForm) {
+        userSettingsForm.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const value = userDiscordInput ? userDiscordInput.value : '';
+          await persistUserDiscord(value);
+        });
+      }
+      if (userDiscordClearBtn) {
+        userDiscordClearBtn.addEventListener('click', async (event) => {
+          event.preventDefault();
+          if (userDiscordInput) userDiscordInput.value = '';
+          await persistUserDiscord('');
+        });
+      }
 
       // Drucker-Verwaltung
       const printerForm = document.getElementById("printerForm");
@@ -796,6 +1077,21 @@
               zeigeBenachrichtigung("Fehler beim Erstellen des Tokens.", "red");
             }
           });
+
+          if (benutzerRolle === "admin" && discordBotForm) {
+            await loadDiscordBotConfig();
+            updateDiscordBotFieldState();
+            discordBotForm.addEventListener('submit', submitDiscordBotConfig);
+            if (discordBotReloadBtn) {
+              discordBotReloadBtn.addEventListener('click', async (event) => {
+                event.preventDefault();
+                await loadDiscordBotConfig({ showStatus: true });
+              });
+            }
+            if (discordBotUseDmInput) {
+              discordBotUseDmInput.addEventListener('change', updateDiscordBotFieldState);
+            }
+          }
 
           const verbrauchNavBlock = document.getElementById("verbrauchNavBlock");
           const verbrauchTabelleBody = document.getElementById("verbrauchTabelleBody");

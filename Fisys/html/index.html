@@ -214,13 +214,29 @@
       </div>
     </div>
   </div>
+  <div id="dashboard-generic-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center px-4 hidden z-50">
+    <div class="bg-gray-800 border border-gray-600 rounded-xl shadow-2xl w-full max-w-md">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-700">
+        <h3 class="text-lg font-semibold text-white" data-modal-title>Hinweis</h3>
+        <button type="button" class="text-gray-300 hover:text-white transition text-xl leading-none" data-modal-close>&times;</button>
+      </div>
+      <div class="px-5 py-4 space-y-3">
+        <p class="text-sm text-gray-200" data-modal-message></p>
+      </div>
+      <div class="flex justify-end gap-2 px-5 pb-5">
+        <a href="#" class="hidden px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-sm text-white" data-modal-action>Zum Login</a>
+        <button type="button" class="px-4 py-2 rounded border border-gray-500 text-sm text-gray-200 hover:bg-gray-700" data-modal-close>Schließen</button>
+      </div>
+    </div>
+  </div>
 </body>
   <script>
     let ws;
     let selectedPrinterSerials = new Set();
     let printerSpoolData = {};
     const printerNameBySerial = new Map();
-    let currentUserInfo = { username: null, role: null };
+    let currentUserInfo = { username: null, role: null, discord_id: null };
+    let activeNotificationSerials = new Set();
     let dashboardNotesSummary = [];
     let dashboardNotesTotal = 0;
     const noteGrid = document.getElementById('dashboard-note-grid');
@@ -236,6 +252,11 @@
     const noteModal = document.getElementById('dashboard-note-modal');
     const noteModalBody = document.getElementById('dashboard-note-modal-body');
     const noteModalCloseButtons = document.querySelectorAll('[data-note-modal-close]');
+    const genericModal = document.getElementById('dashboard-generic-modal');
+    const genericModalTitle = genericModal ? genericModal.querySelector('[data-modal-title]') : null;
+    const genericModalMessage = genericModal ? genericModal.querySelector('[data-modal-message]') : null;
+    const genericModalAction = genericModal ? genericModal.querySelector('[data-modal-action]') : null;
+    const genericModalCloseButtons = genericModal ? genericModal.querySelectorAll('[data-modal-close]') : [];
     let editingNoteId = null;
     let lastCanManageNotes = false;
     if (noteShowAllBtn) {
@@ -269,9 +290,24 @@
         }
       });
     }
+
+    genericModalCloseButtons.forEach(btn => btn.addEventListener('click', () => hideDashboardModal()));
+    if (genericModal) {
+      genericModal.addEventListener('click', (event) => {
+        if (event.target === genericModal) {
+          hideDashboardModal();
+        }
+      });
+    }
+
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && noteModal && !noteModal.classList.contains('hidden')) {
-        closeDashboardNoteModal();
+      if (event.key === 'Escape') {
+        if (noteModal && !noteModal.classList.contains('hidden')) {
+          closeDashboardNoteModal();
+        }
+        if (genericModal && !genericModal.classList.contains('hidden')) {
+          hideDashboardModal();
+        }
       }
     });
     function connectWS() {
@@ -319,7 +355,7 @@
       card.className = 'ps-card bg-gray-700 p-5 rounded-xl shadow-sm';
       card.dataset.serial = serial;
       card.innerHTML = `
-        <div class=\"mt-1 space-y-3\">\n          <div class=\"flex items-center justify-between gap-4\">\n            <div class=\"flex items-baseline gap-3\">\n              <div class=\"ps-name text-base font-medium text-white\">${name || '—'}</div>\n            </div>\n            <div class=\"flex items-center gap-4\">\n              <div class=\"ps-state text-sm font-semibold text-white\">—</div>\n              <div class=\"ps-eta text-sm text-white\"></div>\n            </div>\n          </div>\n          <div>\n            <div class=\"flex items-center justify-between mb-1\">\n              <div class=\"text-sm text-gray-200\">Fortschritt</div>\n              <div class=\"ps-progress-label text-xs text-gray-200\">0%</div>\n            </div>\n            <div class=\"w-full h-3 bg-gray-200 rounded-full overflow-hidden\">\n              <div class=\"ps-progress h-full bg-blue-600 rounded-full\" style=\"width: 0%\"></div>\n            </div>\n          </div>\n          <div class=\"flex items-baseline gap-3\">\n            <div class=\"text-sm text-white\">Job</div>\n            <div class=\"ps-job text-base font-medium text-gray-300 truncate max-w-full\">—</div>\n          </div>\n          <div class=\"border-t border-gray-600 pt-3\">\n            <button type=\"button\" class=\"ps-spool-toggle w-full flex items-center justify-between text-sm text-blue-300 hover:text-blue-200 transition\" data-spool-toggle aria-expanded=\"false\">\n              <span data-spool-label>Spulen im Drucker anzeigen</span>\n              <span class=\"text-xs text-gray-300\" data-spool-arrow>▼</span>\n            </button>\n            <div class=\"ps-spool-panel hidden mt-3\" data-spool-panel>\n              <div class=\"space-y-2\" data-spool-list></div>\n            </div>\n          </div>\n        </div>`;
+        <div class=\"mt-1 space-y-3\">\n          <div class=\"flex items-center justify-between gap-4\">\n            <div class=\"flex items-baseline gap-3\">\n              <div class=\"ps-name text-base font-medium text-white\">${name || '—'}</div>\n            </div>\n            <div class=\"flex items-center gap-4\">\n              <div class=\"ps-state text-sm font-semibold text-white\">—</div>\n              <div class=\"ps-eta text-sm text-white\"></div>\n            </div>\n          </div>\n          <div>\n            <div class=\"flex items-center justify-between mb-1\">\n              <div class=\"text-sm text-gray-200\">Fortschritt</div>\n              <div class=\"ps-progress-label text-xs text-gray-200\">0%</div>\n            </div>\n            <div class=\"w-full h-3 bg-gray-200 rounded-full overflow-hidden\">\n              <div class=\"ps-progress h-full bg-blue-600 rounded-full\" style=\"width: 0%\"></div>\n            </div>\n          </div>\n          <div class=\"flex items-baseline gap-3\">\n            <div class=\"text-sm text-white\">Job</div>\n            <div class=\"ps-job text-base font-medium text-gray-300 truncate max-w-full\">—</div>\n          </div>\n          <div class=\"mt-2 space-y-2\">\n            <button type=\"button\" class=\"ps-notify-btn w-full text-sm text-white bg-blue-600 hover:bg-blue-500 rounded px-3 py-2 transition disabled:opacity-60 disabled:cursor-not-allowed\" data-notify-button>Benachrichtige mich, wenn Druck fertig</button>\n            <p class=\"hidden text-xs\" data-notify-feedback></p>\n          </div>\n          <div class=\"border-t border-gray-600 pt-3\">\n            <button type=\"button\" class=\"ps-spool-toggle w-full flex items-center justify-between text-sm text-blue-300 hover:text-blue-200 transition\" data-spool-toggle aria-expanded=\"false\">\n              <span data-spool-label>Spulen im Drucker anzeigen</span>\n              <span class=\"text-xs text-gray-300\" data-spool-arrow>▼</span>\n            </button>\n            <div class=\"ps-spool-panel hidden mt-3\" data-spool-panel>\n              <div class=\"space-y-2\" data-spool-list></div>\n            </div>\n          </div>\n        </div>`;
       container.appendChild(card);
       initPrinterCardInteractions(card);
       updateCardSpoolUI(serial);
@@ -339,6 +375,7 @@
       });
       // Stelle sicher, dass ausgewählte vorhanden sind
       (printers || []).forEach(p => ensurePrinterCard(p.serial, p.name));
+      syncNotificationButtons();
     }
 
     function updatePrinterStatus(p) {
@@ -401,6 +438,7 @@
       const isRunning = (intProg > 0 && intProg < 100) || /run|print/i.test(stateTxt);
       bar.classList.toggle('shimmer-running', !!isRunning);
       updateCardSpoolUI(serial);
+      updateNotifyButtonState(card);
     }
     function setPrinterSpoolData(payload) {
       printerSpoolData = (payload && typeof payload === 'object') ? payload : {};
@@ -506,60 +544,240 @@
     }
 
     function initPrinterCardInteractions(card) {
-      if (!card || card.dataset.spoolToggleSetup === '1') return;
-      const toggleBtn = card.querySelector('[data-spool-toggle]');
-      const panel = card.querySelector('[data-spool-panel]');
-      if (!toggleBtn || !panel) return;
-      card.dataset.spoolToggleSetup = '1';
+      if (!card) return;
 
-      panel.style.maxHeight = '0px';
-      panel.style.overflow = 'hidden';
-      panel.style.transition = 'max-height 0.3s ease';
-      panel.dataset.spoolPanelInit = '1';
+      if (card.dataset.spoolToggleSetup !== '1') {
+        const toggleBtn = card.querySelector('[data-spool-toggle]');
+        const panel = card.querySelector('[data-spool-panel]');
+        if (toggleBtn && panel) {
+          card.dataset.spoolToggleSetup = '1';
 
-      const updateToggleVisuals = (expanded) => {
-        const arrow = toggleBtn.querySelector('[data-spool-arrow]');
-        if (arrow) arrow.textContent = expanded ? '▲' : '▼';
-        const labelEl = toggleBtn.querySelector('[data-spool-label]');
-        if (labelEl) labelEl.textContent = expanded ? 'Spulen im Drucker ausblenden' : 'Spulen im Drucker anzeigen';
-      };
+          panel.style.maxHeight = '0px';
+          panel.style.overflow = 'hidden';
+          panel.style.transition = 'max-height 0.3s ease';
+          panel.dataset.spoolPanelInit = '1';
 
-      const setPanelState = (expanded) => {
-        toggleBtn.setAttribute('aria-expanded', String(expanded));
-        updateToggleVisuals(expanded);
-        if (expanded) {
-          renderPrinterSpoolsIntoCard(card.dataset.serial);
-          panel.classList.remove('hidden');
-          const scrollHeight = panel.scrollHeight;
-          panel.style.maxHeight = scrollHeight + 'px';
-          panel.querySelectorAll('img').forEach(img => {
-            if (!img.complete) {
-              img.addEventListener('load', () => adjustPanelHeight(panel), { once: true });
+          const updateToggleVisuals = (expanded) => {
+            const arrow = toggleBtn.querySelector('[data-spool-arrow]');
+            if (arrow) arrow.textContent = expanded ? '▲' : '▼';
+            const labelEl = toggleBtn.querySelector('[data-spool-label]');
+            if (labelEl) labelEl.textContent = expanded ? 'Spulen im Drucker ausblenden' : 'Spulen im Drucker anzeigen';
+          };
+
+          const setPanelState = (expanded) => {
+            toggleBtn.setAttribute('aria-expanded', String(expanded));
+            updateToggleVisuals(expanded);
+            if (expanded) {
+              renderPrinterSpoolsIntoCard(card.dataset.serial);
+              panel.classList.remove('hidden');
+              const scrollHeight = panel.scrollHeight;
+              panel.style.maxHeight = scrollHeight + 'px';
+              panel.querySelectorAll('img').forEach(img => {
+                if (!img.complete) {
+                  img.addEventListener('load', () => adjustPanelHeight(panel), { once: true });
+                }
+              });
+              adjustPanelHeight(panel);
+            } else {
+              panel.style.maxHeight = '0px';
+              panel.addEventListener('transitionend', () => {
+                if (panel.style.maxHeight === '0px') {
+                  panel.classList.add('hidden');
+                }
+              }, { once: true });
+            }
+          };
+
+          toggleBtn.addEventListener('click', () => {
+            const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+            const next = !expanded;
+            if (next) {
+              panel.classList.remove('hidden');
+              panel.style.maxHeight = '0px';
+              requestAnimationFrame(() => setPanelState(true));
+            } else {
+              setPanelState(false);
             }
           });
-          adjustPanelHeight(panel);
-        } else {
-          panel.style.maxHeight = '0px';
-          panel.addEventListener('transitionend', () => {
-            if (panel.style.maxHeight === '0px') {
-              panel.classList.add('hidden');
-            }
-          }, { once: true });
         }
-      };
+      }
 
-      toggleBtn.addEventListener('click', () => {
-        const expanded = toggleBtn.getAttribute('aria-expanded') === 'true';
-        const next = !expanded;
-        if (next) {
-          panel.classList.remove('hidden');
-          panel.style.maxHeight = '0px';
-          requestAnimationFrame(() => setPanelState(true));
-        } else {
-          setPanelState(false);
+      if (card.dataset.notifySetup !== '1') {
+        const notifyBtn = card.querySelector('[data-notify-button]');
+        if (notifyBtn) {
+          notifyBtn.addEventListener('click', () => handlePrinterNotifyClick(card.dataset.serial, notifyBtn));
+          card.dataset.notifySetup = '1';
         }
-      });
+      }
+
+      updateNotifyButtonState(card);
     }
+    function updateNotifyButtonState(card) {
+      if (!card) return;
+      const serial = card.dataset.serial;
+      const btn = card.querySelector('[data-notify-button]');
+      const feedback = card.querySelector('[data-notify-feedback]');
+      if (!btn || !serial) return;
+      const active = activeNotificationSerials.has(serial);
+      if (!btn.dataset.originalLabel) {
+        btn.dataset.originalLabel = btn.textContent.trim();
+      }
+      btn.disabled = active;
+      if (active) {
+        btn.textContent = 'Benachrichtigung aktiv';
+        btn.classList.remove('bg-blue-600', 'hover:bg-blue-500');
+        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+      } else {
+        btn.textContent = btn.dataset.originalLabel || 'Benachrichtige mich, wenn Druck fertig';
+        btn.classList.add('bg-blue-600', 'hover:bg-blue-500');
+        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+        if ((!btn.dataset.lastMessage || btn.dataset.lastMessage === '') && feedback) {
+          feedback.classList.add('hidden');
+          feedback.textContent = '';
+        }
+      }
+    }
+
+    function showNotifyFeedback(card, message, tone = 'info') {
+      const feedback = card?.querySelector('[data-notify-feedback]');
+      if (!feedback) return;
+      const toneClasses = ['text-green-400', 'text-red-400', 'text-gray-300'];
+      feedback.classList.remove('hidden', ...toneClasses);
+      feedback.textContent = message;
+      let toneClass = 'text-gray-300';
+      if (tone === 'success') toneClass = 'text-green-400';
+      if (tone === 'error') toneClass = 'text-red-400';
+      feedback.classList.add(toneClass);
+      if (feedback.dataset.timeoutId) {
+        clearTimeout(Number(feedback.dataset.timeoutId));
+      }
+      const timeoutId = window.setTimeout(() => {
+        feedback.classList.add('hidden');
+        feedback.textContent = '';
+        feedback.dataset.timeoutId = '';
+        const btn = card.querySelector('[data-notify-button]');
+        if (btn) btn.dataset.lastMessage = '';
+      }, 6000);
+      feedback.dataset.timeoutId = String(timeoutId);
+      const btn = card.querySelector('[data-notify-button]');
+      if (btn) btn.dataset.lastMessage = message;
+    }
+
+    function syncNotificationButtons() {
+      document.querySelectorAll('.ps-card').forEach(updateNotifyButtonState);
+    }
+
+    function updateNotifyButtonStateForSerial(serial) {
+      if (!serial) return;
+      const card = document.querySelector(`.ps-card[data-serial="${serial}"]`);
+      if (card) updateNotifyButtonState(card);
+    }
+
+    async function handlePrinterNotifyClick(serial, button) {
+      if (!serial || !button) return;
+      const card = button.closest('.ps-card');
+      if (!currentUserInfo || !currentUserInfo.username) {
+        showDashboardModal({
+          title: 'Login benötigt',
+          message: 'Für diese Funktion musst du angemeldet sein.',
+          actionLabel: 'Zum Login',
+          actionHref: '/login'
+        });
+        return;
+      }
+      if (!currentUserInfo.discord_id) {
+        showDashboardModal({
+          title: 'Discord-ID fehlt',
+          message: 'Bitte hinterlege zuerst deine Discord-ID (nur Zahlen) unter Einstellungen > Benutzereinstellungen.',
+          actionLabel: 'Zu den Einstellungen',
+          actionHref: '/einstellungen.html'
+        });
+        return;
+      }
+
+      const originalLabel = button.textContent;
+      let shouldRefreshNotifications = false;
+      button.disabled = true;
+      button.textContent = 'Speichere …';
+      try {
+        const res = await fetch(`/api/printers/${encodeURIComponent(serial)}/notify`, {
+          method: 'POST',
+          credentials: 'same-origin'
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          currentUserInfo = { username: null, role: null, discord_id: null };
+          activeNotificationSerials.clear();
+          syncNotificationButtons();
+          showDashboardModal({
+            title: 'Session abgelaufen',
+            message: 'Bitte melde dich erneut an, um Benachrichtigungen zu aktivieren.',
+            actionLabel: 'Zum Login',
+            actionHref: '/login'
+          });
+          return;
+        }
+        if (!res.ok) {
+          if (res.status === 400 && data?.detail && data.detail.includes('Discord-ID')) {
+            showDashboardModal({
+              title: 'Discord-ID fehlt',
+              message: 'Bitte hinterlege zuerst deine Discord ID in den Einstellungen.',
+              actionLabel: 'Zu den Einstellungen',
+              actionHref: '/einstellungen.html'
+            });
+          } else if (res.status === 503) {
+            const detail = data?.detail || 'Der Discord-Bot ist derzeit deaktiviert. Bitte wende dich an einen Administrator.';
+            const modalTitle = detail.includes('Direktnachrichten') ? 'Bot-Konfiguration' : 'Bot deaktiviert';
+            showDashboardModal({
+              title: modalTitle,
+              message: detail
+            });
+          } else {
+            showNotifyFeedback(card, data?.detail || 'Benachrichtigung konnte nicht gespeichert werden.', 'error');
+          }
+          return;
+        }
+        activeNotificationSerials.add(serial);
+        updateNotifyButtonState(card);
+        showNotifyFeedback(card, data?.detail || 'Benachrichtigung aktiviert.', 'success');
+        shouldRefreshNotifications = true;
+      } catch (error) {
+        console.error('Benachrichtigung fehlgeschlagen', error);
+        showNotifyFeedback(card, 'Es ist ein Fehler aufgetreten. Bitte versuche es erneut.', 'error');
+      } finally {
+        updateNotifyButtonState(card);
+        if (!activeNotificationSerials.has(serial)) {
+          button.disabled = false;
+          button.textContent = originalLabel;
+        }
+        if (shouldRefreshNotifications) {
+          await loadActivePrinterNotifications();
+        } else {
+          syncNotificationButtons();
+        }
+      }
+    }
+
+    async function loadActivePrinterNotifications() {
+      if (!currentUserInfo || !currentUserInfo.username) {
+        activeNotificationSerials.clear();
+        syncNotificationButtons();
+        return;
+      }
+      try {
+        const res = await fetch('/api/printers/notifications', { credentials: 'same-origin' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const items = Array.isArray(data?.items) ? data.items : [];
+        activeNotificationSerials = new Set(items.map(item => item.printer_serial));
+      } catch (error) {
+        console.warn('Konnte aktive Benachrichtigungen nicht laden:', error);
+        activeNotificationSerials.clear();
+      }
+      syncNotificationButtons();
+    }
+
+
 
     async function refreshPrinterData() {
       try {
@@ -934,6 +1152,37 @@
       }
     }
 
+
+    function hideDashboardModal() {
+      if (!genericModal) return;
+      genericModal.classList.add('hidden');
+      if (genericModalAction) {
+        genericModalAction.classList.add('hidden');
+        genericModalAction.removeAttribute('href');
+      }
+    }
+
+    function showDashboardModal({ title = 'Hinweis', message = '', actionLabel, actionHref } = {}) {
+      if (!genericModal) return;
+      if (genericModalTitle) {
+        genericModalTitle.textContent = title || 'Hinweis';
+      }
+      if (genericModalMessage) {
+        genericModalMessage.textContent = message || '';
+      }
+      if (genericModalAction) {
+        if (actionLabel && actionHref) {
+          genericModalAction.textContent = actionLabel;
+          genericModalAction.href = actionHref;
+          genericModalAction.classList.remove('hidden');
+        } else {
+          genericModalAction.classList.add('hidden');
+          genericModalAction.removeAttribute('href');
+        }
+      }
+      genericModal.classList.remove('hidden');
+    }
+
     function closeDashboardNoteModal() {
       if (!noteModal) return;
       noteModal.classList.add('hidden');
@@ -1271,22 +1520,27 @@
         </form>
       `;
 
-      currentUserInfo = { username: daten.username, role: daten.rolle };
+      currentUserInfo = { username: daten.username, role: daten.rolle, discord_id: daten.discord_id || null };
       if (typeof updateDashboardNotePermissions === 'function') {
         updateDashboardNotePermissions();
       }
+      await loadActivePrinterNotifications();
 
       document.getElementById("logoutForm").addEventListener("submit", async (e) => {
         e.preventDefault();
         await fetch("/logout", { method: "POST", credentials: 'same-origin' });
-        currentUserInfo = { username: null, role: null };
+        currentUserInfo = { username: null, role: null, discord_id: null };
+        activeNotificationSerials.clear();
+        syncNotificationButtons();
         if (typeof updateDashboardNotePermissions === 'function') {
           updateDashboardNotePermissions();
         }
         location.reload();
       });
     } catch (err) {
-      currentUserInfo = { username: null, role: null };
+      currentUserInfo = { username: null, role: null, discord_id: null };
+      activeNotificationSerials.clear();
+      syncNotificationButtons();
       if (typeof updateDashboardNotePermissions === 'function') {
         updateDashboardNotePermissions();
       }

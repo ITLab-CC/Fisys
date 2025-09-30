@@ -116,7 +116,7 @@ async def get_userinfo(request: Request, db: Session = Depends(get_db)):
     user.last_seen = datetime.now(timezone.utc)
     db.commit()
 
-    return {"username": user.username, "rolle": user.rolle}
+    return {"username": user.username, "rolle": user.rolle, "discord_id": user.discord_id}
 
 @router.post("/admin/create-token")
 async def create_token(request: Request, db: Session = Depends(get_db)):

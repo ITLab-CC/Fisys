@@ -5,15 +5,26 @@ from datetime import datetime, timezone
 from fastapi.responses import HTMLResponse
 from sqlalchemy import func
 from db import SessionLocal, init_db
-from models import FilamentTyp, FilamentSpule, FilamentVerbrauch, FilamentSpuleHistorie, PrinterJobHistory, User, DashboardNote
+from models import (
+    FilamentTyp,
+    FilamentSpule,
+    FilamentVerbrauch,
+    FilamentSpuleHistorie,
+    PrinterJobHistory,
+    User,
+    DashboardNote,
+    DiscordNotificationSubscription,
+    DiscordBotConfig,
+)
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Response, BackgroundTasks, Request, Query
 from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Optional, Tuple
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from qrcode_utils import generate_qrcode_for_spule, delete_qrcode_for_spule
 import shutil
+import requests
 from auth import router as auth_router, serializer, COOKIE_MAX_AGE
 from printer_service import start_printer_service, stop_printer_service
 from models import Printer, PrinterCreate, PrinterUpdate, PrinterRead
@@ -101,6 +112,8 @@ LATEST_PRINTER_STATUSES: dict[str, dict] = {}
 CURRENT_PRINTER_JOBS: dict[str, dict] = {}
 PRINTER_NAME_CACHE: dict[str, Optional[str]] = {}
 
+DEFAULT_DISCORD_MESSAGE_TEMPLATE = "Hey {username}, dein Druckauftrag {job_name} auf {printer_name} ist fertig!"
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -137,13 +150,15 @@ def _finalize_printer_job(serial: str, entry: dict, status: str, finished_at: da
     duration_seconds = int(duration.total_seconds()) if duration else None
     if duration_seconds is not None and duration_seconds < 0:
         duration_seconds = 0
+    job_name_value = entry.get('job_name')
+    printer_name = None
     session = SessionLocal()
     try:
         printer_name = _resolve_printer_name(serial, session=session)
         job = PrinterJobHistory(
             printer_serial=serial,
             printer_name=printer_name,
-            job_name=entry.get('job_name'),
+            job_name=job_name_value,
             status=status,
             started_at=start_time,
             finished_at=finished_at,
@@ -151,11 +166,14 @@ def _finalize_printer_job(serial: str, entry: dict, status: str, finished_at: da
         )
         session.add(job)
         session.commit()
+        job_name_value = job.job_name
     except Exception as exc:
         session.rollback()
         print(f"[PrinterJob] Persistenzfehler: {exc}")
     finally:
         session.close()
+
+    _process_discord_notifications(serial, printer_name, job_name_value, status)
 
 
 def _track_printer_job(payload: dict) -> None:
@@ -389,6 +407,158 @@ def get_current_user(request: Request, db: Session) -> User:
     return user
 
 
+class _SafeFormatDict(dict):
+    def __missing__(self, key):
+        return ""
+
+
+def _ensure_discord_config(db: Session) -> DiscordBotConfig:
+    config = db.query(DiscordBotConfig).filter(DiscordBotConfig.id == 1).first()
+    if not config:
+        config = DiscordBotConfig(id=1, message_template=DEFAULT_DISCORD_MESSAGE_TEMPLATE)
+        db.add(config)
+        db.commit()
+        db.refresh(config)
+    if getattr(config, 'use_dm', None) is None:
+        config.use_dm = False
+        db.commit()
+        db.refresh(config)
+    return config
+
+
+def _format_discord_message(template: str, context: dict) -> str:
+    safe_context = {k: "" if v is None else str(v) for k, v in context.items()}
+    try:
+        return template.format_map(_SafeFormatDict(safe_context))
+    except Exception:
+        return template
+
+
+
+def _dispatch_discord_message(config: DiscordBotConfig, message: str, user: Optional[User] = None) -> tuple[bool, Optional[str]]:
+    if not config.enabled:
+        return False, "Bot deaktiviert"
+
+    if config.use_dm:
+        if not config.bot_token:
+            return False, "Bot-Token erforderlich, um Direktnachrichten zu senden"
+        if not user or not user.discord_id or not str(user.discord_id).isdigit():
+            return False, "Discord-ID fehlt oder ist ungültig"
+        headers = {"Authorization": f"Bot {config.bot_token}", "Content-Type": "application/json"}
+        try:
+            dm_response = requests.post(
+                "https://discord.com/api/v10/users/@me/channels",
+                headers=headers,
+                json={"recipient_id": str(user.discord_id)},
+                timeout=10,
+            )
+        except Exception as exc:
+            return False, str(exc)
+        if not (200 <= dm_response.status_code < 300):
+            return False, f"DM-Channel-Fehler: HTTP {dm_response.status_code}: {dm_response.text[:200]}"
+        channel_payload = dm_response.json() if dm_response.content else {}
+        channel_id = channel_payload.get("id")
+        if not channel_id:
+            return False, "DM-Channel konnte nicht ermittelt werden"
+        try:
+            message_response = requests.post(
+                f"https://discord.com/api/v10/channels/{channel_id}/messages",
+                headers=headers,
+                json={"content": message},
+                timeout=10,
+            )
+        except Exception as exc:
+            return False, str(exc)
+        if 200 <= message_response.status_code < 300:
+            return True, None
+        return False, f"HTTP {message_response.status_code}: {message_response.text[:200]}"
+
+    if config.webhook_url:
+        try:
+            response = requests.post(
+                config.webhook_url,
+                json={"content": message},
+                timeout=10,
+            )
+        except Exception as exc:
+            return False, str(exc)
+        if 200 <= response.status_code < 300:
+            return True, None
+        return False, f"HTTP {response.status_code}: {response.text[:200]}"
+
+    if config.channel_id and config.bot_token:
+        url = f"https://discord.com/api/v10/channels/{config.channel_id}/messages"
+        headers = {"Authorization": f"Bot {config.bot_token}", "Content-Type": "application/json"}
+        try:
+            response = requests.post(url, json={"content": message}, headers=headers, timeout=10)
+        except Exception as exc:
+            return False, str(exc)
+        if 200 <= response.status_code < 300:
+            return True, None
+        return False, f"HTTP {response.status_code}: {response.text[:200]}"
+
+    return False, "Keine gültige Discord-Konfiguration gefunden"
+
+
+
+def _process_discord_notifications(serial: str, printer_name: Optional[str], job_name: Optional[str], status: str) -> None:
+    if status != 'erfolgreich':
+        return
+    session = SessionLocal()
+    try:
+        pending = (
+            session.query(DiscordNotificationSubscription)
+            .options(joinedload(DiscordNotificationSubscription.user))
+            .filter(
+                DiscordNotificationSubscription.printer_serial == serial,
+                DiscordNotificationSubscription.status == 'pending'
+            )
+            .all()
+        )
+        if not pending:
+            return
+
+        config = _ensure_discord_config(session)
+        if not config.enabled:
+            for sub in pending:
+                sub.status = 'skipped'
+                sub.last_error = 'Discord-Bot deaktiviert'
+            session.commit()
+            return
+
+        template = config.message_template or DEFAULT_DISCORD_MESSAGE_TEMPLATE
+        now = _utcnow()
+        for sub in pending:
+            user = sub.user
+            if not user or not user.discord_id:
+                sub.status = 'failed'
+                sub.last_error = 'Discord-ID fehlt'
+                continue
+
+            mention = f"<@{user.discord_id}> " if user.discord_id and user.discord_id.isdigit() else ""
+            context = {
+                'username': user.username,
+                'printer_name': printer_name or serial,
+                'printer_serial': serial,
+                'job_name': job_name or 'Unbekannter Job',
+                'status': status,
+                'discord_id': user.discord_id,
+                'discord_mention': mention,
+            }
+            message = _format_discord_message(template, context)
+            success, error = _dispatch_discord_message(config, message, user=user)
+            if success:
+                sub.status = 'sent'
+                sub.notified_at = now
+                sub.last_error = None
+            else:
+                sub.status = 'failed'
+                sub.last_error = error or 'Unbekannter Fehler'
+        session.commit()
+    finally:
+        session.close()
+
+
 def log_spool_history(db: Session, spule: FilamentSpule, aktion: str, alt: Optional[float] = None, neu: Optional[float] = None) -> None:
     """Persist a history entry for dashboard timeline tracking."""
     try:
@@ -526,6 +696,19 @@ class DashboardNoteCreate(BaseModel):
 class VerbrauchUpdate(BaseModel):
     verbrauch_in_g: float
 
+
+class UserSettingsUpdate(BaseModel):
+    discord_id: Optional[str] = Field(default=None, max_length=64)
+
+
+class DiscordBotConfigPayload(BaseModel):
+    enabled: Optional[bool] = None
+    use_dm: Optional[bool] = None
+    webhook_url: Optional[str] = Field(default=None, max_length=400)
+    bot_token: Optional[str] = Field(default=None, max_length=400)
+    channel_id: Optional[str] = Field(default=None, max_length=120)
+    message_template: Optional[str] = Field(default=None, max_length=2000)
+
 # DB Dependency
 def get_db():
     db = SessionLocal()
@@ -564,6 +747,139 @@ def _normalize_printer_serial(db: Session, serial: Optional[str]) -> Optional[st
     return printer.serial
 
 # API Endpoints
+
+@app.patch("/api/me/settings")
+def update_user_settings(payload: UserSettingsUpdate, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    raw = (payload.discord_id or "").strip()
+    cleaned = None
+    if raw:
+        if not raw.isdigit():
+            raise HTTPException(status_code=400, detail='Discord-ID darf nur Zahlen enthalten.')
+        if len(raw) > 64:
+            raise HTTPException(status_code=400, detail='Discord-ID ist zu lang.')
+        cleaned = raw
+    user.discord_id = cleaned
+    db.commit()
+    return {"username": user.username, "discord_id": user.discord_id}
+
+
+@app.get("/api/printers/notifications")
+def list_printer_notifications(request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    subs = (
+        db.query(DiscordNotificationSubscription)
+        .filter(
+            DiscordNotificationSubscription.user_id == user.id,
+            DiscordNotificationSubscription.status == 'pending'
+        )
+        .all()
+    )
+    return {
+        "items": [
+            {
+                "id": sub.id,
+                "printer_serial": sub.printer_serial,
+                "job_name": sub.job_name,
+                "created_at": sub.created_at,
+            }
+            for sub in subs
+        ]
+    }
+
+
+@app.post("/api/printers/{serial}/notify", status_code=201)
+def register_printer_notification(serial: str, request: Request, db: Session = Depends(get_db)):
+    user = get_current_user(request, db)
+    if not user.discord_id:
+        raise HTTPException(status_code=400, detail="Bitte hinterlege zuerst deine Discord-ID in den Einstellungen.")
+
+    normalized_serial = _normalize_printer_serial(db, serial.strip())
+    config = _ensure_discord_config(db)
+    if not config.enabled:
+        raise HTTPException(status_code=503, detail="Discord-Bot ist derzeit deaktiviert. Bitte wende dich an einen Admin.")
+    if config.use_dm and not config.bot_token:
+        raise HTTPException(status_code=503, detail="Für Direktnachrichten muss ein Bot-Token hinterlegt werden.")
+
+    existing = (
+        db.query(DiscordNotificationSubscription)
+        .filter(
+            DiscordNotificationSubscription.user_id == user.id,
+            DiscordNotificationSubscription.printer_serial == normalized_serial,
+            DiscordNotificationSubscription.status == 'pending'
+        )
+        .first()
+    )
+
+    snapshot = LATEST_PRINTER_STATUSES.get(normalized_serial) or {}
+    job_name = (snapshot.get('job_name') or '').strip() or (existing.job_name if existing else None)
+    if existing:
+        existing.job_name = job_name
+        existing.created_at = _utcnow()
+        existing.last_error = None
+        db.commit()
+        return {"detail": "Benachrichtigung aktualisiert", "status": existing.status, "printer_serial": normalized_serial}
+
+    subscription = DiscordNotificationSubscription(
+        user_id=user.id,
+        printer_serial=normalized_serial,
+        job_name=job_name,
+        status='pending'
+    )
+    db.add(subscription)
+    db.commit()
+    db.refresh(subscription)
+    return {"detail": "Benachrichtigung gespeichert", "printer_serial": subscription.printer_serial, "status": subscription.status}
+
+
+@app.get("/api/discord/config")
+def get_discord_config(request: Request, db: Session = Depends(get_db)):
+    require_roles(request, db, {"admin"})
+    config = _ensure_discord_config(db)
+    return {
+        "enabled": config.enabled,
+        "use_dm": config.use_dm,
+        "webhook_url": config.webhook_url,
+        "bot_token": config.bot_token,
+        "channel_id": config.channel_id,
+        "message_template": config.message_template,
+        "updated_at": config.updated_at,
+    }
+
+
+@app.patch("/api/discord/config")
+def update_discord_config(payload: DiscordBotConfigPayload, request: Request, db: Session = Depends(get_db)):
+    require_roles(request, db, {"admin"})
+    config = _ensure_discord_config(db)
+    data = payload.model_dump(exclude_unset=True)
+    if "enabled" in data:
+        config.enabled = bool(data["enabled"])
+    if "use_dm" in data:
+        config.use_dm = bool(data["use_dm"])
+    if "webhook_url" in data:
+        value = (data["webhook_url"] or "").strip() or None
+        config.webhook_url = value
+    if "bot_token" in data:
+        value = (data["bot_token"] or "").strip() or None
+        config.bot_token = value
+    if "channel_id" in data:
+        value = (data["channel_id"] or "").strip() or None
+        config.channel_id = value
+    if "message_template" in data:
+        template = (data["message_template"] or "").strip()
+        config.message_template = template or DEFAULT_DISCORD_MESSAGE_TEMPLATE
+    db.commit()
+    db.refresh(config)
+    return {
+        "enabled": config.enabled,
+        "use_dm": config.use_dm,
+        "webhook_url": config.webhook_url,
+        "bot_token": config.bot_token,
+        "channel_id": config.channel_id,
+        "message_template": config.message_template,
+        "updated_at": config.updated_at,
+    }
+
 
 @app.get("/typs/", response_model=List[FilamentTypWithSpulen])
 def read_typs(db: Session = Depends(get_db)):
@@ -715,7 +1031,6 @@ def read_spulen(db: Session = Depends(get_db)):
 
 
 # Neuer Endpoint: Alle Spulen mit ihren Typ-Informationen
-from sqlalchemy.orm import joinedload
 
 @app.get("/spulen_mit_typen/", response_model=List[FilamentSpuleRead])
 def read_spulen_mit_typen(db: Session = Depends(get_db)):

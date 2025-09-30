@@ -161,8 +161,10 @@ class User(Base):
     rolle: Mapped[str] = mapped_column(String, nullable=False, default="user")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    discord_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
 
     notes: Mapped[list['DashboardNote']] = relationship('DashboardNote', back_populates='author', cascade="all, delete-orphan")
+    discord_notifications: Mapped[list['DiscordNotificationSubscription']] = relationship('DiscordNotificationSubscription', back_populates='user', cascade="all, delete-orphan")
 
 class AuthToken(Base):
     __tablename__ = "auth_tokens"
@@ -184,6 +186,34 @@ class Printer(Base):
     serial: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     access_token: Mapped[str] = mapped_column(String, nullable=False)
     show_on_dashboard: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class DiscordNotificationSubscription(Base):
+    __tablename__ = "discord_notification_subscriptions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), nullable=False, index=True)
+    printer_serial: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    job_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default='pending')
+    last_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    notified_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped['User'] = relationship('User', back_populates='discord_notifications')
+
+
+class DiscordBotConfig(Base):
+    __tablename__ = "discord_bot_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    use_dm: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    webhook_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    bot_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    channel_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    message_template: Mapped[str] = mapped_column(Text, nullable=False, default="Hey {username}, dein Druckauftrag {job_name} auf {printer_name} ist fertig!")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
 # Pydantic Schemata für Printer-API
