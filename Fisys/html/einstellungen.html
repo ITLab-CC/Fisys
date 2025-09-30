@@ -83,6 +83,7 @@
               <div>
                 <p class="text-sm font-semibold text-white mb-1">Integrationen</p>
                 <button data-ziel="discordBotConfigBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Discord Bot</button>
+                <button data-ziel="discordSubscriptionsBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Benachrichtigungen</button>
               </div>
               <div>
                 <p class="text-sm font-semibold text-white mb-1">User</p>
@@ -101,7 +102,10 @@
               <h2 class="text-xl text-white font-semibold mb-4">Benutzereinstellungen</h2>
               <form id="userSettingsForm" class="space-y-5 max-w-xl">
                 <div>
-                  <label for="userDiscordId" class="block text-sm font-medium text-gray-200 mb-1">Discord ID</label>
+                  <div class="flex items-center justify-between gap-2 mb-1">
+                    <label for="userDiscordId" class="text-sm font-medium text-gray-200">Discord ID</label>
+                    <button type="button" id="discordIdHelpButton" class="text-xs text-blue-300 hover:text-blue-200 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400/40 rounded px-1 py-0.5">Wo finde ich meine Discord ID?</button>
+                  </div>
                   <input id="userDiscordId" name="discord_id" type="text" class="w-full px-3 py-2 rounded border border-gray-500 bg-gray-800 text-white focus:outline-none focus:ring focus:border-blue-500" placeholder="123456789012345678">
                   <p class="text-xs text-gray-400 mt-1">Gib deine Discord Benutzer-ID ein (nur Ziffern, keine @Mention).</p>
                 </div>
@@ -150,6 +154,47 @@
                 <p id="discordBotFeedback" class="text-xs hidden"></p>
               </form>
             </div>
+            <div id="discordSubscriptionsBlock" class="hidden bg-gray-700 p-6 rounded shadow max-w-4xl mt-10">
+              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <div>
+                  <h2 class="text-xl text-white font-semibold">Discord-Benachrichtigungen</h2>
+                  <p class="text-sm text-gray-300">Bestehende Abonnements einsehen und entfernen.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <select id="discordSubscriptionsFilter" class="px-3 py-2 text-sm bg-gray-800 border border-gray-600 rounded text-gray-200">
+                    <option value="">Alle Status</option>
+                    <option value="pending">Ausstehend</option>
+                    <option value="sent">Gesendet</option>
+                    <option value="failed">Fehlgeschlagen</option>
+                    <option value="skipped">Übersprungen</option>
+                  </select>
+                  <button id="discordSubscriptionsReload" class="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-500 text-sm">Aktualisieren</button>
+                </div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-sm text-left text-gray-200 border border-gray-600">
+                  <thead class="bg-gray-600 border-b border-gray-500 text-xs uppercase tracking-wide text-gray-200">
+                    <tr>
+                      <th class="px-3 py-2">User</th>
+                      <th class="px-3 py-2">Discord ID</th>
+                      <th class="px-3 py-2">Drucker</th>
+                      <th class="px-3 py-2">Job</th>
+                      <th class="px-3 py-2">Status</th>
+                      <th class="px-3 py-2">Erstellt</th>
+                      <th class="px-3 py-2">Gesendet</th>
+                      <th class="px-3 py-2">Fehler</th>
+                      <th class="px-3 py-2">Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="discordSubscriptionsBody">
+                    <tr>
+                      <td colspan="9" class="px-4 py-6 text-center text-gray-400">Keine Daten geladen</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
             <!-- Drucker verwalten -->
             <div id="printerVerwaltungBlock" class="hidden bg-gray-700 p-6 rounded shadow max-w-3xl mt-10">
               <h2 class="text-xl text-white font-semibold mb-4">Drucker</h2>
@@ -301,6 +346,36 @@
         </div>
       </section>
     </div>
+    <div id="discordIdHelpModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/70 px-4" role="dialog" aria-modal="true" aria-labelledby="discordIdHelpTitle" tabindex="-1" aria-hidden="true">
+      <div class="relative w-full max-w-xl rounded-lg bg-gray-900 p-6 text-gray-200 shadow-2xl">
+        <button type="button" id="discordIdHelpClose" class="absolute right-3 top-3 text-gray-400 hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-400/40 rounded" aria-label="Hilfe schließen">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+        <h3 id="discordIdHelpTitle" class="text-lg font-semibold text-white">So findest du deine Discord-ID</h3>
+        <p class="mt-3 text-sm text-gray-300">Aktiviere zuerst den Entwicklermodus, damit du IDs kopieren kannst.</p>
+        <div class="mt-4 space-y-4">
+          <div>
+            <p class="text-sm font-semibold text-white">Desktop</p>
+            <ol class="mt-2 list-decimal list-inside space-y-1 text-sm text-gray-300">
+              <li>Klicke unten links auf das Zahnrad <span class="text-gray-100">„Benutzer-Einstellungen“</span>.</li>
+              <li>Öffne den Abschnitt <span class="text-gray-100">„Erweitert“</span> und aktiviere <span class="text-gray-100">„Entwicklermodus“</span>.</li>
+              <li>Rechtsklicke anschließend auf deinen Namen oder Avatar und wähle <span class="text-gray-100">„ID kopieren“</span>.</li>
+            </ol>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-white">Mobil</p>
+            <ol class="mt-2 list-decimal list-inside space-y-1 text-sm text-gray-300">
+              <li>Öffne dein Profil, tippe auf <span class="text-gray-100">„Erscheinungsbild &amp; App-Verhalten“</span> und aktiviere den <span class="text-gray-100">„Entwicklermodus“</span>.</li>
+              <li>Gehe zu deinem Profil oder einem Chat, tippe auf die drei Punkte neben deinem Namen.</li>
+              <li>Wähle <span class="text-gray-100">„ID kopieren“</span>.</li>
+            </ol>
+          </div>
+        </div>
+        <p class="mt-4 text-xs text-gray-400">Die kopierte Zahl kannst du hier in das Feld „Discord ID“ einfügen.</p>
+      </div>
+    </div>
 <script>
     document.addEventListener("DOMContentLoaded", async () => {
       const highlightBar = document.getElementById("highlightBar");
@@ -316,16 +391,21 @@
         "tokenBlockContainer",
         "tokenUebersichtBlockContainer",
         "discordBotConfigBlock",
+        "discordSubscriptionsBlock",
         "userVerwaltungBlock",
         "verbrauchVerwaltungBlock"
       ];
       let availableSectionIds = [...ALL_SECTION_IDS];
       let autoActivatedInitialSection = false;
+      let discordSubscriptionsLoaded = false;
 
       const userSettingsForm = document.getElementById("userSettingsForm");
       const userDiscordInput = document.getElementById("userDiscordId");
       const userDiscordClearBtn = document.getElementById("userDiscordClear");
       const userSettingsFeedback = document.getElementById("userSettingsFeedback");
+      const discordIdHelpButton = document.getElementById("discordIdHelpButton");
+      const discordIdHelpModal = document.getElementById("discordIdHelpModal");
+      const discordIdHelpClose = document.getElementById("discordIdHelpClose");
       const discordBotForm = document.getElementById("discordBotForm");
       const discordBotEnabledInput = document.getElementById("discordBotEnabled");
       const discordBotUseDmInput = document.getElementById("discordBotUseDm");
@@ -335,6 +415,11 @@
       const discordMessageTemplateInput = document.getElementById("discordMessageTemplate");
       const discordBotFeedback = document.getElementById("discordBotFeedback");
       const discordBotReloadBtn = document.getElementById("discordBotReload");
+      const discordSubscriptionsBlockEl = document.getElementById("discordSubscriptionsBlock");
+      const discordSubscriptionsBody = document.getElementById("discordSubscriptionsBody");
+      const discordSubscriptionsReloadBtn = document.getElementById("discordSubscriptionsReload");
+      const discordSubscriptionsFilter = document.getElementById("discordSubscriptionsFilter");
+      let lastFocusedBeforeDiscordHelp = null;
 
       const navigationPermissions = {
         userSettingsBlock: ["user", "helper", "mod", "admin"],
@@ -344,6 +429,7 @@
         tokenBlockContainer: ["mod", "admin"],
         tokenUebersichtBlockContainer: ["mod", "admin"],
         discordBotConfigBlock: ["admin"],
+        discordSubscriptionsBlock: ["mod", "admin"],
         userVerwaltungBlock: ["mod", "admin"],
         verbrauchVerwaltungBlock: ["mod", "admin"]
       };
@@ -422,7 +508,15 @@
           hideAllSections();
 
           const zielElement = document.getElementById(ziel);
-          if (zielElement) zielElement.classList.remove("hidden");
+          if (zielElement) {
+            zielElement.classList.remove("hidden");
+            if (ziel === "discordSubscriptionsBlock") {
+              if (!discordSubscriptionsLoaded) {
+                discordSubscriptionsLoaded = true;
+                loadDiscordSubscriptions({ showStatus: true });
+              }
+            }
+          }
         });
       }
 
@@ -541,6 +635,59 @@
         });
       }
 
+      const setDiscordIdHelpVisibility = (shouldShow) => {
+        if (!discordIdHelpModal) return;
+        const body = document.body;
+        const display = Boolean(shouldShow);
+        if (display) {
+          if (document.activeElement instanceof HTMLElement) {
+            lastFocusedBeforeDiscordHelp = document.activeElement;
+          }
+          discordIdHelpModal.classList.remove('hidden');
+          discordIdHelpModal.setAttribute('aria-hidden', 'false');
+          if (body) body.classList.add('overflow-hidden');
+          const focusTarget = discordIdHelpModal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+          if (focusTarget instanceof HTMLElement) {
+            focusTarget.focus({ preventScroll: true });
+          } else {
+            discordIdHelpModal.focus({ preventScroll: true });
+          }
+        } else {
+          discordIdHelpModal.classList.add('hidden');
+          discordIdHelpModal.setAttribute('aria-hidden', 'true');
+          if (body) body.classList.remove('overflow-hidden');
+          const fallbackTarget = lastFocusedBeforeDiscordHelp instanceof HTMLElement ? lastFocusedBeforeDiscordHelp : discordIdHelpButton;
+          if (fallbackTarget instanceof HTMLElement) {
+            fallbackTarget.focus({ preventScroll: true });
+          }
+          lastFocusedBeforeDiscordHelp = null;
+        }
+      };
+
+      const closeDiscordIdHelp = () => setDiscordIdHelpVisibility(false);
+
+      if (discordIdHelpButton && discordIdHelpModal) {
+        discordIdHelpButton.addEventListener('click', () => setDiscordIdHelpVisibility(true));
+      }
+
+      if (discordIdHelpClose) {
+        discordIdHelpClose.addEventListener('click', closeDiscordIdHelp);
+      }
+
+      if (discordIdHelpModal) {
+        discordIdHelpModal.addEventListener('click', (event) => {
+          if (event.target === discordIdHelpModal) {
+            closeDiscordIdHelp();
+          }
+        });
+      }
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && discordIdHelpModal && !discordIdHelpModal.classList.contains('hidden')) {
+          closeDiscordIdHelp();
+        }
+      });
+
       async function persistUserDiscord(value) {
         if (!userSettingsForm) return false;
         setUserSettingsLoading(true);
@@ -578,6 +725,91 @@
           return false;
         } finally {
           setUserSettingsLoading(false);
+        }
+      }
+
+      function formatDateTimeShort(value) {
+        if (!value) return '—';
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '—';
+        return date.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+      }
+
+      async function loadDiscordSubscriptions({ showStatus = false } = {}) {
+        if (!discordSubscriptionsBody) return;
+        if (showStatus && discordSubscriptionsBlockEl) {
+          discordSubscriptionsBlockEl.classList.add('opacity-60');
+        }
+        const selectedStatus = discordSubscriptionsFilter ? discordSubscriptionsFilter.value : '';
+        const query = selectedStatus ? `?status=${encodeURIComponent(selectedStatus)}` : '';
+        try {
+          const res = await fetch(`/api/discord/subscriptions${query}`, { credentials: 'same-origin' });
+          if (res.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          if (res.status === 403) {
+            discordSubscriptionsBody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-red-400">Keine Berechtigung.</td></tr>';
+            return;
+          }
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          const items = Array.isArray(data?.items) ? data.items : [];
+          if (!items.length) {
+            discordSubscriptionsBody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-gray-400">Keine Abonnements vorhanden.</td></tr>';
+            return;
+          }
+          discordSubscriptionsBody.innerHTML = items.map(sub => {
+            const user = sub.user || {};
+            const statusLabel = (sub.status || '').toUpperCase();
+            const errorText = sub.last_error ? sub.last_error : '—';
+            const jobName = sub.job_name || '—';
+            return `
+              <tr class="border-b border-gray-700">
+                <td class="px-3 py-2 whitespace-nowrap">${user.username || '—'}</td>
+                <td class="px-3 py-2 whitespace-nowrap">${user.discord_id || '—'}</td>
+                <td class="px-3 py-2">${sub.printer_serial || '—'}</td>
+                <td class="px-3 py-2">${jobName}</td>
+                <td class="px-3 py-2 whitespace-nowrap">${statusLabel}</td>
+                <td class="px-3 py-2 whitespace-nowrap">${formatDateTimeShort(sub.created_at)}</td>
+                <td class="px-3 py-2 whitespace-nowrap">${formatDateTimeShort(sub.notified_at)}</td>
+                <td class="px-3 py-2">${errorText}</td>
+                <td class="px-3 py-2 whitespace-nowrap">
+                  <button data-subscription-id="${sub.id}" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs">Entfernen</button>
+                </td>
+              </tr>`;
+          }).join('');
+          discordSubscriptionsLoaded = true;
+        } catch (error) {
+          console.error('Benachrichtigungen konnten nicht geladen werden:', error);
+          discordSubscriptionsBody.innerHTML = '<tr><td colspan="9" class="px-4 py-6 text-center text-red-400">Fehler beim Laden der Liste.</td></tr>';
+        } finally {
+          if (showStatus && discordSubscriptionsBlockEl) {
+            discordSubscriptionsBlockEl.classList.remove('opacity-60');
+          }
+        }
+      }
+
+      async function removeDiscordSubscription(id) {
+        try {
+          const res = await fetch(`/api/discord/subscriptions/${id}`, { method: 'DELETE', credentials: 'same-origin' });
+          if (res.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          if (res.status === 403) {
+            zeigeBenachrichtigung('Keine Berechtigung zum Entfernen.', 'red');
+            return;
+          }
+          if (!res.ok) {
+            const msg = await res.text();
+            throw new Error(msg || 'Entfernen fehlgeschlagen');
+          }
+          await loadDiscordSubscriptions();
+          zeigeBenachrichtigung('Abonnement entfernt.', 'blue');
+        } catch (error) {
+          console.error('Entfernen fehlgeschlagen:', error);
+          zeigeBenachrichtigung('Entfernen fehlgeschlagen.', 'red');
         }
       }
 
@@ -819,6 +1051,29 @@
           event.preventDefault();
           if (userDiscordInput) userDiscordInput.value = '';
           await persistUserDiscord('');
+        });
+      }
+
+      if (discordSubscriptionsReloadBtn) {
+        discordSubscriptionsReloadBtn.addEventListener('click', async (event) => {
+          event.preventDefault();
+          await loadDiscordSubscriptions({ showStatus: true });
+        });
+      }
+      if (discordSubscriptionsFilter) {
+        discordSubscriptionsFilter.addEventListener('change', () => {
+          loadDiscordSubscriptions({ showStatus: true });
+        });
+      }
+      if (discordSubscriptionsBody) {
+        discordSubscriptionsBody.addEventListener('click', (event) => {
+          const button = event.target.closest('button[data-subscription-id]');
+          if (!button) return;
+          const id = button.dataset.subscriptionId;
+          if (!id) return;
+          zeigePopup('Dieses Abonnement wirklich entfernen?', async () => {
+            await removeDiscordSubscription(id);
+          });
         });
       }
 

@@ -425,18 +425,24 @@
 
       stateEl.classList.remove("text-blue-400","text-green-400","text-red-400","text-yellow-400","text-gray-200","text-white");
       let cls = "text-white";
-      if (stateTxt === "RUNNING" || /print|run/i.test(stateTxt)) cls = "text-blue-400";
+      if (/finish|done/i.test(stateTxt)) cls = "text-green-400";
+      else if (/fail|error|abort|cancel/i.test(stateTxt)) cls = "text-red-400";
+      else if (stateTxt === "RUNNING" || /print|run/i.test(stateTxt)) cls = "text-blue-400";
       else if (/pause/i.test(stateTxt)) cls = "text-yellow-400";
-      else if (/finish|done/i.test(stateTxt)) cls = "text-green-400";
-      else if (/fail|error/i.test(stateTxt)) cls = "text-red-400";
       stateEl.classList.add(cls);
 
       if (!bar.classList.contains('anim-shimmer')) {
         bar.classList.add('anim-shimmer');
       }
-      bar.classList.toggle('finish-pulse', /finish|done/i.test(stateTxt));
       const isRunning = (intProg > 0 && intProg < 100) || /run|print/i.test(stateTxt);
+      const isPaused = /pause/i.test(stateTxt);
+      bar.classList.toggle('finish-pulse', /finish|done/i.test(stateTxt));
       bar.classList.toggle('shimmer-running', !!isRunning);
+
+      card.dataset.printerState = stateTxt;
+      card.dataset.printerProgress = String(intProg);
+      card.dataset.jobActive = (isRunning || isPaused) ? '1' : '0';
+
       updateCardSpoolUI(serial);
       updateNotifyButtonState(card);
     }
@@ -618,6 +624,30 @@
       const btn = card.querySelector('[data-notify-button]');
       const feedback = card.querySelector('[data-notify-feedback]');
       if (!btn || !serial) return;
+      const jobFlag = card.dataset.jobActive;
+      const state = (card.dataset.printerState || '').toUpperCase();
+      const hasState = typeof jobFlag !== 'undefined';
+      const jobActive = jobFlag === '1';
+      const isFinished = /FINISH|DONE/.test(state);
+      const isFailed = /FAIL|ERROR|ABORT|CANCEL/.test(state);
+      const isIdle = state === 'IDLE';
+      const shouldShow = hasState ? (jobActive && !isFinished && !isFailed && !isIdle) : true;
+
+      if (!shouldShow) {
+        btn.classList.add('hidden');
+        btn.disabled = true;
+        activeNotificationSerials.delete(serial);
+        if (feedback) {
+          feedback.classList.add('hidden');
+          feedback.textContent = '';
+        }
+        if (btn.dataset.originalLabel) {
+          btn.textContent = btn.dataset.originalLabel;
+        }
+        return;
+      }
+
+      btn.classList.remove('hidden');
       const active = activeNotificationSerials.has(serial);
       if (!btn.dataset.originalLabel) {
         btn.dataset.originalLabel = btn.textContent.trim();

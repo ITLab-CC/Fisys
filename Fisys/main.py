@@ -502,8 +502,12 @@ def _dispatch_discord_message(config: DiscordBotConfig, message: str, user: Opti
 
 
 def _process_discord_notifications(serial: str, printer_name: Optional[str], job_name: Optional[str], status: str) -> None:
-    if status != 'erfolgreich':
+    normalized = (status or '').lower()
+    is_success = normalized == 'erfolgreich'
+    is_failed = normalized in {'fehlgeschlagen', 'abgebrochen'}
+    if not is_success and not is_failed:
         return
+
     session = SessionLocal()
     try:
         pending = (
@@ -523,6 +527,14 @@ def _process_discord_notifications(serial: str, printer_name: Optional[str], job
             for sub in pending:
                 sub.status = 'skipped'
                 sub.last_error = 'Discord-Bot deaktiviert'
+            session.commit()
+            return
+
+        if is_failed:
+            reason = 'Druck abgebrochen.' if normalized == 'abgebrochen' else 'Druck fehlgeschlagen.'
+            for sub in pending:
+                sub.status = 'failed'
+                sub.last_error = reason
             session.commit()
             return
 
@@ -879,6 +891,48 @@ def update_discord_config(payload: DiscordBotConfigPayload, request: Request, db
         "message_template": config.message_template,
         "updated_at": config.updated_at,
     }
+
+
+@app.get("/api/discord/subscriptions")
+def list_discord_subscriptions(request: Request, status: Optional[str] = None, db: Session = Depends(get_db)):
+    require_roles(request, db, {"mod", "admin"})
+    query = (
+        db.query(DiscordNotificationSubscription)
+        .options(joinedload(DiscordNotificationSubscription.user))
+        .order_by(DiscordNotificationSubscription.created_at.desc())
+    )
+    if status:
+        query = query.filter(DiscordNotificationSubscription.status == status)
+    items = []
+    for sub in query.all():
+        user = sub.user
+        items.append({
+            "id": sub.id,
+            "printer_serial": sub.printer_serial,
+            "job_name": sub.job_name,
+            "status": sub.status,
+            "created_at": sub.created_at,
+            "notified_at": sub.notified_at,
+            "last_error": sub.last_error,
+            "user": {
+                "username": user.username if user else None,
+                "discord_id": user.discord_id if user else None,
+            },
+        })
+    return {"items": items}
+
+
+@app.delete("/api/discord/subscriptions/{subscription_id}", status_code=204)
+def delete_discord_subscription(subscription_id: int, request: Request, db: Session = Depends(get_db)):
+    require_roles(request, db, {"mod", "admin"})
+    sub = db.get(DiscordNotificationSubscription, subscription_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Abonnement nicht gefunden")
+    db.delete(sub)
+    db.commit()
+    return Response(status_code=204)
+
+
 
 
 @app.get("/typs/", response_model=List[FilamentTypWithSpulen])
