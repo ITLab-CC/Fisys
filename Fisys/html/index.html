@@ -237,6 +237,8 @@
     const printerNameBySerial = new Map();
     let currentUserInfo = { username: null, role: null, discord_id: null };
     let activeNotificationSerials = new Set();
+    const NOTIFY_DEFAULT_CLASSES = ['text-blue-200', 'border-blue-500/60', 'bg-blue-500/10', 'hover:bg-blue-500/20', 'focus:ring-blue-400/40'];
+    const NOTIFY_ACTIVE_CLASSES = ['text-emerald-200', 'border-emerald-500/70', 'bg-emerald-500/15', 'hover:bg-emerald-500/25', 'focus:ring-emerald-400/40'];
     let dashboardNotesSummary = [];
     let dashboardNotesTotal = 0;
     const noteGrid = document.getElementById('dashboard-note-grid');
@@ -355,7 +357,7 @@
       card.className = 'ps-card bg-gray-700 p-5 rounded-xl shadow-sm';
       card.dataset.serial = serial;
       card.innerHTML = `
-        <div class=\"mt-1 space-y-3\">\n          <div class=\"flex items-center justify-between gap-4\">\n            <div class=\"flex items-baseline gap-3\">\n              <div class=\"ps-name text-base font-medium text-white\">${name || '—'}</div>\n            </div>\n            <div class=\"flex items-center gap-4\">\n              <div class=\"ps-state text-sm font-semibold text-white\">—</div>\n              <div class=\"ps-eta text-sm text-white\"></div>\n            </div>\n          </div>\n          <div>\n            <div class=\"flex items-center justify-between mb-1\">\n              <div class=\"text-sm text-gray-200\">Fortschritt</div>\n              <div class=\"ps-progress-label text-xs text-gray-200\">0%</div>\n            </div>\n            <div class=\"w-full h-3 bg-gray-200 rounded-full overflow-hidden\">\n              <div class=\"ps-progress h-full bg-blue-600 rounded-full\" style=\"width: 0%\"></div>\n            </div>\n          </div>\n          <div class=\"flex items-baseline gap-3\">\n            <div class=\"text-sm text-white\">Job</div>\n            <div class=\"ps-job text-base font-medium text-gray-300 truncate max-w-full\">—</div>\n          </div>\n          <div class=\"mt-2 space-y-2\">\n            <button type=\"button\" class=\"ps-notify-btn w-full text-sm text-white bg-blue-600 hover:bg-blue-500 rounded px-3 py-2 transition disabled:opacity-60 disabled:cursor-not-allowed\" data-notify-button>Benachrichtige mich, wenn Druck fertig</button>\n            <p class=\"hidden text-xs\" data-notify-feedback></p>\n          </div>\n          <div class=\"border-t border-gray-600 pt-3\">\n            <button type=\"button\" class=\"ps-spool-toggle w-full flex items-center justify-between text-sm text-blue-300 hover:text-blue-200 transition\" data-spool-toggle aria-expanded=\"false\">\n              <span data-spool-label>Spulen im Drucker anzeigen</span>\n              <span class=\"text-xs text-gray-300\" data-spool-arrow>▼</span>\n            </button>\n            <div class=\"ps-spool-panel hidden mt-3\" data-spool-panel>\n              <div class=\"space-y-2\" data-spool-list></div>\n            </div>\n          </div>\n        </div>`;
+        <div class=\"mt-1 space-y-3\">\n          <div class=\"flex items-center justify-between gap-4\">\n            <div class=\"flex items-baseline gap-3\">\n              <div class=\"ps-name text-base font-medium text-white\">${name || '—'}</div>\n            </div>\n            <div class=\"flex items-center gap-4\">\n              <div class=\"ps-state text-sm font-semibold text-white\">—</div>\n              <div class=\"ps-eta text-sm text-white\"></div>\n            </div>\n          </div>\n          <div>\n            <div class=\"flex items-center justify-between mb-1\">\n              <div class=\"text-sm text-gray-200\">Fortschritt</div>\n              <div class=\"ps-progress-label text-xs text-gray-200\">0%</div>\n            </div>\n            <div class=\"w-full h-3 bg-gray-200 rounded-full overflow-hidden\">\n              <div class=\"ps-progress h-full bg-blue-600 rounded-full\" style=\"width: 0%\"></div>\n            </div>\n          </div>\n          <div class=\"flex items-baseline gap-3\">\n            <div class=\"text-sm text-white\">Job</div>\n            <div class=\"ps-job text-base font-medium text-gray-300 truncate max-w-full\">—</div>\n          </div>\n          <div class=\"mt-2 space-y-2\">\n            <button type=\"button\" class=\"ps-notify-btn w-full text-sm text-blue-200 border border-blue-500/60 bg-blue-500/10 hover:bg-blue-500/20 rounded px-3 py-2 transition disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-400/40\" data-notify-button>Benachrichtige mich, wenn Druck fertig</button>\n            <p class=\"hidden text-xs\" data-notify-feedback></p>\n          </div>\n          <div class=\"border-t border-gray-600 pt-3\">\n            <button type=\"button\" class=\"ps-spool-toggle w-full flex items-center justify-between text-sm text-blue-300 hover:text-blue-200 transition\" data-spool-toggle aria-expanded=\"false\">\n              <span data-spool-label>Spulen im Drucker anzeigen</span>\n              <span class=\"text-xs text-gray-300\" data-spool-arrow>▼</span>\n            </button>\n            <div class=\"ps-spool-panel hidden mt-3\" data-spool-panel>\n              <div class=\"space-y-2\" data-spool-list></div>\n            </div>\n          </div>\n        </div>`;
       container.appendChild(card);
       initPrinterCardInteractions(card);
       updateCardSpoolUI(serial);
@@ -655,12 +657,12 @@
       btn.disabled = active;
       if (active) {
         btn.textContent = 'Benachrichtigung aktiv';
-        btn.classList.remove('bg-blue-600', 'hover:bg-blue-500');
-        btn.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
+        btn.classList.remove(...NOTIFY_DEFAULT_CLASSES);
+        btn.classList.add(...NOTIFY_ACTIVE_CLASSES);
       } else {
         btn.textContent = btn.dataset.originalLabel || 'Benachrichtige mich, wenn Druck fertig';
-        btn.classList.add('bg-blue-600', 'hover:bg-blue-500');
-        btn.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
+        btn.classList.remove(...NOTIFY_ACTIVE_CLASSES);
+        btn.classList.add(...NOTIFY_DEFAULT_CLASSES);
         if ((!btn.dataset.lastMessage || btn.dataset.lastMessage === '') && feedback) {
           feedback.classList.add('hidden');
           feedback.textContent = '';
