@@ -211,3 +211,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Fisys frontend build tooling
+Fisys/node_modules/
+Fisys/tailwindcss

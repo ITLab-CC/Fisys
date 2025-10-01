@@ -1,0 +1,11 @@
+{
+  "name": "fisys",
+  "private": true,
+  "scripts": {
+    "tailwind:build": "tailwindcss -i ./html/assets/css/tailwind-input.css -o ./html/assets/css/tailwind.css --minify",
+    "tailwind:watch": "tailwindcss -i ./html/assets/css/tailwind-input.css -o ./html/assets/css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.13"
+  }
+}
