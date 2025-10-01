@@ -523,7 +523,16 @@
         const farbe = sp.farbe || '–';
         const image = sp.bildname && sp.bildname !== 'null' ? sp.bildname : 'platzhalter.jpg';
         const ratio = total > 0 ? Math.max(0, Math.min(100, (rest / total) * 100)) : 0;
-        const ratioClass = ratio > 50 ? 'bg-green-500' : ratio > 25 ? 'bg-orange-400' : 'bg-red-500';
+        let ratioClass = 'bg-green-500';
+        if (Number.isFinite(restValue)) {
+          if (rest <= 100) {
+            ratioClass = 'bg-red-500';
+          } else if (rest <= 250) {
+            ratioClass = 'bg-orange-400';
+          }
+        } else {
+          ratioClass = ratio > 50 ? 'bg-green-500' : ratio > 25 ? 'bg-orange-400' : 'bg-red-500';
+        }
         return `
         <div class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-3 text-sm text-gray-200 space-y-2">
           <div class="flex gap-3">
@@ -1344,9 +1353,12 @@
             hour: '2-digit',
             minute: '2-digit'
           }) : '';
-          const actionKey = (s.letzte_aktion || '').trim();
-          const messageText = actionMessages[actionKey] || '';
+          const rawAction = (s.letzte_aktion || '').trim();
           const showDiff = hasWeights && diffDisplay > 0;
+          const actionKey = rawAction === 'aus_drucker_entfernt' && showDiff
+            ? 'gewicht_geaendert'
+            : rawAction;
+          const messageText = actionMessages[actionKey] || '';
           const messageRowHtml = messageText
             ? `<div class="text-xs text-gray-100 text-center font-semibold">${messageText}</div>`
             : '';
