@@ -213,6 +213,7 @@ class DiscordBotConfig(Base):
     bot_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     channel_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     message_template: Mapped[str] = mapped_column(Text, nullable=False, default="Hey {username}, dein Druckauftrag {job_name} auf {printer_name} ist fertig!")
+    failure_message_template: Mapped[str] = mapped_column(Text, nullable=False, default="Hey {username}, dein Druckauftrag {job_name} auf {printer_name} ist fehlgeschlagen: {failure_reason}")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 

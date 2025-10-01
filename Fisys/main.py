@@ -113,6 +113,7 @@ CURRENT_PRINTER_JOBS: dict[str, dict] = {}
 PRINTER_NAME_CACHE: dict[str, Optional[str]] = {}
 
 DEFAULT_DISCORD_MESSAGE_TEMPLATE = "Hey {username}, dein Druckauftrag {job_name} auf {printer_name} ist fertig!"
+DEFAULT_DISCORD_FAILURE_TEMPLATE = "Hey {username}, dein Druckauftrag {job_name} auf {printer_name} ist fehlgeschlagen: {failure_reason}"
 
 
 def _utcnow() -> datetime:
@@ -415,12 +416,20 @@ class _SafeFormatDict(dict):
 def _ensure_discord_config(db: Session) -> DiscordBotConfig:
     config = db.query(DiscordBotConfig).filter(DiscordBotConfig.id == 1).first()
     if not config:
-        config = DiscordBotConfig(id=1, message_template=DEFAULT_DISCORD_MESSAGE_TEMPLATE)
+        config = DiscordBotConfig(
+            id=1,
+            message_template=DEFAULT_DISCORD_MESSAGE_TEMPLATE,
+            failure_message_template=DEFAULT_DISCORD_FAILURE_TEMPLATE
+        )
         db.add(config)
         db.commit()
         db.refresh(config)
     if getattr(config, 'use_dm', None) is None:
         config.use_dm = False
+        db.commit()
+        db.refresh(config)
+    if getattr(config, 'failure_message_template', None) in (None, ''):
+        config.failure_message_template = DEFAULT_DISCORD_FAILURE_TEMPLATE
         db.commit()
         db.refresh(config)
     return config
@@ -505,8 +514,12 @@ def _process_discord_notifications(serial: str, printer_name: Optional[str], job
     normalized = (status or '').lower()
     is_success = normalized == 'erfolgreich'
     is_failed = normalized in {'fehlgeschlagen', 'abgebrochen'}
-    if not is_success and not is_failed:
+    if not (is_success or is_failed):
         return
+
+    failure_reason = None
+    if is_failed:
+        failure_reason = 'Druck abgebrochen.' if normalized == 'abgebrochen' else 'Druck fehlgeschlagen.'
 
     session = SessionLocal()
     try:
@@ -530,16 +543,10 @@ def _process_discord_notifications(serial: str, printer_name: Optional[str], job
             session.commit()
             return
 
-        if is_failed:
-            reason = 'Druck abgebrochen.' if normalized == 'abgebrochen' else 'Druck fehlgeschlagen.'
-            for sub in pending:
-                sub.status = 'failed'
-                sub.last_error = reason
-            session.commit()
-            return
-
-        template = config.message_template or DEFAULT_DISCORD_MESSAGE_TEMPLATE
+        template_success = config.message_template or DEFAULT_DISCORD_MESSAGE_TEMPLATE
+        template_failure = getattr(config, 'failure_message_template', None) or DEFAULT_DISCORD_FAILURE_TEMPLATE
         now = _utcnow()
+
         for sub in pending:
             user = sub.user
             if not user or not user.discord_id:
@@ -556,16 +563,28 @@ def _process_discord_notifications(serial: str, printer_name: Optional[str], job
                 'status': status,
                 'discord_id': user.discord_id,
                 'discord_mention': mention,
+                'failure_reason': failure_reason or '',
             }
-            message = _format_discord_message(template, context)
+            template_to_use = template_failure if is_failed else template_success
+            message = _format_discord_message(template_to_use, context)
             success, error = _dispatch_discord_message(config, message, user=user)
+
             if success:
-                sub.status = 'sent'
                 sub.notified_at = now
-                sub.last_error = None
+                if is_failed:
+                    base_reason = failure_reason or 'Druck fehlgeschlagen.'
+                    sub.status = 'failed'
+                    sub.last_error = f"{base_reason} Nachricht gesendet."
+                else:
+                    sub.status = 'sent'
+                    sub.last_error = None
             else:
                 sub.status = 'failed'
-                sub.last_error = error or 'Unbekannter Fehler'
+                if is_failed:
+                    base_reason = failure_reason or 'Druck fehlgeschlagen.'
+                    sub.last_error = f"{base_reason} {error}".strip() if error else base_reason
+                else:
+                    sub.last_error = error or 'Unbekannter Fehler'
         session.commit()
     finally:
         session.close()
@@ -720,6 +739,7 @@ class DiscordBotConfigPayload(BaseModel):
     bot_token: Optional[str] = Field(default=None, max_length=400)
     channel_id: Optional[str] = Field(default=None, max_length=120)
     message_template: Optional[str] = Field(default=None, max_length=2000)
+    failure_message_template: Optional[str] = Field(default=None, max_length=2000)
 
 # DB Dependency
 def get_db():
@@ -855,6 +875,7 @@ def get_discord_config(request: Request, db: Session = Depends(get_db)):
         "bot_token": config.bot_token,
         "channel_id": config.channel_id,
         "message_template": config.message_template,
+        "failure_message_template": getattr(config, 'failure_message_template', DEFAULT_DISCORD_FAILURE_TEMPLATE),
         "updated_at": config.updated_at,
     }
 
@@ -880,6 +901,9 @@ def update_discord_config(payload: DiscordBotConfigPayload, request: Request, db
     if "message_template" in data:
         template = (data["message_template"] or "").strip()
         config.message_template = template or DEFAULT_DISCORD_MESSAGE_TEMPLATE
+    if "failure_message_template" in data:
+        failure_template = (data["failure_message_template"] or "").strip()
+        config.failure_message_template = failure_template or DEFAULT_DISCORD_FAILURE_TEMPLATE
     db.commit()
     db.refresh(config)
     return {
@@ -889,6 +913,7 @@ def update_discord_config(payload: DiscordBotConfigPayload, request: Request, db
         "bot_token": config.bot_token,
         "channel_id": config.channel_id,
         "message_template": config.message_template,
+        "failure_message_template": getattr(config, 'failure_message_template', DEFAULT_DISCORD_FAILURE_TEMPLATE),
         "updated_at": config.updated_at,
     }
 

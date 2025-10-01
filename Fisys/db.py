@@ -70,13 +70,23 @@ def init_db():
                         conn.execute(text("ALTER TABLE discord_bot_config ADD COLUMN use_dm BOOLEAN DEFAULT 0"))
                     else:
                         conn.execute(text("ALTER TABLE discord_bot_config ADD COLUMN IF NOT EXISTS use_dm BOOLEAN DEFAULT FALSE"))
+                if "failure_message_template" not in bot_columns:
+                    if is_sqlite:
+                        conn.execute(text("ALTER TABLE discord_bot_config ADD COLUMN failure_message_template TEXT"))
+                    else:
+                        conn.execute(text("ALTER TABLE discord_bot_config ADD COLUMN IF NOT EXISTS failure_message_template TEXT"))
+                failure_default = "Hey {username}, dein Druckauftrag {job_name} auf {printer_name} ist fehlgeschlagen: {failure_reason}"
+                conn.execute(
+                    text("UPDATE discord_bot_config SET failure_message_template = :default WHERE failure_message_template IS NULL"),
+                    {"default": failure_default}
+                )
                 result = conn.execute(text("SELECT COUNT(*) FROM discord_bot_config"))
                 count = result.scalar() if result is not None else 0
                 if not count:
                     default_template = "Hey {username}, dein Druckauftrag {job_name} auf {printer_name} ist fertig!"
                     conn.execute(
-                        text("INSERT INTO discord_bot_config (id, enabled, use_dm, message_template) VALUES (1, :enabled, :use_dm, :template)"),
-                        {"enabled": False, "use_dm": False, "template": default_template}
+                        text("INSERT INTO discord_bot_config (id, enabled, use_dm, message_template, failure_message_template) VALUES (1, :enabled, :use_dm, :template, :failure_template)"),
+                        {"enabled": False, "use_dm": False, "template": default_template, "failure_template": failure_default}
                     )
     except Exception as exc:
         print(f"[DB] Konnte Datenbank-Anpassungen nicht durchführen: {exc}")
