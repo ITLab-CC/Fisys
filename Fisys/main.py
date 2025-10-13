@@ -1719,6 +1719,22 @@ def serve_settings_html():
         raise HTTPException(status_code=404, detail="Datei nicht gefunden")
     return path
 
+# Serve druckdienst.html für /druckdienst
+@app.get("/druckdienst", response_class=FileResponse)
+def serve_druckdienst_page():
+    path = os.path.join(static_dir, "druckdienst.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Seite nicht gefunden")
+    return path
+
+# Serve druckdienst.html directly at /druckdienst.html
+@app.get("/druckdienst.html", response_class=FileResponse)
+def serve_druckdienst_html():
+    path = os.path.join(static_dir, "druckdienst.html")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Datei nicht gefunden")
+    return path
+
 
 # ---- Printer CRUD API ----
 @app.get("/api/printers", response_model=List[PrinterRead])

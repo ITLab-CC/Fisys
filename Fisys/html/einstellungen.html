@@ -81,6 +81,10 @@
                 <button data-ziel="tokenUebersichtBlockContainer" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Token Übersicht</button>
               </div>
               <div>
+                <p class="text-sm font-semibold text-white mb-1">Druckdienst</p>
+                <button data-ziel="druckdienstBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Druckdienst</button>
+              </div>
+              <div>
                 <p class="text-sm font-semibold text-white mb-1">Integrationen</p>
                 <button data-ziel="discordBotConfigBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Discord Bot</button>
                 <button data-ziel="discordSubscriptionsBlock" class="block w-full text-gray-200 text-left px-3 py-2 rounded hover:bg-gray-600 text-sm">Benachrichtigungen</button>
@@ -287,6 +291,13 @@
             <!-- Token-Tabelle -->
             <div id="tokenUebersichtBlockContainer" class="hidden"></div>
 
+            <!-- Druckdienst -->
+            <div id="druckdienstBlock" class="hidden bg-gray-700 p-6 rounded shadow max-w-xl">
+              <h2 class="text-xl text-white font-semibold mb-4">Druckdienst</h2>
+              <p class="text-sm text-gray-300 mb-4">Öffne den Druckdienst in einem neuen Fenster, um Druckaufträge zu verwalten.</p>
+              <button type="button" id="druckdienstOpenPage" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-sm text-white rounded transition">Druckdienst öffnen</button>
+            </div>
+
             <!-- User-Verwaltung -->
             <div id="userVerwaltungBlock" class="hidden bg-gray-700 p-6 rounded shadow">
               <h2 class="text-xl text-white font-semibold mb-4">User verwalten</h2>
@@ -395,6 +406,7 @@
         "printerVerwaltungBlock",
         "tokenBlockContainer",
         "tokenUebersichtBlockContainer",
+        "druckdienstBlock",
         "discordBotConfigBlock",
         "discordSubscriptionsBlock",
         "userVerwaltungBlock",
@@ -425,6 +437,7 @@
       const discordSubscriptionsBody = document.getElementById("discordSubscriptionsBody");
       const discordSubscriptionsReloadBtn = document.getElementById("discordSubscriptionsReload");
       const discordSubscriptionsFilter = document.getElementById("discordSubscriptionsFilter");
+      const druckdienstOpenBtn = document.getElementById("druckdienstOpenPage");
       let lastFocusedBeforeDiscordHelp = null;
 
       const navigationPermissions = {
@@ -434,6 +447,7 @@
         printerVerwaltungBlock: ["helper", "mod", "admin"],
         tokenBlockContainer: ["mod", "admin"],
         tokenUebersichtBlockContainer: ["mod", "admin"],
+        druckdienstBlock: ["mod", "admin"],
         discordBotConfigBlock: ["admin"],
         discordSubscriptionsBlock: ["mod", "admin"],
         userVerwaltungBlock: ["mod", "admin"],
@@ -493,6 +507,12 @@
           }
         }
       };
+
+      if (druckdienstOpenBtn) {
+        druckdienstOpenBtn.addEventListener("click", () => {
+          window.open("/druckdienst.html", "_blank", "noopener");
+        });
+      }
 
       if (settingsMenu) {
         settingsMenu.addEventListener("click", (e) => {
