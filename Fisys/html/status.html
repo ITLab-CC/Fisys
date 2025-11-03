@@ -367,12 +367,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       const daten = await res.json();
       const labels = [];
-      const values = [];
+      const dailyValues = [];
       daten.forEach(entry => {
         labels.push(formatDateLabel(entry.date));
-        values.push(Number(entry.verbrauch) || 0);
+        dailyValues.push(Number(entry.verbrauch) || 0);
       });
-      const hasData = values.some(v => v > 0);
+      const hasData = dailyValues.some(v => v > 0);
+
+      const cumulativeValues = [];
+      dailyValues.reduce((sum, value, index) => {
+        const next = sum + value;
+        cumulativeValues[index] = next;
+        return next;
+      }, 0);
 
       if (!hasData) {
         if (consumptionChart) {
@@ -397,13 +404,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           datasets: [
             {
               label: "Verbrauch (g)",
-              data: values,
-              tension: 0.3,
+              data: cumulativeValues,
+              tension: 0.1,
               fill: false,
               borderColor: "#38bdf8",
               backgroundColor: "rgba(56, 189, 248, 0.3)",
-              pointRadius: 3,
-              pointHoverRadius: 5,
+              pointRadius: 0,
+              pointHoverRadius: 0,
             },
           ],
         },
@@ -431,10 +438,15 @@ document.addEventListener("DOMContentLoaded", async () => {
               display: false,
             },
             tooltip: {
+              intersect: false,
               callbacks: {
                 label: context => {
-                  const value = context.parsed.y || 0;
-                  return `${value.toLocaleString("de-DE")} g`;
+                  const cumulative = context.parsed.y || 0;
+                  const daily = dailyValues[context.dataIndex] || 0;
+                  return [
+                    `Gesamt: ${cumulative.toLocaleString("de-DE")} g`,
+                    `Tag: ${daily.toLocaleString("de-DE")} g`,
+                  ];
                 },
               },
             },
@@ -472,7 +484,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     month: "dieser Monat",
     year: "dieses Jahr",
   };
-  const colorPalette = [
+  const fallbackPalette = [
     "#38bdf8",
     "#f472b6",
     "#f97316",
@@ -487,6 +499,64 @@ document.addEventListener("DOMContentLoaded", async () => {
   ];
   let currentColorPeriod = "month";
   let colorChart = null;
+
+  const colorNameMap = {
+    "schwarz": "#111827",
+    "weiß": "#f9fafb",
+    "weiss": "#f9fafb",
+    "grau": "#6b7280",
+    "silber": "#9ca3af",
+    "anthrazit": "#1f2937",
+    "rot": "#ef4444",
+    "grün": "#22c55e",
+    "gruen": "#22c55e",
+    "blau": "#3b82f6",
+    "hellblau": "#60a5fa",
+    "dunkelblau": "#1d4ed8",
+    "gelb": "#facc15",
+    "orange": "#f97316",
+    "lila": "#a855f7",
+    "violett": "#8b5cf6",
+    "pink": "#f472b6",
+    "rosa": "#fbcfe8",
+    "magenta": "#db2777",
+    "cyan": "#22d3ee",
+    "türkis": "#14b8a6",
+    "tuerkis": "#14b8a6",
+    "braun": "#92400e",
+    "beige": "#f5e6c8",
+    "gold": "#d97706",
+    "kupfer": "#b45309",
+    "birke": "#d6ba8c",
+    "transparent": "rgba(148, 163, 184, 0.35)",
+  };
+
+  function pickColorForLabel(label, fallbackIndex) {
+    if (!label) {
+      return fallbackPalette[fallbackIndex % fallbackPalette.length];
+    }
+    const raw = String(label).trim();
+    if (!raw) {
+      return fallbackPalette[fallbackIndex % fallbackPalette.length];
+    }
+    if (/^#?[0-9a-fA-F]{3,8}$/.test(raw)) {
+      return raw.startsWith("#") ? raw : `#${raw}`;
+    }
+    const lower = raw.toLowerCase();
+    if (colorNameMap[lower]) {
+      return colorNameMap[lower];
+    }
+    const partialMatch = Object.keys(colorNameMap).find(name => lower.includes(name));
+    if (partialMatch) {
+      return colorNameMap[partialMatch];
+    }
+    const testEl = document.createElement("span");
+    testEl.style.color = raw;
+    if (testEl.style.color) {
+      return raw;
+    }
+    return fallbackPalette[fallbackIndex % fallbackPalette.length];
+  }
 
   function updateColorButtons() {
     colorButtons.forEach(btn => {
@@ -548,7 +618,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      const backgroundColors = labels.map((_, index) => colorPalette[index % colorPalette.length]);
+      const backgroundColors = labels.map((label, index) => pickColorForLabel(label, index));
 
       if (colorChart) {
         colorChart.destroy();
@@ -563,7 +633,8 @@ document.addEventListener("DOMContentLoaded", async () => {
               label: "Verbrauch nach Farbe",
               data: values,
               backgroundColor: backgroundColors,
-              borderWidth: 1,
+              borderColor: backgroundColors.map(color => color.startsWith("rgba") ? color : color),
+              borderWidth: 1.5,
             },
           ],
         },
@@ -572,10 +643,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: "bottom",
-              labels: {
-                boxWidth: 12,
-              },
+              display: false,
             },
             tooltip: {
               callbacks: {
