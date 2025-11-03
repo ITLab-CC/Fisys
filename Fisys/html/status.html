@@ -5,6 +5,45 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Status | Fisys</title>
   <link rel="stylesheet" href="/static/assets/css/tailwind.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js" defer></script>
+  <style>
+    .scroll-card,
+    .chart-card {
+      display: flex;
+      flex-direction: column;
+      border-radius: 0.75rem;
+      background-color: rgba(55, 65, 81, 1);
+      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
+    }
+    .scroll-card {
+      min-height: 22rem;
+    }
+    .scroll-card.scroll-card--tall {
+      min-height: 26rem;
+    }
+    .scroll-card__body {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+      margin-right: -0.25rem;
+    }
+    .chart-card {
+      min-height: 24rem;
+      padding-bottom: 0.75rem;
+    }
+    .chart-area {
+      flex: 1 1 auto;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .chart-area canvas {
+      width: 100% !important;
+      height: 100% !important;
+      min-height: 220px;
+    }
+  </style>
 </head>
 <body class="bg-gray-800 min-h-screen flex">
 
@@ -38,39 +77,80 @@
       <p class="text-sm text-gray-200 mt-1">System- und Druckerstatus im Überblick</p>
     </header>
 
-    <section class="flex-1 pt-4 px-10 pb-10 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <section class="flex-1 pt-4 px-10 pb-10">
+      <div class="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
 
-      <!-- Fast leere oder leere Typen -->
-      <div class="bg-gray-700 rounded-lg shadow p-6">
-        <h2 class="text-lg text-white font-semibold mb-4 border-b pb-2">Fast leere oder leere Typen</h2>
-        <ul id="low-stock-list" class="space-y-3 text-sm text-white">
-          <li class="text-white">Lade Daten...</li>
-        </ul>
-      </div>
+        <!-- Fast leere oder leere Typen -->
+        <div class="scroll-card scroll-card--tall p-6 text-gray-100">
+          <h2 class="text-lg font-semibold mb-4 border-b border-gray-600 pb-2">Fast leere oder leere Typen</h2>
+          <ul id="low-stock-list" class="scroll-card__body space-y-3 text-sm text-white">
+            <li class="text-white">Lade Daten...</li>
+          </ul>
+        </div>
 
-      <!-- Meistgenutzte Filamente -->
-      <div class="bg-gray-700 rounded-lg shadow p-6">
-        <h2 class="text-lg text-white font-semibold mb-4 border-b pb-2">Meistgenutzte Filamente</h2>
-        <ul id="top-filaments-list" class="space-y-3 text-sm text-white">
-          <li class="text-white">Lade Daten...</li>
-        </ul>
-      </div>
+        <!-- Meistgenutzte Filamente -->
+        <div class="scroll-card p-6 text-gray-100">
+          <h2 class="text-lg font-semibold mb-4 border-b border-gray-600 pb-2">Meistgenutzte Filamente</h2>
+          <ul id="top-filaments-list" class="scroll-card__body space-y-3 text-sm text-white">
+            <li class="text-white">Lade Daten...</li>
+          </ul>
+        </div>
 
-      <!-- Verbrauch pro Typ -->
-      <div class="bg-gray-700 rounded-lg shadow p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 border-b pb-2">
-          <h2 class="text-lg text-white font-semibold">Verbrauch pro Typ <span id="usage-period-label" class="text-sm text-gray-300">(diese Woche)</span></h2>
-          <div class="inline-flex items-center gap-1 bg-gray-800 p-1 rounded-md">
-            <button type="button" data-usage-period="day" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Tag</button>
-            <button type="button" data-usage-period="week" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Woche</button>
-            <button type="button" data-usage-period="month" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Monat</button>
+        <!-- Verbrauch pro Typ -->
+        <div class="scroll-card scroll-card--tall p-6 text-gray-100">
+          <div class="flex flex-wrap items-center justify-between gap-3 mb-4 border-b border-gray-600 pb-2">
+            <h2 class="text-lg font-semibold">
+              Verbrauch pro Typ <span id="usage-period-label" class="text-sm text-gray-300">(diese Woche)</span>
+            </h2>
+            <div class="inline-flex items-center gap-1 bg-gray-800 p-1 rounded-md">
+              <button type="button" data-usage-period="day" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Tag</button>
+              <button type="button" data-usage-period="week" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Woche</button>
+              <button type="button" data-usage-period="month" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Monat</button>
+            </div>
+          </div>
+          <ul id="usage-list" class="scroll-card__body space-y-3 text-sm text-white">
+            <li class="text-white">Lade Daten...</li>
+          </ul>
+        </div>
+
+        <!-- Gesamtverbrauch -->
+        <div class="chart-card p-6 text-gray-100 gap-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-600 pb-2">
+            <h2 class="text-lg font-semibold">
+              Gesamtverbrauch
+              <span id="consumption-days-label" class="text-sm text-gray-300">(30 Tage)</span>
+            </h2>
+            <div class="inline-flex items-center gap-1 bg-gray-800 p-1 rounded-md">
+              <button type="button" data-consumption-days="7" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">7T</button>
+              <button type="button" data-consumption-days="30" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">30T</button>
+              <button type="button" data-consumption-days="90" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">90T</button>
+            </div>
+          </div>
+          <div class="chart-area">
+            <canvas id="consumption-trend-chart"></canvas>
+            <p id="consumption-trend-empty" class="absolute inset-0 flex items-center justify-center text-sm text-gray-200 text-center hidden">Keine Verbrauchsdaten für diesen Zeitraum.</p>
           </div>
         </div>
-        <ul id="usage-list" class="space-y-3 text-sm text-white">
-          <li class="text-white">Lade Daten...</li>
-        </ul>
-      </div>
 
+        <!-- Farbnutzung -->
+        <div class="chart-card p-6 text-gray-100 gap-4">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-600 pb-2">
+            <h2 class="text-lg font-semibold">
+              Farbnutzung
+              <span id="color-usage-period-label" class="text-sm text-gray-300">(dieser Monat)</span>
+            </h2>
+            <div class="inline-flex items-center gap-1 bg-gray-800 p-1 rounded-md">
+              <button type="button" data-color-period="month" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Monat</button>
+              <button type="button" data-color-period="year" class="px-2 py-1 text-xs font-semibold rounded bg-gray-700 text-gray-200 hover:bg-gray-600 transition">Jahr</button>
+            </div>
+          </div>
+          <div class="chart-area">
+            <canvas id="color-usage-chart"></canvas>
+            <p id="color-usage-empty" class="absolute inset-0 flex items-center justify-center text-sm text-gray-200 text-center hidden">Keine Verbrauchsdaten für diesen Zeitraum.</p>
+          </div>
+        </div>
+
+      </div>
     </section>
 
     <script>
@@ -217,6 +297,338 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   });
+
+  const chartIsAvailable = typeof window.Chart !== "undefined";
+  if (chartIsAvailable) {
+    Chart.defaults.color = "#e2e8f0";
+    Chart.defaults.borderColor = "rgba(148, 163, 184, 0.25)";
+    if (Chart.defaults.font) {
+      Chart.defaults.font.family = "'Inter', 'system-ui', sans-serif";
+    }
+  }
+
+  const consumptionCanvas = document.getElementById("consumption-trend-chart");
+  const consumptionEmpty = document.getElementById("consumption-trend-empty");
+  const consumptionButtons = document.querySelectorAll("[data-consumption-days]");
+  const consumptionDaysLabel = document.getElementById("consumption-days-label");
+  const consumptionDaysLabelMap = {
+    7: "7 Tage",
+    30: "30 Tage",
+    90: "90 Tage",
+  };
+  let currentConsumptionDays = 30;
+  let consumptionChart = null;
+
+  function updateConsumptionButtons() {
+    consumptionButtons.forEach(btn => {
+      const days = Number(btn.dataset.consumptionDays);
+      const isActive = days === currentConsumptionDays;
+      activeButtonClasses.forEach(cls => btn.classList.toggle(cls, isActive));
+      inactiveButtonClasses.forEach(cls => btn.classList.toggle(cls, !isActive));
+    });
+  }
+
+  function formatDateLabel(dateString) {
+    if (typeof dateString !== "string") return dateString;
+    const parts = dateString.split("-");
+    if (parts.length === 3) {
+      const [year, month, day] = parts;
+      return `${day}.${month}.${year.slice(-2)}`;
+    }
+    return dateString;
+  }
+
+  async function loadConsumptionTrend(days) {
+    const numericDays = Number(days);
+    const normalized = Number.isFinite(numericDays) && numericDays > 0 ? numericDays : 30;
+    currentConsumptionDays = normalized;
+    updateConsumptionButtons();
+    if (consumptionDaysLabel) {
+      const label = consumptionDaysLabelMap[normalized] || `${normalized} Tage`;
+      consumptionDaysLabel.textContent = `(${label})`;
+    }
+
+    if (!chartIsAvailable || !consumptionCanvas) {
+      if (consumptionEmpty) {
+        const message = chartIsAvailable ? "Keine Verbrauchsdaten für diesen Zeitraum." : "Diagrammbibliothek konnte nicht geladen werden.";
+        consumptionEmpty.textContent = message;
+        consumptionEmpty.classList.remove("hidden");
+      }
+      return;
+    }
+
+    consumptionEmpty.classList.add("hidden");
+    consumptionCanvas.classList.remove("hidden");
+
+    try {
+      const res = await fetch(`/api/status/consumption_trend?days=${normalized}`);
+      if (!res.ok) {
+        throw new Error(`Antwortstatus ${res.status}`);
+      }
+      const daten = await res.json();
+      const labels = [];
+      const values = [];
+      daten.forEach(entry => {
+        labels.push(formatDateLabel(entry.date));
+        values.push(Number(entry.verbrauch) || 0);
+      });
+      const hasData = values.some(v => v > 0);
+
+      if (!hasData) {
+        if (consumptionChart) {
+          consumptionChart.destroy();
+          consumptionChart = null;
+        }
+        consumptionCanvas.classList.add("hidden");
+        if (consumptionEmpty) {
+          consumptionEmpty.textContent = "Keine Verbrauchsdaten für diesen Zeitraum.";
+          consumptionEmpty.classList.remove("hidden");
+        }
+        return;
+      }
+
+      if (consumptionChart) {
+        consumptionChart.destroy();
+      }
+      consumptionChart = new Chart(consumptionCanvas, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Verbrauch (g)",
+              data: values,
+              tension: 0.3,
+              fill: false,
+              borderColor: "#38bdf8",
+              backgroundColor: "rgba(56, 189, 248, 0.3)",
+              pointRadius: 3,
+              pointHoverRadius: 5,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: value => `${value} g`,
+              },
+              grid: {
+                color: "rgba(148, 163, 184, 0.25)",
+              },
+            },
+            x: {
+              grid: {
+                color: "rgba(148, 163, 184, 0.15)",
+              },
+            },
+          },
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              callbacks: {
+                label: context => {
+                  const value = context.parsed.y || 0;
+                  return `${value.toLocaleString("de-DE")} g`;
+                },
+              },
+            },
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Fehler beim Laden des Verbrauchstrends:", error);
+      if (consumptionChart) {
+        consumptionChart.destroy();
+        consumptionChart = null;
+      }
+      consumptionCanvas.classList.add("hidden");
+      if (consumptionEmpty) {
+        consumptionEmpty.textContent = "Fehler beim Laden der Verbrauchsdaten.";
+        consumptionEmpty.classList.remove("hidden");
+      }
+    }
+  }
+
+  consumptionButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const days = Number(btn.dataset.consumptionDays);
+      if (days && days !== currentConsumptionDays) {
+        loadConsumptionTrend(days);
+      }
+    });
+  });
+
+  const colorCanvas = document.getElementById("color-usage-chart");
+  const colorEmpty = document.getElementById("color-usage-empty");
+  const colorButtons = document.querySelectorAll("[data-color-period]");
+  const colorPeriodLabel = document.getElementById("color-usage-period-label");
+  const colorPeriodLabelMap = {
+    month: "dieser Monat",
+    year: "dieses Jahr",
+  };
+  const colorPalette = [
+    "#38bdf8",
+    "#f472b6",
+    "#f97316",
+    "#a855f7",
+    "#22d3ee",
+    "#84cc16",
+    "#facc15",
+    "#14b8a6",
+    "#ef4444",
+    "#c084fc",
+    "#fb7185",
+  ];
+  let currentColorPeriod = "month";
+  let colorChart = null;
+
+  function updateColorButtons() {
+    colorButtons.forEach(btn => {
+      const isActive = (btn.dataset.colorPeriod || "").toLowerCase() === currentColorPeriod;
+      activeButtonClasses.forEach(cls => btn.classList.toggle(cls, isActive));
+      inactiveButtonClasses.forEach(cls => btn.classList.toggle(cls, !isActive));
+    });
+  }
+
+  async function loadColorUsage(period) {
+    const normalized = (period || "month").toLowerCase();
+    if (!(normalized in colorPeriodLabelMap)) {
+      return loadColorUsage("month");
+    }
+
+    currentColorPeriod = normalized;
+    updateColorButtons();
+    if (colorPeriodLabel) {
+      colorPeriodLabel.textContent = `(${colorPeriodLabelMap[currentColorPeriod]})`;
+    }
+
+    if (!chartIsAvailable || !colorCanvas) {
+      if (colorEmpty) {
+        const message = chartIsAvailable ? "Keine Verbrauchsdaten für diesen Zeitraum." : "Diagrammbibliothek konnte nicht geladen werden.";
+        colorEmpty.textContent = message;
+        colorEmpty.classList.remove("hidden");
+      }
+      return;
+    }
+
+    colorEmpty.classList.add("hidden");
+    colorCanvas.classList.remove("hidden");
+
+    try {
+      const res = await fetch(`/api/status/color_usage?period=${currentColorPeriod}`);
+      if (!res.ok) {
+        throw new Error(`Antwortstatus ${res.status}`);
+      }
+      const daten = await res.json();
+      const labels = [];
+      const values = [];
+      daten.forEach(entry => {
+        labels.push(entry.farbe || "Unbekannt");
+        values.push(Number(entry.verbrauch) || 0);
+      });
+      const total = values.reduce((sum, v) => sum + v, 0);
+      const hasData = total > 0;
+
+      if (!hasData) {
+        if (colorChart) {
+          colorChart.destroy();
+          colorChart = null;
+        }
+        colorCanvas.classList.add("hidden");
+        if (colorEmpty) {
+          colorEmpty.textContent = "Keine Verbrauchsdaten für diesen Zeitraum.";
+          colorEmpty.classList.remove("hidden");
+        }
+        return;
+      }
+
+      const backgroundColors = labels.map((_, index) => colorPalette[index % colorPalette.length]);
+
+      if (colorChart) {
+        colorChart.destroy();
+      }
+
+      colorChart = new Chart(colorCanvas, {
+        type: "doughnut",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Verbrauch nach Farbe",
+              data: values,
+              backgroundColor: backgroundColors,
+              borderWidth: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: {
+                boxWidth: 12,
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label: context => {
+                  const label = context.label || "Unbekannt";
+                  const value = context.parsed || 0;
+                  const percent = total ? ((value / total) * 100).toFixed(1) : "0.0";
+                  return `${label}: ${value.toLocaleString("de-DE")} g (${percent}%)`;
+                },
+              },
+            },
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Fehler beim Laden der Farbnutzungsdaten:", error);
+      if (colorChart) {
+        colorChart.destroy();
+        colorChart = null;
+      }
+      colorCanvas.classList.add("hidden");
+      if (colorEmpty) {
+        colorEmpty.textContent = "Fehler beim Laden der Verbrauchsdaten.";
+        colorEmpty.classList.remove("hidden");
+      }
+    }
+  }
+
+  colorButtons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const period = (btn.dataset.colorPeriod || "").toLowerCase();
+      if (period && period !== currentColorPeriod) {
+        loadColorUsage(period);
+      }
+    });
+  });
+
+  updateConsumptionButtons();
+  updateColorButtons();
+
+  if (chartIsAvailable) {
+    await loadConsumptionTrend(currentConsumptionDays);
+    await loadColorUsage(currentColorPeriod);
+  } else {
+    if (consumptionEmpty) {
+      consumptionEmpty.textContent = "Diagramme konnten nicht geladen werden.";
+      consumptionEmpty.classList.remove("hidden");
+    }
+    if (colorEmpty) {
+      colorEmpty.textContent = "Diagramme konnten nicht geladen werden.";
+      colorEmpty.classList.remove("hidden");
+    }
+  }
 
   await loadUsage(currentUsagePeriod);
 });

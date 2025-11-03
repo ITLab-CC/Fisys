@@ -2303,6 +2303,96 @@ def get_weekly_usage(db: Session = Depends(get_db)):
     return _usage_since(db, datetime.utcnow() - _USAGE_PERIODS["week"])
 
 
+@app.get("/api/status/consumption_trend")
+def get_consumption_trend(
+    days: int = Query(30, ge=1, le=180),
+    db: Session = Depends(get_db)
+):
+    """
+    Aggregiert den Gesamtverbrauch der letzten `days` Tage (inkl. heute) als Zeitreihe.
+    Gibt stets alle Tage zurück, fehlende Werte werden mit 0 ergänzt.
+    """
+    now = datetime.utcnow()
+    start_of_today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start = start_of_today - timedelta(days=days - 1)
+
+    bucket = func.date(FilamentVerbrauch.datum)
+    rows = (
+        db.query(
+            bucket.label("day"),
+            func.sum(FilamentVerbrauch.verbrauch_in_g).label("verbrauch")
+        )
+        .filter(FilamentVerbrauch.datum >= start)
+        .group_by(bucket)
+        .order_by(bucket)
+        .all()
+    )
+
+    def _normalize_day(value):
+        if isinstance(value, datetime):
+            return value.date().isoformat()
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return str(value)
+
+    totals_by_day = {_normalize_day(row.day): float(row.verbrauch or 0) for row in rows}
+
+    timeline = []
+    for offset in range(days):
+        current_day = (start + timedelta(days=offset)).date().isoformat()
+        timeline.append({
+            "date": current_day,
+            "verbrauch": round(totals_by_day.get(current_day, 0), 2)
+        })
+
+    return timeline
+
+
+@app.get("/api/status/color_usage")
+def get_color_usage(
+    period: str = Query("month"),
+    db: Session = Depends(get_db)
+):
+    """
+    Summiert den Verbrauch nach Filament-Farben für den angegebenen Zeitraum.
+    `period` unterstützt 'month' (aktueller Monat) und 'year' (aktuelles Jahr).
+    """
+    period_key = (period or "month").lower()
+    now = datetime.utcnow()
+
+    if period_key == "month":
+        since = datetime(now.year, now.month, 1)
+    elif period_key == "year":
+        since = datetime(now.year, 1, 1)
+    else:
+        raise HTTPException(status_code=400, detail="Ungültiger Zeitraum. Erlaubt: month, year")
+
+    color_expr = func.coalesce(
+        func.nullif(func.trim(FilamentTyp.farbe), ""),
+        "Unbekannt"
+    )
+
+    rows = (
+        db.query(
+            color_expr.label("farbe"),
+            func.sum(FilamentVerbrauch.verbrauch_in_g).label("verbrauch")
+        )
+        .join(FilamentTyp, FilamentTyp.id == FilamentVerbrauch.typ_id)
+        .filter(FilamentVerbrauch.datum >= since)
+        .group_by(color_expr)
+        .order_by(func.sum(FilamentVerbrauch.verbrauch_in_g).desc())
+        .all()
+    )
+
+    return [
+        {
+            "farbe": row.farbe,
+            "verbrauch": round(float(row.verbrauch or 0), 2)
+        }
+        for row in rows
+    ]
+
+
 # Serve login.html for /login
 @app.get("/login", response_class=FileResponse)
 def serve_login_page():
