@@ -24,8 +24,48 @@
     .highlight-container {
       position: relative;
     }
+    @keyframes page-spinner {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    #page-loading-overlay {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 16rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(15, 23, 42, 0.95);
+      z-index: 70;
+      transition: opacity 0.35s ease;
+    }
+    #page-loading-overlay.page-loading-overlay--hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .page-loading-spinner {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 9999px;
+      border: 4px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #38bdf8;
+      animation: page-spinner 0.9s linear infinite;
+    }
+    @media (max-width: 1024px) {
+      #page-loading-overlay {
+        left: 0;
+      }
+    }
   </style>
   <body class="min-h-screen flex bg-gray-800">
+    <div id="page-loading-overlay" role="status" aria-live="polite">
+      <div class="page-loading-spinner" aria-hidden="true"></div>
+      <p class="text-gray-200 text-sm mt-4">Lade Einstellungen …</p>
+    </div>
     <!-- Sidebar -->
     <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
       <div>
@@ -400,7 +440,26 @@
       </div>
     </div>
 <script>
+    const pageLoadingOverlay = document.getElementById("page-loading-overlay");
+    let pageLoadingOverlayTimeoutId = null;
+
+    function hidePageLoadingOverlay() {
+      if (!pageLoadingOverlay || pageLoadingOverlay.dataset.dismissed === "1") {
+        return;
+      }
+      if (pageLoadingOverlayTimeoutId) {
+        clearTimeout(pageLoadingOverlayTimeoutId);
+        pageLoadingOverlayTimeoutId = null;
+      }
+      pageLoadingOverlay.dataset.dismissed = "1";
+      pageLoadingOverlay.classList.add("page-loading-overlay--hidden");
+      setTimeout(() => pageLoadingOverlay.remove(), 400);
+    }
+
+    pageLoadingOverlayTimeoutId = window.setTimeout(() => hidePageLoadingOverlay(), 8000);
+
     document.addEventListener("DOMContentLoaded", async () => {
+      try {
       const highlightBar = document.getElementById("highlightBar");
       const settingsMenu = document.getElementById("einstellungsMenue");
       if (settingsMenu) {
@@ -667,9 +726,11 @@
             console.error("Logout fehlgeschlagen", err);
           }
         });
+        hidePageLoadingOverlay();
       } catch (err) {
         updateAdminPanelButton(null);
         console.warn("Nicht eingeloggt – Weiterleitung zur Login-Seite");
+        hidePageLoadingOverlay();
         window.location.href = "/login";
         return;
       }
@@ -1777,7 +1838,12 @@
   if (["mod", "admin"].includes(benutzerRolle)) {
     ladeBenutzerTabelle();
   }
-});
+      } catch (error) {
+        console.error("Fehler beim Initialisieren der Einstellungen:", error);
+      } finally {
+        hidePageLoadingOverlay();
+      }
+    });
   </script>
   <div id="popupOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
     <div class="bg-gray-700 rounded shadow-lg p-6 max-w-sm w-full text-center">

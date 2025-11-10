@@ -5,8 +5,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Filamenttypen | Fisys</title>
   <link rel="stylesheet" href="/static/assets/css/tailwind.css" />
+  <style>
+    @keyframes page-spinner {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    #page-loading-overlay {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 16rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(15, 23, 42, 0.95);
+      z-index: 70;
+      transition: opacity 0.35s ease;
+    }
+    #page-loading-overlay.page-loading-overlay--hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .page-loading-spinner {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 9999px;
+      border: 4px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #38bdf8;
+      animation: page-spinner 0.9s linear infinite;
+    }
+    @media (max-width: 1024px) {
+      #page-loading-overlay {
+        left: 0;
+      }
+    }
+  </style>
 </head>
 <body class="min-h-screen flex bg-gray-800">
+  <div id="page-loading-overlay" role="status" aria-live="polite">
+    <div class="page-loading-spinner" aria-hidden="true"></div>
+    <p class="text-gray-200 text-sm mt-4">Lade Filamenttypen …</p>
+  </div>
   <!-- Sidebar -->
   <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
     <div>
@@ -92,6 +134,17 @@
   </div>
 
   <script>
+const pageLoadingOverlay = document.getElementById("page-loading-overlay");
+
+function hidePageLoadingOverlay() {
+  if (!pageLoadingOverlay || pageLoadingOverlay.dataset.dismissed === "1") {
+    return;
+  }
+  pageLoadingOverlay.dataset.dismissed = "1";
+  pageLoadingOverlay.classList.add("page-loading-overlay--hidden");
+  setTimeout(() => pageLoadingOverlay.remove(), 400);
+}
+
 // Stelle sicher, dass das Modal für "+ Spule hinzufügen" zuverlässig geöffnet wird
 window.addEventListener("DOMContentLoaded", () => {
   // Für Typenmodal Abbrechen-Button
@@ -586,8 +639,6 @@ function zeigeHinweis(nachricht, farbe = "bg-gray-800") {
   }, 3000);
 }
 
-  loadTypen();
-
   // Auth-Bereich (Login/Logout)
   const authBereich = document.getElementById("auth-bereich");
 
@@ -620,13 +671,9 @@ function zeigeHinweis(nachricht, farbe = "bg-gray-800") {
     }
   }
 
-  ladeAuthStatus();
-
-  // Buttons nur für berechtigte Rollen anzeigen
-  (async () => {
+  async function updateButtonVisibility() {
     const buttonContainer = document.getElementById("button-container");
-    const btnTyp = document.getElementById("btn-typ-hinzufuegen");
-    const btnSpule = document.getElementById("btn-spule-hinzufuegen");
+    if (!buttonContainer) return;
     try {
       const res = await fetch("/api/userinfo");
       if (res.ok) {
@@ -636,9 +683,12 @@ function zeigeHinweis(nachricht, farbe = "bg-gray-800") {
         }
       }
     } catch (err) {
-      // Bei Fehler nichts anzeigen
+      // Ignorieren, Buttons bleiben verborgen
     }
-  })();
+  }
+
+  const initialTasks = [loadTypen(), ladeAuthStatus(), updateButtonVisibility()];
+  Promise.allSettled(initialTasks).finally(() => hidePageLoadingOverlay());
 });
   </script>
   <!-- Bestätigungs-Modal für Typ-Löschen -->

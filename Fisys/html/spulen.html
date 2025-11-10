@@ -5,8 +5,50 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spulen Übersicht | Fisys</title>
   <link rel="stylesheet" href="/static/assets/css/tailwind.css" />
+  <style>
+    @keyframes page-spinner {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    #page-loading-overlay {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 16rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: rgba(15, 23, 42, 0.95);
+      z-index: 70;
+      transition: opacity 0.35s ease;
+    }
+    #page-loading-overlay.page-loading-overlay--hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .page-loading-spinner {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 9999px;
+      border: 4px solid rgba(255, 255, 255, 0.15);
+      border-top-color: #38bdf8;
+      animation: page-spinner 0.9s linear infinite;
+    }
+    @media (max-width: 1024px) {
+      #page-loading-overlay {
+        left: 0;
+      }
+    }
+  </style>
 </head>
 <body class="bg-gray-800 min-h-screen flex">
+  <div id="page-loading-overlay" role="status" aria-live="polite">
+    <div class="page-loading-spinner" aria-hidden="true"></div>
+    <p class="text-gray-200 text-sm mt-4">Lade Spulen …</p>
+  </div>
 
   <!-- Sidebar identisch zu index.html -->
   <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
@@ -60,6 +102,17 @@
   </main>
 
   <script>
+const pageLoadingOverlay = document.getElementById("page-loading-overlay");
+
+function hidePageLoadingOverlay() {
+  if (!pageLoadingOverlay || pageLoadingOverlay.dataset.dismissed === "1") {
+    return;
+  }
+  pageLoadingOverlay.dataset.dismissed = "1";
+  pageLoadingOverlay.classList.add("page-loading-overlay--hidden");
+  setTimeout(() => pageLoadingOverlay.remove(), 400);
+}
+
 let currentEditSpuleId = null;
 let currentEditSpule = null;
 let cachedPrinters = null;
@@ -81,6 +134,39 @@ async function getUserInfoOnce() {
     console.error("Fehler beim Laden von /api/userinfo:", e);
     __cachedUserInfo = null;
     return null;
+  }
+}
+
+async function initAuthArea() {
+  const authBereich = document.getElementById("auth-bereich");
+  if (!authBereich) return;
+  try {
+    const daten = await getUserInfoOnce();
+    if (daten) {
+      authBereich.innerHTML = `
+        <form id="logoutForm" class="flex flex-col items-center">
+          <span class="text-sm text-gray-300 mb-1">Angemeldet als ${daten.username}</span>
+          <button type="submit" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition w-full">Logout</button>
+        </form>
+      `;
+      const logoutForm = document.getElementById("logoutForm");
+      if (logoutForm) {
+        logoutForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          await fetch("/logout", { method: "POST" });
+          window.location.reload();
+        });
+      }
+    } else {
+      authBereich.innerHTML = `
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      `;
+    }
+  } catch (err) {
+    console.error("Fehler beim Auth-Check:", err);
+    authBereich.innerHTML = `
+      <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+    `;
   }
 }
 
@@ -315,7 +401,7 @@ function closeEditModal() {
 }
 
 window.addEventListener("DOMContentLoaded", () => {
-  loadSpulen();
+  const pendingTasks = [loadSpulen(), initAuthArea()];
 
   document.getElementById('cancel-btn').addEventListener('click', () => {
     closeEditModal();
@@ -379,6 +465,8 @@ window.addEventListener("DOMContentLoaded", () => {
       alert(error.message);
     }
   });
+
+  Promise.allSettled(pendingTasks).finally(() => hidePageLoadingOverlay());
 });
 
 document.getElementById("suchfeld").addEventListener("input", () => {
@@ -437,28 +525,5 @@ document.getElementById("suchfeld").addEventListener("input", () => {
     </div>
   </div>
 
-  <script>
-    window.addEventListener("DOMContentLoaded", async () => {
-      const authBereich = document.getElementById("auth-bereich");
-      try {
-        const daten = await getUserInfoOnce();
-        if (daten) {
-          authBereich.innerHTML = `
-            <form id="logoutForm" class="flex flex-col items-center">
-              <span class="text-sm text-gray-300 mb-1">Angemeldet als ${daten.username}</span>
-              <button type="submit" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition w-full">Logout</button>
-            </form>
-          `;
-          document.getElementById("logoutForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            await fetch("/logout", { method: "POST" });
-            window.location.reload();
-          });
-        }
-      } catch (err) {
-        console.error("Fehler beim Auth-Check:", err);
-      }
-    });
-  </script>
 </body>
 </html>
