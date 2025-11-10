@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Panel | Fisys</title>
+  <link rel="stylesheet" href="/static/assets/css/tailwind.css" />
+  <style>
+    .card {
+      background-color: rgba(55, 65, 81, 1);
+      border-radius: 0.75rem;
+      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35);
+    }
+    .filter-grid input,
+    .filter-grid select {
+      min-width: 180px;
+    }
+  </style>
+</head>
+<body class="bg-gray-800 min-h-screen flex">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-[#0f172a] text-white flex flex-col justify-between fixed h-full">
+    <div>
+      <div class="pt-1 pb-1">
+        <img src="/static/assets/Fisys Logo.png" alt="Fisys Logo" class="h-20 mx-auto" />
+      </div>
+      <nav class="px-4 space-y-2">
+        <a href="/" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Dashboard</a>
+        <a href="/spulen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Spulen</a>
+        <a href="/filamentseite.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Filamenttypen</a>
+        <hr class="my-2 border-gray-700" />
+        <a href="/status" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Status</a>
+        <a href="/einstellungen.html" class="block px-4 py-2 rounded hover:bg-gray-800 transition text-gray-300">Einstellungen</a>
+      </nav>
+    </div>
+    <div class="mt-auto">
+      <div class="px-4 pb-2" id="user-info-container">
+        <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+      </div>
+      <div class="p-4 text-xs text-center text-gray-400">© 2025 Fisys</div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 flex flex-col ml-64">
+    <header class="bg-gray-800 px-10 pt-10 pb-6">
+      <h1 class="text-3xl text-white font-bold">Admin Panel</h1>
+      <p class="text-sm text-gray-200 mt-1">Übersicht über Nutzer und Logs</p>
+    </header>
+
+    <section class="flex-1 pt-4 px-10 pb-10 space-y-10">
+      <div id="admin-access-warning" class="card p-6 text-gray-100 bg-gray-700 border border-red-500/40">
+        <h2 class="text-xl font-semibold text-red-300 mb-2">Keine Berechtigung</h2>
+        <p class="text-sm text-gray-200">Dieses Panel steht nur Administratoren oder Moderatoren zur Verfügung. Bitte melde dich mit einem entsprechenden Konto an.</p>
+      </div>
+
+      <div id="admin-dashboard" class="space-y-10 hidden">
+        <!-- Nutzerliste -->
+        <section class="card p-6 text-gray-100 border border-gray-600">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 class="text-xl font-semibold">Nutzerübersicht</h2>
+              <p class="text-sm text-gray-300">Alle registrierten Benutzer inkl. Rollen & letzter Aktivität.</p>
+            </div>
+            <div class="flex gap-2">
+              <button id="toggle-users" class="hidden px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-semibold">Alle anzeigen</button>
+              <button id="refresh-users" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm font-semibold">Neu laden</button>
+            </div>
+          </div>
+          <div class="filter-grid grid gap-3 md:grid-cols-2 lg:grid-cols-3 mb-4">
+            <input id="user-search" type="search" placeholder="Nach Benutzer suchen..." class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+            <select id="user-role-filter" class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500">
+              <option value="">Alle Rollen</option>
+              <option value="admin">Admin</option>
+              <option value="mod">Mod</option>
+              <option value="helper">Helper</option>
+              <option value="user">User</option>
+            </select>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-left text-sm">
+              <thead class="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-600">
+                <tr>
+                  <th class="py-3">Benutzername</th>
+                  <th class="py-3">Rolle</th>
+                  <th class="py-3">Discord</th>
+                  <th class="py-3">Registriert</th>
+                  <th class="py-3">Zuletzt aktiv</th>
+                </tr>
+              </thead>
+              <tbody id="user-table-body" class="divide-y divide-gray-700">
+                <tr><td colspan="5" class="py-4 text-center text-gray-400">Lade Nutzer...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="user-meta" class="text-xs text-gray-400 mt-3">–</p>
+        </section>
+
+        <!-- Druckjob-Logs -->
+        <section class="card p-6 text-gray-100 border border-gray-600">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 class="text-xl font-semibold">Druck-Logs</h2>
+              <p class="text-sm text-gray-300">Verfolge abgeschlossene, fehlgeschlagene oder abgebrochene Jobs.</p>
+            </div>
+            <div class="flex gap-2">
+              <button id="toggle-jobs" class="hidden px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-semibold">Alle anzeigen</button>
+              <button id="refresh-jobs" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm font-semibold">Neu laden</button>
+            </div>
+          </div>
+          <div class="filter-grid grid gap-3 md:grid-cols-2 lg:grid-cols-4 mb-4">
+            <input id="job-search" type="search" placeholder="Job, Drucker oder Serial..." class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+            <select id="job-status-filter" class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500">
+              <option value="">Alle Stati</option>
+              <option value="erfolgreich">Erfolgreich</option>
+              <option value="fehlgeschlagen">Fehlgeschlagen</option>
+              <option value="abgebrochen">Abgebrochen</option>
+            </select>
+            <input id="job-date-from" type="date" class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+            <input id="job-date-to" type="date" class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-left text-sm">
+              <thead class="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-600">
+                <tr>
+                  <th class="py-3">Job</th>
+                  <th class="py-3">Drucker</th>
+                  <th class="py-3">Status</th>
+                  <th class="py-3">Dauer</th>
+                  <th class="py-3">Gestartet</th>
+                  <th class="py-3">Beendet</th>
+                </tr>
+              </thead>
+              <tbody id="job-table-body" class="divide-y divide-gray-700">
+                <tr><td colspan="6" class="py-4 text-center text-gray-400">Lade Druck-Logs...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="job-meta" class="text-xs text-gray-400 mt-3">–</p>
+        </section>
+
+        <!-- Spulen-Historie -->
+        <section class="card p-6 text-gray-100 border border-gray-600">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 class="text-xl font-semibold">Spulen-Historie</h2>
+              <p class="text-sm text-gray-300">Alle Aktionen wie Wiegen, Verpacken oder Druckereinlagerung.</p>
+            </div>
+            <div class="flex gap-2">
+              <button id="toggle-spools" class="hidden px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-semibold">Alle anzeigen</button>
+              <button id="refresh-spools" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm font-semibold">Neu laden</button>
+            </div>
+          </div>
+          <div class="filter-grid grid gap-3 md:grid-cols-2 lg:grid-cols-4 mb-4">
+            <input id="spool-search" type="search" placeholder="Typ, Farbe oder Spulen-ID..." class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+            <input id="spool-action" type="text" placeholder="Aktion (z.B. gewogen)" class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+            <input id="spool-date-from" type="date" class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+            <input id="spool-date-to" type="date" class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-left text-sm">
+              <thead class="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-600">
+                <tr>
+                  <th class="py-3">Zeitpunkt</th>
+                  <th class="py-3">Spule</th>
+                  <th class="py-3">Typ</th>
+                  <th class="py-3">Aktion</th>
+                  <th class="py-3">Gewicht</th>
+                </tr>
+              </thead>
+              <tbody id="spool-table-body" class="divide-y divide-gray-700">
+                <tr><td colspan="5" class="py-4 text-center text-gray-400">Lade Historie...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="spool-meta" class="text-xs text-gray-400 mt-3">–</p>
+        </section>
+
+        <!-- Verbrauchslog -->
+        <section class="card p-6 text-gray-100 border border-gray-600">
+          <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+            <div>
+              <h2 class="text-xl font-semibold">Verbrauchslog</h2>
+              <p class="text-sm text-gray-300">Protokollierte Materialverbräuche mit Filterfunktion.</p>
+            </div>
+            <div class="flex gap-2">
+              <button id="toggle-consumption" class="hidden px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm font-semibold">Alle anzeigen</button>
+              <button id="refresh-consumption" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm font-semibold">Neu laden</button>
+            </div>
+          </div>
+          <div class="filter-grid grid gap-3 md:grid-cols-2 lg:grid-cols-4 mb-4">
+            <input id="consumption-search" type="search" placeholder="Material oder Typ..." class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+            <input id="consumption-date-from" type="date" class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+            <input id="consumption-date-to" type="date" class="px-3 py-2 rounded bg-gray-800 border border-gray-600 text-sm text-gray-100 focus:outline-none focus:ring focus:ring-blue-500" />
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-left text-sm">
+              <thead class="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-600">
+                <tr>
+                  <th class="py-3">Datum</th>
+                  <th class="py-3">Typ</th>
+                  <th class="py-3">Material</th>
+                  <th class="py-3">Farbe</th>
+                  <th class="py-3">Verbrauch (g)</th>
+                </tr>
+              </thead>
+              <tbody id="consumption-table-body" class="divide-y divide-gray-700">
+                <tr><td colspan="5" class="py-4 text-center text-gray-400">Lade Verbrauchsdaten...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="consumption-meta" class="text-xs text-gray-400 mt-3">–</p>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const adminAllowedRoles = new Set(["admin", "mod"]);
+    const COLLAPSED_LIMIT = 20;
+    const EXPANDED_LIMIT = 200;
+
+    const usersState = { expanded: false };
+    const jobsState = { expanded: false };
+    const spoolsState = { expanded: false };
+    const consumptionState = { expanded: false };
+
+    const toggleUsersBtn = document.getElementById("toggle-users");
+    const toggleJobsBtn = document.getElementById("toggle-jobs");
+    const toggleSpoolsBtn = document.getElementById("toggle-spools");
+    const toggleConsumptionBtn = document.getElementById("toggle-consumption");
+
+    function formatDate(value, withTime = true) {
+      if (!value) return "—";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "—";
+      const options = withTime
+        ? { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }
+        : { day: "2-digit", month: "2-digit", year: "numeric" };
+      return new Intl.DateTimeFormat("de-DE", options).format(date);
+    }
+
+    function formatDuration(seconds) {
+      if (seconds == null) return "—";
+      const sec = Math.max(0, Number(seconds));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      return [h, m, s].map(v => String(v).padStart(2, "0")).join(":");
+    }
+
+    function setTableState(tbody, message, colSpan = 5) {
+      if (!tbody) return;
+      tbody.innerHTML = `<tr><td colspan="${colSpan}" class="py-4 text-center text-gray-400">${message}</td></tr>`;
+    }
+
+    function getLimitForState(state) {
+      return state.expanded ? EXPANDED_LIMIT : COLLAPSED_LIMIT;
+    }
+
+    function updateToggleButton(button, state, total) {
+      if (!button) return;
+      const totalNumber = Number(total ?? 0);
+      const hasMore = totalNumber > COLLAPSED_LIMIT;
+      button.classList.toggle("hidden", !hasMore);
+      button.textContent = state.expanded ? "Weniger anzeigen" : "Alle anzeigen";
+    }
+
+    async function fetchJSON(url) {
+      const res = await fetch(url, { credentials: "same-origin" });
+      if (!res.ok) {
+        const detail = await res.text();
+        throw new Error(detail || res.statusText);
+      }
+      return res.json();
+    }
+
+    // --- Nutzerliste ---
+    const userSearch = document.getElementById("user-search");
+    const userRoleFilter = document.getElementById("user-role-filter");
+    const userTableBody = document.getElementById("user-table-body");
+    const userMeta = document.getElementById("user-meta");
+    let userReloadTimer;
+
+    async function loadUsers() {
+      const limit = getLimitForState(usersState);
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (userSearch.value.trim()) params.set("search", userSearch.value.trim());
+      if (userRoleFilter.value) params.set("role", userRoleFilter.value);
+      setTableState(userTableBody, "Lade Nutzer...", 5);
+      try {
+        const data = await fetchJSON(`/api/admin/users?${params.toString()}`);
+        if (!data.items || !data.items.length) {
+          setTableState(userTableBody, "Keine Nutzer gefunden.", 5);
+        } else {
+          userTableBody.innerHTML = data.items.map(user => `
+            <tr>
+              <td class="py-2 text-white font-medium">${user.username}</td>
+              <td class="py-2 capitalize">${user.rolle}</td>
+              <td class="py-2 text-gray-300">${user.discord_id || "–"}</td>
+              <td class="py-2 text-gray-300">${formatDate(user.created_at, true)}</td>
+              <td class="py-2 text-gray-300">${formatDate(user.last_seen, true)}</td>
+            </tr>
+          `).join("");
+        }
+        const total = data.total ?? data.items?.length ?? 0;
+        updateToggleButton(toggleUsersBtn, usersState, total);
+        const shown = data.items?.length ?? 0;
+        const extraInfo = (!usersState.expanded && total > COLLAPSED_LIMIT) ? " (Ansicht begrenzt auf 20)" : "";
+        userMeta.textContent = `Zeige ${shown} von ${total} Nutzern${extraInfo}`;
+      } catch (error) {
+        console.error("Fehler beim Laden der Nutzer:", error);
+        setTableState(userTableBody, "Fehler beim Laden der Nutzer.", 5);
+        userMeta.textContent = "Fehler";
+      }
+    }
+
+    function scheduleUserReload() {
+      clearTimeout(userReloadTimer);
+      userReloadTimer = setTimeout(loadUsers, 300);
+    }
+
+    userSearch.addEventListener("input", scheduleUserReload);
+    userRoleFilter.addEventListener("change", loadUsers);
+    document.getElementById("refresh-users").addEventListener("click", loadUsers);
+    if (toggleUsersBtn) {
+      toggleUsersBtn.addEventListener("click", () => {
+        usersState.expanded = !usersState.expanded;
+        loadUsers();
+      });
+    }
+
+    // --- Druckjobs ---
+    const jobSearch = document.getElementById("job-search");
+    const jobStatusFilter = document.getElementById("job-status-filter");
+    const jobDateFrom = document.getElementById("job-date-from");
+    const jobDateTo = document.getElementById("job-date-to");
+    const jobTableBody = document.getElementById("job-table-body");
+    const jobMeta = document.getElementById("job-meta");
+    let jobReloadTimer;
+
+    async function loadPrinterJobs() {
+      const limit = getLimitForState(jobsState);
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (jobSearch.value.trim()) params.set("search", jobSearch.value.trim());
+      if (jobStatusFilter.value) params.set("status", jobStatusFilter.value);
+      if (jobDateFrom.value) params.set("date_from", jobDateFrom.value);
+      if (jobDateTo.value) params.set("date_to", jobDateTo.value);
+
+      setTableState(jobTableBody, "Lade Druck-Logs...", 6);
+      try {
+        const data = await fetchJSON(`/api/admin/logs/printer_jobs?${params.toString()}`);
+        if (!data.items || !data.items.length) {
+          setTableState(jobTableBody, "Keine Druck-Logs gefunden.", 6);
+        } else {
+          jobTableBody.innerHTML = data.items.map(entry => `
+            <tr>
+              <td class="py-2 text-white font-medium">${entry.job_name || "—"}</td>
+              <td class="py-2 text-gray-300">${entry.printer_name || entry.printer_serial || "–"}</td>
+              <td class="py-2">
+                <span class="px-2 py-1 rounded text-xs font-semibold ${entry.status === "erfolgreich" ? "bg-emerald-500/20 text-emerald-200" : entry.status === "fehlgeschlagen" ? "bg-red-500/20 text-red-200" : "bg-yellow-500/20 text-yellow-200"}">
+                  ${entry.status ?? "–"}
+                </span>
+              </td>
+              <td class="py-2 text-gray-300">${formatDuration(entry.duration_seconds)}</td>
+              <td class="py-2 text-gray-300">${formatDate(entry.started_at)}</td>
+              <td class="py-2 text-gray-300">${formatDate(entry.finished_at)}</td>
+            </tr>
+          `).join("");
+        }
+        const total = data.total ?? data.items?.length ?? 0;
+        updateToggleButton(toggleJobsBtn, jobsState, total);
+        const shown = data.items?.length ?? 0;
+        const extraInfo = (!jobsState.expanded && total > COLLAPSED_LIMIT) ? " (Ansicht begrenzt auf 20)" : "";
+        jobMeta.textContent = `Zeige ${shown} von ${total} Einträgen${extraInfo}`;
+      } catch (error) {
+        console.error("Fehler beim Laden der Druck-Logs:", error);
+        setTableState(jobTableBody, "Fehler beim Laden der Druck-Logs.", 6);
+        jobMeta.textContent = "Fehler";
+      }
+    }
+
+    function scheduleJobReload() {
+      clearTimeout(jobReloadTimer);
+      jobReloadTimer = setTimeout(loadPrinterJobs, 300);
+    }
+
+    jobSearch.addEventListener("input", scheduleJobReload);
+    jobStatusFilter.addEventListener("change", loadPrinterJobs);
+    jobDateFrom.addEventListener("change", loadPrinterJobs);
+    jobDateTo.addEventListener("change", loadPrinterJobs);
+    document.getElementById("refresh-jobs").addEventListener("click", loadPrinterJobs);
+    if (toggleJobsBtn) {
+      toggleJobsBtn.addEventListener("click", () => {
+        jobsState.expanded = !jobsState.expanded;
+        loadPrinterJobs();
+      });
+    }
+
+    // --- Spulen-Historie ---
+    const spoolSearch = document.getElementById("spool-search");
+    const spoolAction = document.getElementById("spool-action");
+    const spoolDateFrom = document.getElementById("spool-date-from");
+    const spoolDateTo = document.getElementById("spool-date-to");
+    const spoolTableBody = document.getElementById("spool-table-body");
+    const spoolMeta = document.getElementById("spool-meta");
+    let spoolReloadTimer;
+
+    async function loadSpoolLogs() {
+      const limit = getLimitForState(spoolsState);
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (spoolSearch.value.trim()) params.set("search", spoolSearch.value.trim());
+      if (spoolAction.value.trim()) params.set("action", spoolAction.value.trim());
+      if (spoolDateFrom.value) params.set("date_from", spoolDateFrom.value);
+      if (spoolDateTo.value) params.set("date_to", spoolDateTo.value);
+
+      setTableState(spoolTableBody, "Lade Spulen-Historie...", 5);
+      try {
+        const data = await fetchJSON(`/api/admin/logs/spools?${params.toString()}`);
+        if (!data.items || !data.items.length) {
+          setTableState(spoolTableBody, "Keine Einträge gefunden.", 5);
+        } else {
+          spoolTableBody.innerHTML = data.items.map(entry => `
+            <tr>
+              <td class="py-2 text-gray-300">${formatDate(entry.created_at)}</td>
+              <td class="py-2 text-white font-medium">#${entry.spulen_id ?? "–"}</td>
+              <td class="py-2 text-gray-300">${entry.typ_name || "–"}<br><span class="text-xs text-gray-400">${entry.material || "?"} • ${entry.farbe || "?"}</span></td>
+              <td class="py-2 text-gray-300 capitalize">${entry.aktion || "–"}</td>
+              <td class="py-2 text-gray-300">${entry.alt_gewicht != null || entry.neu_gewicht != null ? `${entry.alt_gewicht ?? "?"}g → ${entry.neu_gewicht ?? "?"}g` : "–"}</td>
+            </tr>
+          `).join("");
+        }
+        const total = data.total ?? data.items?.length ?? 0;
+        updateToggleButton(toggleSpoolsBtn, spoolsState, total);
+        const shown = data.items?.length ?? 0;
+        const extraInfo = (!spoolsState.expanded && total > COLLAPSED_LIMIT) ? " (Ansicht begrenzt auf 20)" : "";
+        spoolMeta.textContent = `Zeige ${shown} von ${total} Einträgen${extraInfo}`;
+      } catch (error) {
+        console.error("Fehler beim Laden der Spulen-Historie:", error);
+        setTableState(spoolTableBody, "Fehler beim Laden der Spulen-Historie.", 5);
+        spoolMeta.textContent = "Fehler";
+      }
+    }
+
+    function scheduleSpoolReload() {
+      clearTimeout(spoolReloadTimer);
+      spoolReloadTimer = setTimeout(loadSpoolLogs, 300);
+    }
+
+    spoolSearch.addEventListener("input", scheduleSpoolReload);
+    spoolAction.addEventListener("input", scheduleSpoolReload);
+    spoolDateFrom.addEventListener("change", loadSpoolLogs);
+    spoolDateTo.addEventListener("change", loadSpoolLogs);
+    document.getElementById("refresh-spools").addEventListener("click", loadSpoolLogs);
+    if (toggleSpoolsBtn) {
+      toggleSpoolsBtn.addEventListener("click", () => {
+        spoolsState.expanded = !spoolsState.expanded;
+        loadSpoolLogs();
+      });
+    }
+
+    // --- Verbrauch ---
+    const consumptionSearch = document.getElementById("consumption-search");
+    const consumptionDateFrom = document.getElementById("consumption-date-from");
+    const consumptionDateTo = document.getElementById("consumption-date-to");
+    const consumptionTableBody = document.getElementById("consumption-table-body");
+    const consumptionMeta = document.getElementById("consumption-meta");
+    let consumptionReloadTimer;
+
+    async function loadConsumptionLogs() {
+      const limit = getLimitForState(consumptionState);
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (consumptionSearch.value.trim()) params.set("search", consumptionSearch.value.trim());
+      if (consumptionDateFrom.value) params.set("date_from", consumptionDateFrom.value);
+      if (consumptionDateTo.value) params.set("date_to", consumptionDateTo.value);
+
+      setTableState(consumptionTableBody, "Lade Verbrauchsdaten...", 5);
+      try {
+        const data = await fetchJSON(`/api/admin/logs/verbrauch?${params.toString()}`);
+        if (!data.items || !data.items.length) {
+          setTableState(consumptionTableBody, "Keine Verbrauchsdaten gefunden.", 5);
+        } else {
+          consumptionTableBody.innerHTML = data.items.map(entry => {
+            const typLabel = entry.typ_name || (entry.typ_id ? `Typ #${entry.typ_id}` : "–");
+            return `
+            <tr>
+              <td class="py-2 text-gray-300">${formatDate(entry.datum, false)}</td>
+              <td class="py-2 text-white font-medium">${typLabel}</td>
+              <td class="py-2 text-gray-300">${entry.material || "–"}</td>
+              <td class="py-2 text-gray-300">${entry.farbe || "–"}</td>
+              <td class="py-2 text-gray-300">${entry.verbrauch_in_g?.toLocaleString("de-DE") ?? "0"} g</td>
+            </tr>
+          `;
+          }).join("");
+        }
+        const total = data.total ?? data.items?.length ?? 0;
+        updateToggleButton(toggleConsumptionBtn, consumptionState, total);
+        const shown = data.items?.length ?? 0;
+        const extraInfo = (!consumptionState.expanded && total > COLLAPSED_LIMIT) ? " (Ansicht begrenzt auf 20)" : "";
+        consumptionMeta.textContent = `Zeige ${shown} von ${total} Einträgen${extraInfo}`;
+      } catch (error) {
+        console.error("Fehler beim Laden der Verbrauchsdaten:", error);
+        setTableState(consumptionTableBody, "Fehler beim Laden der Verbrauchsdaten.", 5);
+        consumptionMeta.textContent = "Fehler";
+      }
+    }
+
+    function scheduleConsumptionReload() {
+      clearTimeout(consumptionReloadTimer);
+      consumptionReloadTimer = setTimeout(loadConsumptionLogs, 300);
+    }
+
+    consumptionSearch.addEventListener("input", scheduleConsumptionReload);
+    consumptionDateFrom.addEventListener("change", loadConsumptionLogs);
+    consumptionDateTo.addEventListener("change", loadConsumptionLogs);
+    document.getElementById("refresh-consumption").addEventListener("click", loadConsumptionLogs);
+    if (toggleConsumptionBtn) {
+      toggleConsumptionBtn.addEventListener("click", () => {
+        consumptionState.expanded = !consumptionState.expanded;
+        loadConsumptionLogs();
+      });
+    }
+
+    async function loadUserInfoAndInit() {
+      const warning = document.getElementById("admin-access-warning");
+      const dashboard = document.getElementById("admin-dashboard");
+      try {
+        const res = await fetch("/api/userinfo", { credentials: "same-origin" });
+        if (!res.ok) throw new Error("Nicht angemeldet");
+        const user = await res.json();
+        updateUserInfoCard(user);
+        if (!adminAllowedRoles.has(user.rolle)) {
+          warning.classList.remove("hidden");
+          dashboard.classList.add("hidden");
+          return;
+        }
+        warning.classList.add("hidden");
+        dashboard.classList.remove("hidden");
+        loadUsers();
+        loadPrinterJobs();
+        loadSpoolLogs();
+        loadConsumptionLogs();
+      } catch (error) {
+        console.error("Admin Auth fehlgeschlagen:", error);
+        warning.classList.remove("hidden");
+      }
+    }
+
+    function updateUserInfoCard(user) {
+      const container = document.getElementById("user-info-container");
+      if (!container) return;
+      if (!user || !user.username) {
+        container.innerHTML = `
+          <a href="/login" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition">Login</a>
+        `;
+        return;
+      }
+      container.innerHTML = `
+        <form id="logoutForm" class="flex flex-col items-center">
+          <span class="text-sm text-gray-300 mb-1">Angemeldet als ${user.username}</span>
+          <button type="submit" class="block px-4 py-2 rounded text-white text-sm text-center bg-gray-800 hover:bg-gray-700 transition w-full">Logout</button>
+        </form>
+      `;
+      container.querySelector("#logoutForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await fetch("/logout", { method: "POST", credentials: "same-origin" });
+        location.href = "/login";
+      });
+    }
+
+    loadUserInfoAndInit();
+  </script>
+</body>
+</html>

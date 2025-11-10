@@ -144,6 +144,8 @@ def _mqtt_loop(serial: str):
                     pass
                 else:
                     inst["latest_payload"] = parsed
+                    inst["last_seen"] = time.time()
+                    inst["offline_emitted"] = False
         except Exception as e:
             # _log.exception(f"[MQTT] on_message parse error: {e}")
             pass
@@ -192,13 +194,30 @@ def _sender_loop(serial: str):
         return
     on_push: Callable[[dict[str, Any]], None] = inst.get("on_push")
     interval_seconds: int = inst.get("interval_seconds", 15)
+    offline_timeout: int = inst.get("offline_timeout", 30)
     # Schicke alle interval_seconds den *zuletzt gesehenen* Status, wenn vorhanden.
     # Es wird nichts persistiert – nur der flüchtige Snapshot wird genutzt.
     while inst.get("running"):
         payload = None
+        last_seen = None
         with inst["latest_lock"]:
             payload = inst.get("latest_payload")
-        if payload:
+            last_seen = inst.get("last_seen")
+        now = time.time()
+        if last_seen and offline_timeout and (now - last_seen) > offline_timeout:
+            if not inst.get("offline_emitted"):
+                try:
+                    offline_payload = {
+                        "serial": serial,
+                        "state": "offline",
+                        "offline": True,
+                        "printer_name": inst.get("name"),
+                    }
+                    on_push(offline_payload)
+                except Exception:
+                    pass
+                inst["offline_emitted"] = True
+        elif payload:
             try:
                 # Anreichern mit Name (falls vorhanden)
                 enriched = dict(payload)
@@ -206,7 +225,11 @@ def _sender_loop(serial: str):
                 if name:
                     enriched.setdefault("printer_name", name)
                     enriched.setdefault("name", name)
+                if last_seen:
+                    enriched.setdefault("last_seen_ts", last_seen)
+                enriched.pop("offline", None)
                 on_push(enriched)
+                inst["offline_emitted"] = False
             except Exception as e:
                 # _log.exception(f"[SENDER] on_push failed: {e}")
                 pass
@@ -224,7 +247,7 @@ def _sender_loop(serial: str):
 # Public API
 # ----------------------------
 
-def start_printer_service(*, ip: str, serial: str, access_code: str, on_push: Callable[[dict[str, Any]], None], interval_seconds: int = 15, name: Optional[str] = None) -> None:
+def start_printer_service(*, ip: str, serial: str, access_code: str, on_push: Callable[[dict[str, Any]], None], interval_seconds: int = 15, name: Optional[str] = None, offline_timeout: int = 30) -> None:
     # Starte (falls nicht vorhanden) eine Instanz je Serial
     if serial in _instances and _instances[serial].get("running"):
         return
@@ -234,8 +257,11 @@ def start_printer_service(*, ip: str, serial: str, access_code: str, on_push: Ca
         "access_code": access_code,
         "on_push": on_push,
         "interval_seconds": interval_seconds,
+        "offline_timeout": max(10, offline_timeout),
         "latest_lock": threading.Lock(),
         "latest_payload": None,
+        "last_seen": None,
+        "offline_emitted": False,
         "running": True,
         "name": name,
     }

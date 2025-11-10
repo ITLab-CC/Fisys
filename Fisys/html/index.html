@@ -93,6 +93,17 @@
         color: rgba(203, 213, 225, 0.7);
         pointer-events: none;
       }
+      @keyframes spinner {
+        to { transform: rotate(360deg); }
+      }
+      .spinner {
+        width: 1rem;
+        height: 1rem;
+        border-radius: 9999px;
+        border: 2px solid rgba(255,255,255,0.2);
+        border-top-color: #facc15;
+        animation: spinner 1s linear infinite;
+      }
     </style>
   </head>
 <body class="bg-gray-800 min-h-screen">
@@ -240,9 +251,9 @@
     const NOTIFY_DEFAULT_CLASSES = ['text-blue-200', 'border-blue-500/60', 'bg-blue-500/10', 'hover:bg-blue-500/20', 'focus:ring-blue-400/40'];
     const NOTIFY_ACTIVE_CLASSES = ['text-emerald-200', 'border-emerald-500/70', 'bg-emerald-500/15', 'hover:bg-emerald-500/25', 'focus:ring-emerald-400/40'];
     let dashboardNotesSummary = [];
-    let dashboardNotesTotal = 0;
-    const noteGrid = document.getElementById('dashboard-note-grid');
-    const noteEmpty = document.getElementById('dashboard-note-empty');
+  let dashboardNotesTotal = 0;
+  const noteGrid = document.getElementById('dashboard-note-grid');
+  const noteEmpty = document.getElementById('dashboard-note-empty');
     const noteShowAllBtn = document.getElementById('dashboard-note-show-all');
     const noteNewBtn = document.getElementById('dashboard-note-new');
     const noteForm = document.getElementById('dashboard-note-form');
@@ -259,8 +270,10 @@
     const genericModalMessage = genericModal ? genericModal.querySelector('[data-modal-message]') : null;
     const genericModalAction = genericModal ? genericModal.querySelector('[data-modal-action]') : null;
     const genericModalCloseButtons = genericModal ? genericModal.querySelectorAll('[data-modal-close]') : [];
-    let editingNoteId = null;
-    let lastCanManageNotes = false;
+  let editingNoteId = null;
+  let lastCanManageNotes = false;
+  const PRINTER_OFFLINE_TIMEOUT_MS = 30000;
+  const PRINTER_OFFLINE_CHECK_MS = 15000;
     if (noteShowAllBtn) {
       noteShowAllBtn.addEventListener('click', () => {
         if (noteShowAllBtn.disabled) return;
@@ -312,7 +325,49 @@
         }
       }
     });
-    function connectWS() {
+
+    function normalizeTimestampMs(value) {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return null;
+      return num > 1e12 ? num : num * 1000;
+    }
+
+    function getEstimatedFinishInfo(payload) {
+      if (!payload) return null;
+      const etaMinutesRaw = Number(payload.eta_min);
+      if (!Number.isFinite(etaMinutesRaw) || etaMinutesRaw <= 0) {
+        return null;
+      }
+
+      const etaMinutesDisplay = Math.max(0, Math.round(etaMinutesRaw));
+      let finishMs = normalizeTimestampMs(payload.eta_finish_ts);
+
+      if (!finishMs) {
+        const baseMs = normalizeTimestampMs(payload.server_ts) ?? Date.now();
+        finishMs = baseMs + etaMinutesRaw * 60000;
+      }
+
+      if (!Number.isFinite(finishMs) || finishMs <= 0) {
+        return null;
+      }
+
+      const finishDate = new Date(finishMs);
+      if (Number.isNaN(finishDate.getTime())) {
+        return null;
+      }
+
+      const finishLabel = finishDate.toLocaleTimeString('de-DE', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return {
+        etaMinutesDisplay,
+        finishLabel: `${finishLabel} Uhr`
+      };
+    }
+
+  function connectWS() {
       const proto = (location.protocol === 'https:') ? 'wss' : 'ws';
       ws = new WebSocket(`${proto}://${location.host}/ws/dashboard`);
       ws.onopen = () => {
@@ -341,8 +396,58 @@
           loadDashboardDetails();
         }
       };
+  }
+  connectWS();
+
+  function markPrinterCardOffline(card) {
+    if (!card || card.dataset.offline === '1') {
+      return;
     }
-    connectWS();
+    const stateEl = card.querySelector('.ps-state');
+    const etaEl = card.querySelector('.ps-eta');
+    const bar = card.querySelector('.ps-progress');
+    const barLbl = card.querySelector('.ps-progress-label');
+    const jobEl = card.querySelector('.ps-job');
+    if (stateEl) {
+      stateEl.textContent = "Nicht erreichbar";
+      stateEl.classList.remove("text-blue-400","text-green-400","text-red-400","text-yellow-400","text-gray-200","text-white");
+      stateEl.classList.add("text-red-400");
+    }
+    if (etaEl) {
+      etaEl.textContent = "";
+    }
+    if (bar) {
+      bar.style.width = "0%";
+      bar.classList.remove('shimmer-running', 'finish-pulse');
+    }
+    if (barLbl) {
+      barLbl.textContent = "—";
+    }
+    if (jobEl) {
+      jobEl.textContent = "—";
+    }
+    setCardLoading(card, false);
+    card.dataset.offline = '1';
+  }
+
+  function checkPrinterCardTimeouts() {
+    const now = Date.now();
+    document.querySelectorAll('.ps-card').forEach(card => {
+      const last = Number(card.dataset.lastUpdateTs || "0");
+      if (!last) return;
+      if (now - last > PRINTER_OFFLINE_TIMEOUT_MS) {
+        markPrinterCardOffline(card);
+      }
+    });
+  }
+  setInterval(checkPrinterCardTimeouts, PRINTER_OFFLINE_CHECK_MS);
+
+  function setCardLoading(card, isLoading) {
+    if (!card) return;
+    const loadingEl = card.querySelector('.ps-loading');
+    if (!loadingEl) return;
+    loadingEl.classList.toggle('hidden', !isLoading);
+  }
 
     function ensurePrinterCard(serial, name) {
       const container = document.getElementById('printer-status-container');
@@ -356,8 +461,10 @@
       card = document.createElement('div');
       card.className = 'ps-card bg-gray-700 p-5 rounded-xl shadow-sm';
       card.dataset.serial = serial;
+      card.dataset.lastUpdateTs = String(Date.now());
+      card.dataset.offline = '0';
       card.innerHTML = `
-        <div class=\"mt-1 space-y-3\">\n          <div class=\"flex items-center justify-between gap-4\">\n            <div class=\"flex items-baseline gap-3\">\n              <div class=\"ps-name text-base font-medium text-white\">${name || '—'}</div>\n            </div>\n            <div class=\"flex items-center gap-4\">\n              <div class=\"ps-state text-sm font-semibold text-white\">—</div>\n              <div class=\"ps-eta text-sm text-white\"></div>\n            </div>\n          </div>\n          <div>\n            <div class=\"flex items-center justify-between mb-1\">\n              <div class=\"text-sm text-gray-200\">Fortschritt</div>\n              <div class=\"ps-progress-label text-xs text-gray-200\">0%</div>\n            </div>\n            <div class=\"w-full h-3 bg-gray-200 rounded-full overflow-hidden\">\n              <div class=\"ps-progress h-full bg-blue-600 rounded-full\" style=\"width: 0%\"></div>\n            </div>\n          </div>\n          <div class=\"flex items-baseline gap-3\">\n            <div class=\"text-sm text-white\">Job</div>\n            <div class=\"ps-job text-base font-medium text-gray-300 truncate max-w-full\">—</div>\n          </div>\n          <div class=\"mt-2 space-y-2\">\n            <button type=\"button\" class=\"ps-notify-btn w-full text-sm text-blue-200 border border-blue-500/60 bg-blue-500/10 hover:bg-blue-500/20 rounded px-3 py-2 transition disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-400/40\" data-notify-button>Benachrichtige mich, wenn Druck fertig</button>\n            <p class=\"hidden text-xs\" data-notify-feedback></p>\n          </div>\n          <div class=\"border-t border-gray-600 pt-3\">\n            <button type=\"button\" class=\"ps-spool-toggle w-full flex items-center justify-between text-sm text-blue-300 hover:text-blue-200 transition\" data-spool-toggle aria-expanded=\"false\">\n              <span data-spool-label>Spulen im Drucker anzeigen</span>\n              <span class=\"text-xs text-gray-300\" data-spool-arrow>▼</span>\n            </button>\n            <div class=\"ps-spool-panel hidden mt-3\" data-spool-panel>\n              <div class=\"space-y-2\" data-spool-list></div>\n            </div>\n          </div>\n        </div>`;
+        <div class=\"mt-1 space-y-3\">\n          <div class=\"flex items-center justify-between gap-4\">\n            <div class=\"flex items-baseline gap-3\">\n              <div class=\"ps-name text-base font-medium text-white\">${name || '—'}</div>\n            </div>\n            <div class=\"flex items-center gap-4\">\n              <div class=\"ps-state text-sm font-semibold text-white\">—</div>\n              <div class=\"ps-eta text-sm text-white\"></div>\n            </div>\n          </div>\n          <div class=\"ps-loading flex items-center gap-2 text-sm text-gray-300\">\n            <span class=\"spinner\"></span>\n            <span>Status wird geladen…</span>\n          </div>\n          <div>\n            <div class=\"flex items-center justify-between mb-1\">\n              <div class=\"text-sm text-gray-200\">Fortschritt</div>\n              <div class=\"ps-progress-label text-xs text-gray-200\">0%</div>\n            </div>\n            <div class=\"w-full h-3 bg-gray-200 rounded-full overflow-hidden\">\n              <div class=\"ps-progress h-full bg-blue-600 rounded-full\" style=\"width: 0%\"></div>\n            </div>\n          </div>\n          <div class=\"flex items-baseline gap-3\">\n            <div class=\"text-sm text-white\">Job</div>\n            <div class=\"ps-job text-base font-medium text-gray-300 truncate max-w-full\">—</div>\n          </div>\n          <div class=\"mt-2 space-y-2\">\n            <button type=\"button\" class=\"ps-notify-btn w-full text-sm text-blue-200 border border-blue-500/60 bg-blue-500/10 hover:bg-blue-500/20 rounded px-3 py-2 transition disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-400/40\" data-notify-button>Benachrichtige mich, wenn Druck fertig</button>\n            <p class=\"hidden text-xs\" data-notify-feedback></p>\n          </div>\n          <div class=\"border-t border-gray-600 pt-3\">\n            <button type=\"button\" class=\"ps-spool-toggle w-full flex items-center justify-between text-sm text-blue-300 hover:text-blue-200 transition\" data-spool-toggle aria-expanded=\"false\">\n              <span data-spool-label>Spulen im Drucker anzeigen</span>\n              <span class=\"text-xs text-gray-300\" data-spool-arrow>▼</span>\n            </button>\n            <div class=\"ps-spool-panel hidden mt-3\" data-spool-panel>\n              <div class=\"space-y-2\" data-spool-list></div>\n            </div>\n          </div>\n        </div>`;
       container.appendChild(card);
       initPrinterCardInteractions(card);
       updateCardSpoolUI(serial);
@@ -393,6 +500,16 @@
       printerNameBySerial.set(serial, name);
       const card = ensurePrinterCard(serial, name);
       if (!card) return;
+      card.dataset.lastUpdateTs = String(Date.now());
+
+      const normalizedStateText = String(p.state ?? "—");
+      const isOfflinePayload = p.offline === true || normalizedStateText.toLowerCase() === "offline";
+      if (isOfflinePayload) {
+        markPrinterCardOffline(card);
+        return;
+      }
+      card.dataset.offline = '0';
+      setCardLoading(card, false);
 
       const nameEl = card.querySelector('.ps-name');
       const jobEl = card.querySelector('.ps-job');
@@ -423,7 +540,14 @@
 
       const stateTxt = String(p.state ?? "—");
       stateEl.textContent = stateTxt;
-      etaEl.textContent = `${p.eta_min != null ? p.eta_min + " min" : ""}`;
+      const etaInfo = getEstimatedFinishInfo(p);
+      if (etaInfo) {
+        etaEl.textContent = `${etaInfo.etaMinutesDisplay} min • ${etaInfo.finishLabel}`;
+      } else if (p.eta_min != null && p.eta_min !== "") {
+        etaEl.textContent = `${p.eta_min} min`;
+      } else {
+        etaEl.textContent = "";
+      }
 
       stateEl.classList.remove("text-blue-400","text-green-400","text-red-400","text-yellow-400","text-gray-200","text-white");
       let cls = "text-white";

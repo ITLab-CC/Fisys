@@ -3,7 +3,7 @@ import os
 import string
 from datetime import datetime, timezone
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from db import SessionLocal, init_db
 from models import (
     FilamentTyp,
@@ -28,6 +28,13 @@ import requests
 from auth import router as auth_router, serializer, COOKIE_MAX_AGE
 from printer_service import start_printer_service, stop_printer_service
 from models import Printer, PrinterCreate, PrinterUpdate, PrinterRead
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -361,6 +368,229 @@ def get_printer_status_single():
     # Reihenfolge ist in dict nicht garantiert – Ziel: einfache Abwärtskompatibilität
     return next(iter(LATEST_PRINTER_STATUSES.values()))
 
+
+@app.get("/api/admin/users", response_class=JSONResponse)
+def api_admin_users(
+    request: Request,
+    db: Session = Depends(get_db),
+    search: Optional[str] = Query(default=None, max_length=64),
+    role: Optional[str] = Query(default=None, regex="^(user|helper|mod|admin)$"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+):
+    require_admin_or_mod(request, db)
+
+    query = db.query(User)
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(User.username.ilike(pattern))
+    if role:
+        query = query.filter(User.rolle == role)
+
+    total = query.count()
+    users = (
+        query
+        .order_by(User.username.asc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    items = [
+        {
+            "username": u.username,
+            "rolle": u.rolle,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "last_seen": u.last_seen.isoformat() if u.last_seen else None,
+            "discord_id": u.discord_id,
+        }
+        for u in users
+    ]
+    return {"total": total, "items": items}
+
+
+@app.get("/api/admin/logs/printer_jobs", response_class=JSONResponse)
+def api_admin_printer_jobs(
+    request: Request,
+    db: Session = Depends(get_db),
+    search: Optional[str] = Query(default=None, max_length=64),
+    status: Optional[str] = Query(default=None, max_length=32),
+    serial: Optional[str] = Query(default=None, max_length=64),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+):
+    require_admin_or_mod(request, db)
+
+    query = db.query(PrinterJobHistory)
+    if search:
+        cleaned = search.strip()
+        pattern = f"%{cleaned}%"
+        query = query.filter(
+            or_(
+                PrinterJobHistory.job_name.ilike(pattern),
+                PrinterJobHistory.printer_name.ilike(pattern),
+                PrinterJobHistory.printer_serial.ilike(pattern),
+            )
+        )
+    if status:
+        query = query.filter(PrinterJobHistory.status.ilike(status.strip()))
+    if serial:
+        query = query.filter(PrinterJobHistory.printer_serial == serial.strip())
+
+    start_dt = _parse_iso_datetime(date_from)
+    end_dt = _parse_iso_datetime(date_to)
+    if start_dt:
+        query = query.filter(PrinterJobHistory.created_at >= start_dt)
+    if end_dt:
+        query = query.filter(PrinterJobHistory.created_at <= end_dt)
+
+    total = query.count()
+    entries = (
+        query
+        .order_by(PrinterJobHistory.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    items = [
+        {
+            "id": job.id,
+            "printer_serial": job.printer_serial,
+            "printer_name": job.printer_name,
+            "job_name": job.job_name,
+            "status": job.status,
+            "started_at": job.started_at.isoformat() if job.started_at else None,
+            "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+            "duration_seconds": job.duration_seconds,
+            "created_at": job.created_at.isoformat() if job.created_at else None,
+        }
+        for job in entries
+    ]
+    return {"total": total, "items": items}
+
+
+@app.get("/api/admin/logs/spools", response_class=JSONResponse)
+def api_admin_spool_logs(
+    request: Request,
+    db: Session = Depends(get_db),
+    search: Optional[str] = Query(default=None, max_length=64),
+    action: Optional[str] = Query(default=None, max_length=64),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+):
+    require_admin_or_mod(request, db)
+
+    query = db.query(FilamentSpuleHistorie)
+    if search:
+        cleaned = search.strip()
+        pattern = f"%{cleaned}%"
+        filters = [
+            FilamentSpuleHistorie.typ_name.ilike(pattern),
+            FilamentSpuleHistorie.material.ilike(pattern),
+            FilamentSpuleHistorie.farbe.ilike(pattern),
+        ]
+        if cleaned.isdigit():
+            filters.append(FilamentSpuleHistorie.spulen_id == int(cleaned))
+        query = query.filter(or_(*filters))
+    if action:
+        query = query.filter(FilamentSpuleHistorie.aktion.ilike(f"%{action.strip()}%"))
+
+    start_dt = _parse_iso_datetime(date_from)
+    end_dt = _parse_iso_datetime(date_to)
+    if start_dt:
+        query = query.filter(FilamentSpuleHistorie.created_at >= start_dt)
+    if end_dt:
+        query = query.filter(FilamentSpuleHistorie.created_at <= end_dt)
+
+    total = query.count()
+    entries = (
+        query
+        .order_by(FilamentSpuleHistorie.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    items = [
+        {
+            "id": log.id,
+            "spulen_id": log.spulen_id,
+            "typ_name": log.typ_name,
+            "material": log.material,
+            "farbe": log.farbe,
+            "durchmesser": log.durchmesser,
+            "aktion": log.aktion,
+            "alt_gewicht": log.alt_gewicht,
+            "neu_gewicht": log.neu_gewicht,
+            "verpackt": log.verpackt,
+            "in_printer": log.in_printer,
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+        }
+        for log in entries
+    ]
+    return {"total": total, "items": items}
+
+
+@app.get("/api/admin/logs/verbrauch", response_class=JSONResponse)
+def api_admin_consumption_logs(
+    request: Request,
+    db: Session = Depends(get_db),
+    typ_id: Optional[int] = Query(default=None, ge=1),
+    search: Optional[str] = Query(default=None, max_length=64),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+):
+    require_admin_or_mod(request, db)
+
+    query = (
+        db.query(FilamentVerbrauch)
+        .options(joinedload(FilamentVerbrauch.typ))
+        .join(FilamentTyp, FilamentTyp.id == FilamentVerbrauch.typ_id)
+    )
+    if typ_id:
+        query = query.filter(FilamentVerbrauch.typ_id == typ_id)
+    if search:
+        cleaned = search.strip()
+        pattern = f"%{cleaned}%"
+        query = query.filter(or_(FilamentTyp.name.ilike(pattern), FilamentTyp.material.ilike(pattern), FilamentTyp.farbe.ilike(pattern)))
+
+    start_dt = _parse_iso_datetime(date_from)
+    end_dt = _parse_iso_datetime(date_to)
+    if start_dt:
+        query = query.filter(FilamentVerbrauch.datum >= start_dt)
+    if end_dt:
+        query = query.filter(FilamentVerbrauch.datum <= end_dt)
+
+    total = query.count()
+    entries = (
+        query
+        .order_by(FilamentVerbrauch.datum.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    items = [
+        {
+            "id": entry.id,
+            "typ_id": entry.typ_id,
+            "typ_name": entry.typ.name if entry.typ else None,
+            "material": entry.typ.material if entry.typ else None,
+            "farbe": entry.typ.farbe if entry.typ else None,
+            "verbrauch_in_g": entry.verbrauch_in_g,
+            "datum": entry.datum.isoformat() if entry.datum else None,
+        }
+        for entry in entries
+    ]
+    return {"total": total, "items": items}
+
 # Statische Dateien (HTML, CSS, JS)
 static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "html"))
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
@@ -384,6 +614,16 @@ def serve_filamentseite_html():
 def serve_spulen_page():
     return os.path.join(static_dir, "spulen.html")
 
+
+@app.get("/admin", response_class=FileResponse)
+def serve_admin_page():
+    return os.path.join(static_dir, "admin.html")
+
+
+@app.get("/admin.html", response_class=FileResponse)
+def serve_admin_html():
+    return os.path.join(static_dir, "admin.html")
+
 # Helper functions
 
 
@@ -406,6 +646,26 @@ def get_current_user(request: Request, db: Session) -> User:
     user.last_seen = datetime.now(timezone.utc)
     db.commit()
     return user
+
+
+def require_admin_or_mod(request: Request, db: Session) -> User:
+    """Stellt sicher, dass der aktuelle Benutzer mindestens Mod-Rechte hat."""
+    user = get_current_user(request, db)
+    if user.rolle not in ("admin", "mod"):
+        raise HTTPException(status_code=403, detail="Keine Berechtigung")
+    return user
+
+
+def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        # Unterstützt Datum (YYYY-MM-DD) oder ISO-Strings
+        if len(value) == 10 and value.count("-") == 2:
+            return datetime.fromisoformat(value + "T00:00:00")
+        return datetime.fromisoformat(value)
+    except Exception:
+        return None
 
 
 class _SafeFormatDict(dict):
@@ -740,16 +1000,6 @@ class DiscordBotConfigPayload(BaseModel):
     channel_id: Optional[str] = Field(default=None, max_length=120)
     message_template: Optional[str] = Field(default=None, max_length=2000)
     failure_message_template: Optional[str] = Field(default=None, max_length=2000)
-
-# DB Dependency
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
 
 def require_roles(request: Request, db: Session, allowed_roles: set[str]) -> User:
     """Stellt sicher, dass der aktuelle Nutzer eine erlaubte Rolle besitzt."""

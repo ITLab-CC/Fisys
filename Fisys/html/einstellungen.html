@@ -52,8 +52,15 @@
     <!-- Main content -->
     <div class="flex-1 flex flex-col ml-64">
       <header class="bg-gray-800 px-10 py-10 relative">
-        <h1 class="text-3xl text-white font-bold">Einstellungen</h1>
-        <p class="text-sm text-gray-200 mt-1">Verwalte globale Optionen und Systemeinstellungen</p>
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 class="text-3xl text-white font-bold">Einstellungen</h1>
+            <p class="text-sm text-gray-200 mt-1">Verwalte globale Optionen und Systemeinstellungen</p>
+          </div>
+          <button type="button" id="open-admin-panel" class="hidden px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-500 rounded transition disabled:opacity-60 disabled:cursor-not-allowed">
+            Admin-Panel öffnen
+          </button>
+        </div>
       </header>
 
       <section class="flex-1 pt-2 px-10 pb-10">
@@ -614,11 +621,27 @@
         </div>
       `;
       const authBereich = document.getElementById("authBereich");
+      const adminPanelButton = document.getElementById("open-admin-panel");
+      const adminAllowedRoles = new Set(["admin", "mod"]);
+
+      function updateAdminPanelButton(role) {
+        if (!adminPanelButton) return;
+        const allowed = role && adminAllowedRoles.has(role);
+        adminPanelButton.classList.toggle("hidden", !allowed);
+        adminPanelButton.disabled = !allowed;
+      }
+      if (adminPanelButton) {
+        adminPanelButton.addEventListener("click", () => {
+          window.location.href = "/admin";
+        });
+      }
+
       try {
         const res = await fetch("/api/userinfo");
         if (!res.ok) throw new Error("Nicht eingeloggt");
         const daten = await res.json();
         benutzerRolle = daten.rolle;
+        updateAdminPanelButton(benutzerRolle);
         filterSettingsMenuForRole(benutzerRolle);
         hideAllSections();
         activateFirstAvailableSection();
@@ -645,6 +668,7 @@
           }
         });
       } catch (err) {
+        updateAdminPanelButton(null);
         console.warn("Nicht eingeloggt – Weiterleitung zur Login-Seite");
         window.location.href = "/login";
         return;
